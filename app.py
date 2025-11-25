@@ -592,6 +592,8 @@ def load_data():
         m = pd.read_csv(METRICAS_CSV)
         if not m.empty:
             m['fecha'] = pd.to_datetime(m['fecha'], errors='coerce')
+            # Eliminar filas con fechas NaT
+            m = m.dropna(subset=['fecha'])
             for col in ['seguidores', 'alcance', 'interacciones', 'likes_promedio', 'engagement_rate']:
                 m[col] = pd.to_numeric(m[col], errors='coerce').fillna(0)
         return c, m
@@ -602,15 +604,27 @@ def save_batch(datos):
     with st.spinner('Guardando datos...'):
         _, df_m = load_data()
         new = pd.DataFrame(datos)
+        
+        # Convertir fecha a datetime si no lo es
+        new['fecha'] = pd.to_datetime(new['fecha'], errors='coerce')
+        
+        # Asegurar tipos numéricos
+        for col in ['seguidores', 'alcance', 'interacciones', 'likes_promedio']:
+            new[col] = pd.to_numeric(new[col], errors='coerce').fillna(0)
+        
+        # Calcular engagement rate
         new['engagement_rate'] = new.apply(lambda x: round((x['interacciones']/x['seguidores']*100), 2) if x['seguidores']>0 else 0, axis=1)
         
+        # Eliminar duplicados (misma cuenta + misma fecha)
         if not df_m.empty and not new.empty:
             df_m['k'] = df_m['id_cuenta'] + df_m['fecha'].dt.strftime('%Y-%m-%d')
-            new['k'] = new['id_cuenta'] + pd.to_datetime(new['fecha']).dt.strftime('%Y-%m-%d')
+            new['k'] = new['id_cuenta'] + new['fecha'].dt.strftime('%Y-%m-%d')
             df_m = df_m[~df_m['k'].isin(new['k'])].drop(columns=['k'])
             new = new.drop(columns=['k'])
             
-        pd.concat([df_m, new], ignore_index=True).to_csv(METRICAS_CSV, index=False)
+        # Concatenar y guardar
+        result = pd.concat([df_m, new], ignore_index=True).sort_values(['id_cuenta', 'fecha'])
+        result.to_csv(METRICAS_CSV, index=False)
         st.cache_data.clear()
 
 def get_id(entidad, plat, user):
@@ -913,6 +927,12 @@ def page_analisis_detalle():
 
     # KPIs del último mes disponible
     last_date = df_e['fecha'].max()
+    
+    # Verificar que last_date no sea NaT
+    if pd.isna(last_date):
+        st.error("No hay fechas válidas para esta institución.")
+        return
+    
     df_last = df_e[df_e['fecha'] == last_date]
     
     st.markdown(f"### Resultados al cierre de {last_date.strftime('%Y-%m')}")
