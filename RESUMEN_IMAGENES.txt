@@ -1,0 +1,55 @@
+# 🎯 RESUMEN RÁPIDO - Agregar Imágenes
+
+## ¿Dónde van las imágenes?
+
+📂 **Ruta**: `f:\MATRIZ DE REDES\social_media_matrix\images\`
+
+## ¿Qué archivos necesito?
+
+### Obligatorias:
+1. ✅ **logo_maristas.png** → Logo del sidebar (800x800px, fondo transparente)
+2. ✅ **** → Fondo de página inicio (1920x1080px Full HD)
+banner_landing.jpg
+### Opcional:
+3. ⭐ **icon_maristas.png** → Ícono pequeño (128x128px)
+
+---
+
+## 🚀 Pasos Rápidos
+
+### Windows (Arrastrar y Soltar):
+1. Abre la carpeta: `f:\MATRIZ DE REDES\social_media_matrix\images`
+2. Arrastra tus imágenes con los nombres exactos
+3. Refresca Streamlit (F5 en navegador)
+
+### PowerShell:
+```powershell
+cd "f:\MATRIZ DE REDES\social_media_matrix\images"
+Copy-Item "C:\ruta\tu_logo.png" -Destination "logo_maristas.png"
+Copy-Item "C:\ruta\tu_banner.jpg" -Destination "banner_landing.jpg"
+```
+
+---
+
+## ✨ Resultado
+
+- **Logo** aparece en menú lateral izquierdo
+- **Banner** aparece como fondo en página "Inicio"
+- Si no hay imágenes, usa fallbacks automáticos (no se rompe nada)
+
+---
+
+## 📸 Ejemplo de Nombres
+
+```
+images/
+├── logo_maristas.png         ← Exactamente este nombre
+├── banner_landing.jpg        ← Exactamente este nombre
+└── icon_maristas.png         ← Opcional
+```
+
+**IMPORTANTE**: Los nombres deben ser **exactos** (incluyendo mayúsculas/minúsculas)
+
+---
+
+¿Todo claro? 👍
