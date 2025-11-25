@@ -310,6 +310,40 @@ def inject_custom_css():
         /* Date picker */
         .stDateInput input {{
             color: {COLOR_TEXT} !important;
+            background-color: white !important;
+        }}
+        
+        /* Date picker calendario desplegable */
+        [data-baseweb="calendar"] {{
+            background-color: white !important;
+        }}
+        [data-baseweb="calendar"] * {{
+            color: {COLOR_TEXT} !important;
+            background-color: white !important;
+        }}
+        
+        /* Días del mes en el calendario */
+        [data-baseweb="calendar"] button {{
+            color: {COLOR_TEXT} !important;
+            background-color: white !important;
+        }}
+        [data-baseweb="calendar"] button:hover {{
+            background-color: #F3F4F6 !important;
+            color: {COLOR_TEXT} !important;
+        }}
+        
+        /* Día seleccionado */
+        [data-baseweb="calendar"] [aria-selected="true"] {{
+            background-color: {COLOR_PRIMARY} !important;
+            color: white !important;
+        }}
+        
+        /* Encabezado del calendario (mes/año) */
+        [data-baseweb="calendar-header"] {{
+            background-color: white !important;
+        }}
+        [data-baseweb="calendar-header"] * {{
+            color: {COLOR_TEXT} !important;
         }}
         
         /* Number input */
@@ -601,31 +635,30 @@ def load_data():
         return pd.DataFrame(columns=COLS_CUENTAS), pd.DataFrame(columns=COLS_METRICAS)
 
 def save_batch(datos):
-    with st.spinner('Guardando datos...'):
-        _, df_m = load_data()
-        new = pd.DataFrame(datos)
+    _, df_m = load_data()
+    new = pd.DataFrame(datos)
+    
+    # Convertir fecha a datetime si no lo es
+    new['fecha'] = pd.to_datetime(new['fecha'], errors='coerce')
+    
+    # Asegurar tipos numéricos
+    for col in ['seguidores', 'alcance', 'interacciones', 'likes_promedio']:
+        new[col] = pd.to_numeric(new[col], errors='coerce').fillna(0)
+    
+    # Calcular engagement rate
+    new['engagement_rate'] = new.apply(lambda x: round((x['interacciones']/x['seguidores']*100), 2) if x['seguidores']>0 else 0, axis=1)
+    
+    # Eliminar duplicados (misma cuenta + misma fecha)
+    if not df_m.empty and not new.empty:
+        df_m['k'] = df_m['id_cuenta'] + df_m['fecha'].dt.strftime('%Y-%m-%d')
+        new['k'] = new['id_cuenta'] + new['fecha'].dt.strftime('%Y-%m-%d')
+        df_m = df_m[~df_m['k'].isin(new['k'])].drop(columns=['k'])
+        new = new.drop(columns=['k'])
         
-        # Convertir fecha a datetime si no lo es
-        new['fecha'] = pd.to_datetime(new['fecha'], errors='coerce')
-        
-        # Asegurar tipos numéricos
-        for col in ['seguidores', 'alcance', 'interacciones', 'likes_promedio']:
-            new[col] = pd.to_numeric(new[col], errors='coerce').fillna(0)
-        
-        # Calcular engagement rate
-        new['engagement_rate'] = new.apply(lambda x: round((x['interacciones']/x['seguidores']*100), 2) if x['seguidores']>0 else 0, axis=1)
-        
-        # Eliminar duplicados (misma cuenta + misma fecha)
-        if not df_m.empty and not new.empty:
-            df_m['k'] = df_m['id_cuenta'] + df_m['fecha'].dt.strftime('%Y-%m-%d')
-            new['k'] = new['id_cuenta'] + new['fecha'].dt.strftime('%Y-%m-%d')
-            df_m = df_m[~df_m['k'].isin(new['k'])].drop(columns=['k'])
-            new = new.drop(columns=['k'])
-            
-        # Concatenar y guardar
-        result = pd.concat([df_m, new], ignore_index=True).sort_values(['id_cuenta', 'fecha'])
-        result.to_csv(METRICAS_CSV, index=False)
-        st.cache_data.clear()
+    # Concatenar y guardar
+    result = pd.concat([df_m, new], ignore_index=True).sort_values(['id_cuenta', 'fecha'])
+    result.to_csv(METRICAS_CSV, index=False)
+    st.cache_data.clear()
 
 def get_id(entidad, plat, user):
     c, _ = load_data()
@@ -636,10 +669,9 @@ def get_id(entidad, plat, user):
     return nid
 
 def simular(meses=6):
-    with st.spinner(f'Generando {meses} meses de datos de prueba...'):
-        d = []
-        fechas = [date.today() - timedelta(days=30*i) for i in range(meses)][::-1]
-        
+    d = []
+    fechas = [date.today() - timedelta(days=30*i) for i in range(meses)][::-1]
+    
     for e, redes in COLEGIOS_MARISTAS.items():
         for p, u in redes.items():
             cid = get_id(e, p, u)
@@ -1071,10 +1103,13 @@ def page_captura():
                 })
         
         if batch:
-            save_batch(batch)
-            st.success("✓ Datos guardados correctamente.")
+            with st.spinner('💾 Guardando datos...'):
+                import time
+                time.sleep(0.5)  # Animación breve
+                save_batch(batch)
+            st.success(f"✅ ¡Datos guardados correctamente! Se registraron {len(batch)} plataforma(s) para {entidad}.", icon="✅")
         else:
-            st.warning("⚠ No hay datos para guardar. Asegúrate de ingresar al menos seguidores.")
+            st.warning("⚠️ No hay datos para guardar. Asegúrate de ingresar al menos seguidores.", icon="⚠️")
     
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -1091,12 +1126,18 @@ def page_settings():
         c1, c2 = st.columns(2)
         with c1:
             if st.button("Generar Datos Demo", use_container_width=True):
-                save_batch(simular(sl))
-                st.success("✓ Datos de prueba generados correctamente.")
+                with st.spinner(f'🎲 Generando {sl} meses de datos simulados...'):
+                    import time
+                    time.sleep(0.8)
+                    save_batch(simular(sl))
+                st.success(f"✅ ¡Datos de prueba generados! Se crearon {sl} meses de métricas para {len(COLEGIOS_MARISTAS)} instituciones.", icon="✅")
         with c2:
             if st.button("Resetear Base de Datos", use_container_width=True):
-                reset_db()
-                st.warning("⚠ Base de datos reseteada.")
+                with st.spinner('🗑️ Eliminando toda la base de datos...'):
+                    import time
+                    time.sleep(0.5)
+                    reset_db()
+                st.warning("⚠️ Base de datos reseteada completamente. Todos los datos han sido eliminados.", icon="⚠️")
                 st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
     
