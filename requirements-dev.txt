@@ -1,0 +1,39 @@
+# ========================================
+# DEPENDENCIES FOR DEVELOPMENT & TESTING
+# ========================================
+
+# Testing Framework
+pytest==8.3.3                    # Framework de testing principal
+pytest-cov==6.0.0                # Plugin de cobertura de código
+pytest-mock==3.14.0              # Utilidades avanzadas para mocking
+pytest-xdist==3.6.1              # Ejecución paralela de tests
+pytest-timeout==2.3.1            # Timeout para tests lentos
+
+# Mocking & Fixtures
+pytest-asyncio==0.24.0           # Tests asíncronos (si usas async/await)
+freezegun==1.5.1                 # Mock de fechas/tiempos
+responses==0.25.3                # Mock de HTTP requests
+
+# Code Quality
+black==24.10.0                   # Formatter de código
+flake8==7.1.1                    # Linter (detección de errores)
+mypy==1.13.0                     # Type checker estático
+pylint==3.3.1                    # Análisis de código estático
+
+# Coverage Reporting
+coverage[toml]==7.6.7            # Cobertura avanzada con config TOML
+
+# Testing Streamlit
+# Nota: Streamlit testing se hace con pytest-mock y fixtures personalizados
+
+# Mocking de Google Services
+google-auth-stubs==0.2.0         # Type stubs para google-auth
+
+# Development Tools
+ipython==8.29.0                  # Shell interactivo mejorado
+ipdb==0.13.13                    # Debugger interactivo
+
+# ========================================
+# INSTALACIÓN
+# ========================================
+# pip install -r requirements-dev.txt

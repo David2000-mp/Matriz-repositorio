@@ -9,9 +9,14 @@ import gspread
 from google.oauth2.service_account import Credentials
 from pathlib import Path
 from typing import Tuple, Optional, Dict, List
-import logging
 import os
 import uuid
+
+# Importar sistema de logging centralizado
+from utils.logger import get_logger, log_exception
+
+# Crear logger para este módulo
+logger = get_logger(__name__)
 
 # ===========================
 # CONSTANTES DE DATOS
@@ -119,8 +124,9 @@ def conectar_sheets() -> Optional[gspread.Spreadsheet]:
     try:
         # Validar que existen las credenciales antes de usarlas
         if "gcp_service_account" not in st.secrets:
-            st.error("❌ Falta configuración de credenciales. Crea .streamlit/secrets.toml con gcp_service_account")
-            logging.error("No se encontraron credenciales en st.secrets")
+            error_msg = "No se encontraron credenciales en st.secrets. Crea .streamlit/secrets.toml con gcp_service_account"
+            logger.error(error_msg)
+            st.error(f"❌ {error_msg}")
             return None
         
         # Definimos los permisos
@@ -137,8 +143,8 @@ def conectar_sheets() -> Optional[gspread.Spreadsheet]:
         spreadsheet = client.open("BaseDatosMatriz")
         return spreadsheet
     except Exception as e:
-        st.error(f"Error al conectar con Google Sheets: {e}")
-        logging.error(f"Error conectando a Sheets: {e}")
+        log_exception(logger, f"Error conectando a Google Sheets: {e}")
+        st.error(f"❌ Error al conectar con Google Sheets: {e}")
         return None
 
 
@@ -183,9 +189,9 @@ def load_data() -> Tuple[pd.DataFrame, pd.DataFrame]:
                     # NORMALIZACIÓN CRÍTICA: Forzar string, quitar espacios, minúsculas
                     if 'id_cuenta' in c.columns:
                         c['id_cuenta'] = c['id_cuenta'].astype(str).str.strip().str.lower()
-                    logging.info(f"Cuentas cargadas: {len(c)} registros")
+                    logger.info(f"Cuentas cargadas: {len(c)} registros")
             except Exception as e:
-                logging.error(f"Error leyendo hoja 'cuentas': {e}")
+                logger.error(f"Error leyendo hoja 'cuentas': {e}")
                 c = pd.DataFrame(columns=COLS_CUENTAS)
             
             # Leer HOJA 2: metricas
@@ -206,12 +212,12 @@ def load_data() -> Tuple[pd.DataFrame, pd.DataFrame]:
                     if not all(col in m.columns for col in required_cols):
                         faltantes = set(required_cols) - set(m.columns)
                         st.error(f"❌ Columnas faltantes en hoja 'metricas': {', '.join(faltantes)}")
-                        logging.error(f"Columnas faltantes: {faltantes}")
+                        logger.error(f"Columnas faltantes: {faltantes}")
                         return c, pd.DataFrame(columns=COLS_METRICAS)
 
                     # LIMPIEZA DE FECHAS
                     m['fecha'] = m['fecha'].astype(str)
-                    logging.debug(f"Primeras 3 fechas raw: {m['fecha'].head(3).tolist()}")
+                    logger.debug(f"Primeras 3 fechas raw: {m['fecha'].head(3).tolist()}")
                     m['fecha'] = pd.to_datetime(m['fecha'], errors='coerce', format='%Y-%m-%d')
                     m = m.dropna(subset=['fecha'])
 
@@ -222,9 +228,9 @@ def load_data() -> Tuple[pd.DataFrame, pd.DataFrame]:
                             m[col] = m[col].astype(str).str.replace(',', '', regex=False)
                             m[col] = pd.to_numeric(m[col], errors='coerce').fillna(0)
                     
-                    logging.info(f"Métricas cargadas: {len(m)} registros")
+                    logger.info(f"Métricas cargadas: {len(m)} registros")
             except Exception as e:
-                logging.error(f"Error leyendo hoja 'metricas': {e}")
+                logger.error(f"Error leyendo hoja 'metricas': {e}")
                 m = pd.DataFrame(columns=COLS_METRICAS)
             
             # FILTRO DE SEGURIDAD
@@ -235,12 +241,12 @@ def load_data() -> Tuple[pd.DataFrame, pd.DataFrame]:
 
     except Exception as e:
         error_msg = str(e)
-        logging.error(f"Error detallado leyendo Sheets: {error_msg}")
+        logger.error(f"Error detallado leyendo Sheets: {error_msg}")
         
         # Manejo específico de error 429 (Quota exceeded)
         if "429" in error_msg or "Quota" in error_msg:
             st.error("⛔ Límite de Google API alcanzado. Espera 1 minuto y recarga la página.")
-            logging.warning("Error 429: Quota de Google Sheets excedida")
+            logger.warning("Error 429: Quota de Google Sheets excedida")
         else:
             st.warning(f"⚠️ Error de lectura en la nube: {e}. Usando datos locales.")
 
@@ -320,11 +326,11 @@ def guardar_datos(nuevo_df: pd.DataFrame, modo: str = 'completo') -> bool:
                         sheet_cuentas = spreadsheet.worksheet('cuentas')
                         nuevas_filas = cuentas_a_agregar.astype(str).values.tolist()
                         sheet_cuentas.append_rows(nuevas_filas)
-                        logging.info(f"Hoja 'cuentas': {len(cuentas_a_agregar)} cuentas nuevas agregadas")
+                        logger.info(f"Hoja 'cuentas': {len(cuentas_a_agregar)} cuentas nuevas agregadas")
                     except Exception as e:
-                        logging.error(f"Error al actualizar 'cuentas': {e}")
+                        logger.error(f"Error al actualizar 'cuentas': {e}")
                 else:
-                    logging.info("Hoja 'cuentas': No hay cuentas nuevas para agregar")
+                    logger.info("Hoja 'cuentas': No hay cuentas nuevas para agregar")
             
             # GUARDAR EN HOJA 2: metricas (OPTIMIZADO CON APPEND)
             cols_metricas = ['id_cuenta', 'fecha', 'seguidores', 'alcance', 'interacciones', 'likes_promedio', 'engagement_rate']
@@ -351,18 +357,18 @@ def guardar_datos(nuevo_df: pd.DataFrame, modo: str = 'completo') -> bool:
                         sheet_metricas = spreadsheet.worksheet('metricas')
                         datos_append = metricas_nuevas.astype(str).values.tolist()
                         sheet_metricas.append_rows(datos_append)  # <--- APPEND EN LUGAR DE CLEAR+UPDATE
-                        logging.info(f"Hoja 'metricas': {len(metricas_nuevas)} registros nuevos agregados")
+                        logger.info(f"Hoja 'metricas': {len(metricas_nuevas)} registros nuevos agregados")
                     except Exception as e:
-                        logging.error(f"Error append métricas: {e}")
+                        logger.error(f"Error append métricas: {e}")
                         raise
                 else:
-                    logging.info("No hay métricas nuevas para subir")
+                    logger.info("No hay métricas nuevas para subir")
             
             st.cache_data.clear()
             return True
     except Exception as e:
-        st.error(f"Error al guardar en Google Sheets: {e}")
-        logging.error(f"Error en guardar_datos: {e}")
+        log_exception(logger, f"Error crítico en guardar_datos: {e}")
+        st.error(f"❌ Error al guardar en Google Sheets: {e}")
         return False
 
 
@@ -378,7 +384,7 @@ def save_batch(datos: List[Dict]) -> None:
     
     cuentas, df_m = load_data()
     new = pd.DataFrame(datos)
-    logging.info(f"save_batch - Nuevos datos: {len(new)} registros, Entidades únicas: {new['entidad'].nunique() if 'entidad' in new.columns else 'N/A'}")
+    logger.info(f"save_batch - Nuevos datos: {len(new)} registros, Entidades únicas: {new['entidad'].nunique() if 'entidad' in new.columns else 'N/A'}")
     
     # Convertir fecha a datetime si no lo es
     new['fecha'] = pd.to_datetime(new['fecha'], errors='coerce')
@@ -431,7 +437,7 @@ def save_batch(datos: List[Dict]) -> None:
         
         cuentas_completas.to_csv(CUENTAS_CSV, index=False)
     except Exception as e:
-        logging.error(f"Error guardando cuentas CSV: {e}")
+        logger.error(f"Error guardando cuentas CSV: {e}")
     
     # Luego intentar sincronizar con Google Sheets (una sola operación)
     try:
@@ -474,7 +480,7 @@ def get_id(entidad: str, plat: str, user: str, df_cuentas_cache: Optional[pd.Dat
     
     # Asegurar que las columnas existen y normalizar
     if 'entidad' not in c.columns or 'plataforma' not in c.columns:
-        logging.warning("Columnas 'entidad' o 'plataforma' no encontradas en cuentas")
+        logger.warning("Columnas 'entidad' o 'plataforma' no encontradas en cuentas")
         c['entidad'] = c.get('entidad', '')
         c['plataforma'] = c.get('plataforma', '')
     
@@ -483,13 +489,13 @@ def get_id(entidad: str, plat: str, user: str, df_cuentas_cache: Optional[pd.Dat
               (c['plataforma'].str.lower() == plat.lower())]
     
     if not exist.empty:
-        logging.debug(f"ID existente encontrado para {entidad} - {plat}")
+        logger.debug(f"ID existente encontrado para {entidad} - {plat}")
         # Normalizar ID al retornarlo
         return str(exist.iloc[0]['id_cuenta']).strip().lower()
     
     # Crear nuevo ID único (normalizado desde el inicio)
     nid = uuid.uuid4().hex.lower()  # Siempre en minúsculas
-    logging.info(f"Creando nuevo ID para {entidad} - {plat}: {nid}")
+    logger.info(f"Creando nuevo ID para {entidad} - {plat}: {nid}")
     
     # Guardar nueva cuenta en CSV local (backup)
     nueva_cuenta = pd.DataFrame([{
@@ -524,9 +530,9 @@ def reset_db() -> None:
                 sheet_cuentas.clear()
                 headers_cuentas = ['id_cuenta', 'entidad', 'plataforma', 'usuario_red']
                 sheet_cuentas.update('A1', [headers_cuentas])
-                logging.info("Hoja 'cuentas' reseteada")
+                logger.info("Hoja 'cuentas' reseteada")
             except Exception as e:
-                logging.error(f"Error reseteando 'cuentas': {e}")
+                logger.error(f"Error reseteando 'cuentas': {e}")
             
             # Limpiar hoja 'metricas'
             try:
@@ -534,11 +540,11 @@ def reset_db() -> None:
                 sheet_metricas.clear()
                 headers_metricas = ['id_cuenta', 'fecha', 'seguidores', 'alcance', 'interacciones', 'likes_promedio', 'engagement_rate']
                 sheet_metricas.update('A1', [headers_metricas])
-                logging.info("Hoja 'metricas' reseteada")
+                logger.info("Hoja 'metricas' reseteada")
             except Exception as e:
-                logging.error(f"Error reseteando 'metricas': {e}")
+                logger.error(f"Error reseteando 'metricas': {e}")
     except Exception as e:
-        logging.error(f"Error general reseteando Google Sheets: {e}")
+        logger.error(f"Error general reseteando Google Sheets: {e}")
     
     st.cache_data.clear()
     st.cache_resource.clear()
