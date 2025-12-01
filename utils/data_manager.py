@@ -143,7 +143,8 @@ def conectar_sheets() -> Optional[gspread.Spreadsheet]:
         spreadsheet = client.open("BaseDatosMatriz")
         return spreadsheet
     except Exception as e:
-        log_exception(logger, f"Error conectando a Google Sheets: {e}")
+        # Capturar cualquier excepción y loguear
+        logger.error(f"Error conectando a Google Sheets: {e}")
         st.error(f"❌ Error al conectar con Google Sheets: {e}")
         return None
 
@@ -176,68 +177,73 @@ def load_data() -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
     try:
         spreadsheet = conectar_sheets()
-        if spreadsheet is not None:
-            # Leer HOJA 1: cuentas
-            try:
-                sheet_cuentas = spreadsheet.worksheet('cuentas')
-                data_cuentas = sheet_cuentas.get_all_records(expected_headers=[])
-                c = pd.DataFrame(data_cuentas) if data_cuentas else pd.DataFrame(columns=COLS_CUENTAS)
-                
-                # Limpiar nombres de columnas
-                if not c.empty:
-                    c.columns = c.columns.str.strip().str.lower()  # Normalizar nombres
-                    # NORMALIZACIÓN CRÍTICA: Forzar string, quitar espacios, minúsculas
-                    if 'id_cuenta' in c.columns:
-                        c['id_cuenta'] = c['id_cuenta'].astype(str).str.strip().str.lower()
-                    logger.info(f"Cuentas cargadas: {len(c)} registros")
-            except Exception as e:
+        
+        # Si client es None, lanzar excepción para usar fallback CSV
+        if spreadsheet is None:
+            logger.warning("conectar_sheets() retornó None. Usando fallback CSV.")
+            raise Exception("No se pudo conectar a Google Sheets")
+        
+        # Variables para almacenar los DataFrames
+        c = pd.DataFrame(columns=COLS_CUENTAS)
+        m = pd.DataFrame(columns=COLS_METRICAS)
+        
+        # Leer HOJA 1: cuentas
+        try:
+            sheet_cuentas = spreadsheet.worksheet('cuentas')
+            data_cuentas = sheet_cuentas.get_all_records(expected_headers=[])
+            c = pd.DataFrame(data_cuentas) if data_cuentas else pd.DataFrame(columns=COLS_CUENTAS)
+            
+            # Limpiar nombres de columnas
+            if not c.empty:
+                c.columns = c.columns.str.strip().str.lower()  # Normalizar nombres
+                # NORMALIZACIÓN CRÍTICA: Forzar string, quitar espacios, minúsculas
+                if 'id_cuenta' in c.columns:
+                    c['id_cuenta'] = c['id_cuenta'].astype(str).str.strip().str.lower()
+                logger.info(f"Cuentas cargadas: {len(c)} registros")
+        except Exception as e:
+            # Detectar error de cuota API (429 o Quota exceeded)
+            if "429" in str(e) or "Quota exceeded" in str(e):
+                logger.error(f"Error de cuota API al leer 'cuentas': {e}")
+                st.error(f"❌ Error de cuota API: {e}")
+                # Lanzar excepción para usar fallback CSV
+                raise Exception(f"Error de cuota API: {e}")
+            else:
                 logger.error(f"Error leyendo hoja 'cuentas': {e}")
                 c = pd.DataFrame(columns=COLS_CUENTAS)
+        
+        # Leer HOJA 2: metricas
+        try:
+            sheet_metricas = spreadsheet.worksheet('metricas')
+            data_metricas = sheet_metricas.get_all_records(expected_headers=[])
+            m = pd.DataFrame(data_metricas) if data_metricas else pd.DataFrame(columns=COLS_METRICAS)
             
-            # Leer HOJA 2: metricas
-            try:
-                sheet_metricas = spreadsheet.worksheet('metricas')
-                data_metricas = sheet_metricas.get_all_records(expected_headers=[])
-                m = pd.DataFrame(data_metricas) if data_metricas else pd.DataFrame(columns=COLS_METRICAS)
+            # Limpiar nombres y normalizar id_cuenta
+            if not m.empty:
+                m.columns = m.columns.str.strip().str.lower()
+                if 'id_cuenta' in m.columns:
+                    m['id_cuenta'] = m['id_cuenta'].astype(str).str.strip().str.lower()
                 
-                if not m.empty:
-                    # Limpiar nombres de columnas
-                    m.columns = m.columns.str.strip().str.lower()  # Normalizar nombres
-                    # NORMALIZACIÓN CRÍTICA: Forzar string, quitar espacios, minúsculas
-                    if 'id_cuenta' in m.columns:
-                        m['id_cuenta'] = m['id_cuenta'].astype(str).str.strip().str.lower()
-                    
-                    # Validar columnas necesarias
-                    required_cols = ['id_cuenta', 'fecha']
-                    if not all(col in m.columns for col in required_cols):
-                        faltantes = set(required_cols) - set(m.columns)
-                        st.error(f"❌ Columnas faltantes en hoja 'metricas': {', '.join(faltantes)}")
-                        logger.error(f"Columnas faltantes: {faltantes}")
-                        return c, pd.DataFrame(columns=COLS_METRICAS)
-
-                    # LIMPIEZA DE FECHAS
-                    m['fecha'] = m['fecha'].astype(str)
-                    logger.debug(f"Primeras 3 fechas raw: {m['fecha'].head(3).tolist()}")
-                    m['fecha'] = pd.to_datetime(m['fecha'], errors='coerce', format='%Y-%m-%d')
-                    m = m.dropna(subset=['fecha'])
-
-                    # LIMPIEZA NUMÉRICA
-                    cols_numericas = ['seguidores', 'alcance', 'interacciones', 'likes_promedio', 'engagement_rate']
-                    for col in cols_numericas:
-                        if col in m.columns:
-                            m[col] = m[col].astype(str).str.replace(',', '', regex=False)
-                            m[col] = pd.to_numeric(m[col], errors='coerce').fillna(0)
-                    
-                    logger.info(f"Métricas cargadas: {len(m)} registros")
-            except Exception as e:
+                # Convertir fecha a datetime si no lo es
+                if 'fecha' in m.columns:
+                    m['fecha'] = pd.to_datetime(m['fecha'], errors='coerce')
+                
+                logger.info(f"Métricas cargadas: {len(m)} registros")
+        except Exception as e:
+            # Detectar error de cuota API (429 o Quota exceeded)
+            if "429" in str(e) or "Quota exceeded" in str(e):
+                logger.error(f"Error de cuota API al leer 'metricas': {e}")
+                st.error(f"❌ Error de cuota API: {e}")
+                # Lanzar excepción para usar fallback CSV
+                raise Exception(f"Error de cuota API: {e}")
+            else:
                 logger.error(f"Error leyendo hoja 'metricas': {e}")
                 m = pd.DataFrame(columns=COLS_METRICAS)
-            
-            # FILTRO DE SEGURIDAD
-            if not c.empty and not m.empty:
-                m = m[m['id_cuenta'].isin(c['id_cuenta'])]
-            
-            return c, m
+        
+        # FILTRO DE SEGURIDAD
+        if not c.empty and not m.empty:
+            m = m[m['id_cuenta'].isin(c['id_cuenta'])]
+        
+        return c, m
 
     except Exception as e:
         error_msg = str(e)
@@ -400,15 +406,14 @@ def save_batch(datos: List[Dict]) -> None:
     if 'entidad' not in new.columns or 'plataforma' not in new.columns:
         new = pd.merge(new, cuentas, on='id_cuenta', how='left')
     
-    # Eliminar duplicados (misma cuenta + misma fecha)
-    if not df_m.empty and not new.empty:
-        df_m['k'] = df_m['id_cuenta'] + df_m['fecha'].dt.strftime('%Y-%m-%d')
-        new['k'] = new['id_cuenta'] + new['fecha'].dt.strftime('%Y-%m-%d')
-        df_m = df_m[~df_m['k'].isin(new['k'])].drop(columns=['k'])
-        new = new.drop(columns=['k'])
+    # Concatenar primero
+    result = pd.concat([df_m, new], ignore_index=True)
     
-    # Concatenar y asegurar orden de columnas
-    result = pd.concat([df_m, new], ignore_index=True).sort_values(['id_cuenta', 'fecha'])
+    # Eliminar duplicados (misma cuenta + misma fecha), manteniendo el más reciente
+    result = result.drop_duplicates(subset=['id_cuenta', 'fecha'], keep='last')
+    
+    # Ordenar
+    result = result.sort_values(['id_cuenta', 'fecha'])
     
     # Asegurar que todas las columnas necesarias existan
     cols_necesarias = ['id_cuenta', 'entidad', 'plataforma', 'usuario_red', 'fecha', 
