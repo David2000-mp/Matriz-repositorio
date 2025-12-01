@@ -1,3 +1,155 @@
+import streamlit as st
+import pandas as pd
+from datetime import datetime
+from utils.data_manager import save_batch, load_data, COLEGIOS_MARISTAS
+from components.styles import inject_custom_css
+
+def render():
+    """Renderiza la vista de captura de datos (Manual y Masiva)."""
+    inject_custom_css()
+    
+    st.title("📝 Captura de Datos")
+    st.markdown("---")
+
+    # Crear pestañas principales
+    tab_manual, tab_masiva = st.tabs(["✍️ Captura Manual", "📂 Carga Masiva (Excel/CSV)"])
+
+    # ==========================================
+    # PESTAÑA 1: CAPTURA MANUAL (Tu código original)
+    # ==========================================
+    with tab_manual:
+        st.subheader("Registro Individual")
+        
+        # Cargar datos para validaciones
+        try:
+            cuentas, _ = load_data()
+        except:
+            cuentas = pd.DataFrame()
+
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            # Selector de Institución
+            lista_instituciones = list(COLEGIOS_MARISTAS.keys())
+            entidad = st.selectbox("Institución", lista_instituciones)
+            
+            # Selector de Plataforma (Dinámico según institución)
+            redes_disponibles = list(COLEGIOS_MARISTAS[entidad].keys())
+            plataforma = st.selectbox("Plataforma", redes_disponibles)
+            
+            # Mostrar usuario automático
+            usuario = COLEGIOS_MARISTAS[entidad][plataforma]
+            st.caption(f"Cuenta: **{usuario}**")
+
+        with col2:
+            fecha = st.date_input("Fecha del Reporte", datetime.now())
+
+        st.markdown("### Métricas")
+        
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            seguidores = st.number_input("Seguidores Totales", min_value=0, step=1)
+            alcance = st.number_input("Alcance / Impresiones", min_value=0, step=1)
+        
+        with c2:
+            interacciones = st.number_input("Interacciones Totales", min_value=0, step=1)
+            likes = st.number_input("Likes Promedio", min_value=0.0, step=0.1)
+        
+        with c3:
+            # Cálculo automático de engagement sugerido
+            eng_sugerido = 0.0
+            if seguidores > 0:
+                eng_sugerido = (interacciones / seguidores) * 100
+            
+            engagement = st.number_input("Engagement Rate (%)", min_value=0.0, step=0.01, value=eng_sugerido)
+            if eng_sugerido > 0:
+                st.caption(f"Calculado: {eng_sugerido:.2f}%")
+
+        # Botón de Guardado Manual
+        if st.button("💾 Guardar Registro", type="primary", use_container_width=True):
+            if seguidores > 0:
+                datos = [{
+                    "entidad": entidad,
+                    "plataforma": plataforma,
+                    "usuario_red": usuario,
+                    "fecha": fecha.strftime('%Y-%m-%d'),
+                    "seguidores": seguidores,
+                    "alcance": alcance,
+                    "interacciones": interacciones,
+                    "likes_promedio": likes,
+                    "engagement_rate": engagement
+                }]
+                
+                with st.spinner("Guardando en la nube..."):
+                    save_batch(datos)
+                st.success("✅ ¡Registro guardado exitosamente!")
+                st.balloons()
+            else:
+                st.error("⚠️ Los seguidores no pueden ser 0")
+
+    # ==========================================
+    # PESTAÑA 2: CARGA MASIVA (Tu código nuevo)
+    # ==========================================
+    with tab_masiva:
+        st.subheader("Importar Datos Históricos")
+        st.info("Sube un archivo Excel o CSV con las columnas: `entidad`, `plataforma`, `fecha`, `seguidores`, `alcance`, `interacciones`.")
+        st.markdown("---")
+        st.markdown("### 1. Selecciona tu archivo de datos masivos")
+        archivo = st.file_uploader(
+            "[📂] Haz clic aquí para subir tu archivo CSV o Excel",
+            type=["csv", "xlsx"],
+            accept_multiple_files=False
+        )
+
+        if archivo is not None:
+            st.markdown("---")
+            st.markdown("### 2. Vista previa y validación")
+            # Detectar tipo de archivo y leer con pandas
+            try:
+                if archivo.name.lower().endswith(".csv"):
+                    df = pd.read_csv(archivo)
+                elif archivo.name.lower().endswith(".xlsx"):
+                    df = pd.read_excel(archivo)
+                else:
+                    st.error("Formato de archivo no soportado.")
+                    st.stop()
+            except Exception as e:
+                st.error(f"Error al leer el archivo: {e}")
+                st.stop()
+
+            # Normalizar nombres de columnas (eliminar espacios y minúsculas)
+            df.columns = [str(col).strip().lower() for col in df.columns]
+
+            # Columnas mínimas requeridas para que el sistema funcione
+            columnas_requeridas = ['entidad', 'plataforma', 'fecha', 'seguidores']
+            faltantes = [col for col in columnas_requeridas if col not in df.columns]
+
+            if faltantes:
+                st.error(f"❌ Faltan las siguientes columnas requeridas en tu archivo: {faltantes}")
+                st.markdown("**Ejemplo de estructura esperada:**")
+                st.code("entidad, plataforma, fecha, seguidores, alcance, interacciones")
+            else:
+                st.success(f"✅ Archivo válido. Se detectaron {len(df)} registros.")
+                st.markdown("---")
+                st.markdown("### 3. Confirma y procesa tu carga masiva")
+                st.dataframe(df.head(10), width='stretch')
+                st.markdown("---")
+                # Botón destacado y centrado
+                col1, col2, col3 = st.columns([1,2,1])
+                with col2:
+                    procesar = st.button("🚀 PROCESAR Y SUBIR A LA NUBE", type="primary", use_container_width=True)
+                if procesar:
+                    try:
+                        # Convertir a formato de lista de diccionarios para save_batch
+                        if 'fecha' in df.columns:
+                            df['fecha'] = pd.to_datetime(df['fecha']).dt.strftime('%Y-%m-%d')
+                        datos_masivos = df.to_dict('records')
+                        with st.spinner(f"Procesando {len(datos_masivos)} registros. Esto puede tardar unos segundos..."):
+                            save_batch(datos_masivos)
+                        st.success(f"¡Éxito! {len(datos_masivos)} registros han sido procesados y guardados.")
+                        st.balloons()
+                    except Exception as e:
+                        st.error(f"Hubo un error al procesar el lote: {e}")
 """
 Vista de Captura Manual de Datos para CHAMPILYTICS.
 Formulario para ingreso manual de métricas.
@@ -178,7 +330,7 @@ def render():
             
             st.dataframe(
                 df_display,
-                use_container_width=True,
+                width='stretch',
                 hide_index=True,
                 column_config={
                     "fecha": "Fecha",

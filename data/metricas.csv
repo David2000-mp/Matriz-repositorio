@@ -1,1 +1,3 @@
-id_cuenta,fecha,seguidores,alcance,interacciones,likes_promedio,engagement_rate
+id_cuenta,entidad,plataforma,usuario_red,fecha,seguidores,alcance,interacciones,likes_promedio,engagement_rate
+b4f09e05bff8465abb0ee79d8345959c,,,,2025-12-01,1250,500,5250,150,420.0
+f7fd8af3d16c4ba7b9729870cc962334,Centro Universitario México,Instagram,@centrounivmx,2025-12-01,800000000000000,8000000,80000000000,8000000000,0.01
