@@ -6,22 +6,24 @@ TESTS DE INTEGRACIÓN PARA COBERTURA 80%
 Tests enfocados en aumentar cobertura ejecutando las líneas reales
 de manejo de errores y edge cases en data_manager.py.
 
-OBJETIVO: 71% → 80%+
+OBJETIVO: 50% → 80%+
 
 Líneas a cubrir:
-- 127-130, 145-148: conectar_sheets() errors
-- 193-195, 213-216, 232-234: load_data() sheet reading errors
-- 242-281: load_data() error handling (429, CSV fallback)
-- 321, 330-333, 347, 361-365: guardar_datos() errors
-- 401, 418, 436, 439-440, 445-450: save_batch()
-- 477, 483-485: get_id() with None df
-- 534-535, 544-547: reset_db() errors
+- 127-130, 145-149: conectar_sheets() errors
+- 183-184, 203-212, 231-240: load_data() sheet reading errors
+- 248-287: load_data() error handling (429, CSV fallback)
+- 323-374: guardar_datos() errors
+- 407, 413-458: save_batch() error paths
+- 488-490, 497-499: get_id() with None df
+- 539-540, 549-552: reset_db() errors
 """
 
 import pytest
 import pandas as pd
-from unittest.mock import MagicMock, patch
+import numpy as np
+from unittest.mock import MagicMock, patch, Mock
 from datetime import datetime
+import os
 
 from utils.data_manager import (
     conectar_sheets,
@@ -494,3 +496,387 @@ def test_reset_db_sin_conexion_maneja_error():
             assert True
         except Exception:
             pytest.fail("reset_db() debe manejar falta de conexión sin crashear")
+
+
+# ========================================
+# NUEVOS TESTS PARA ALCANZAR 80%+ COBERTURA
+# ========================================
+
+@pytest.mark.integration
+def test_conectar_sheets_falla_sin_credenciales():
+    """
+    TEST: conectar_sheets() retorna None cuando faltan credenciales
+    
+    OBJETIVO: Cubrir líneas 127-130 (error de credenciales)
+    """
+    # ARRANGE: Secrets sin credenciales
+    fake_secrets = {}
+    
+    with patch('streamlit.secrets', fake_secrets), \
+         patch('streamlit.error') as mock_error:
+        
+        # ACT
+        resultado = conectar_sheets()
+        
+        # ASSERT
+        assert resultado is None, "Debe retornar None sin credenciales"
+        assert mock_error.called, "Debe mostrar error"
+
+
+@pytest.mark.integration
+def test_conectar_sheets_falla_con_excepcion_gspread():
+    """
+    TEST: conectar_sheets() maneja excepciones de gspread
+    
+    OBJETIVO: Cubrir líneas 145-149 (manejo de excepciones)
+    """
+    # ARRANGE: Mock que lanza excepción en gspread
+    fake_secrets = {
+        "gcp_service_account": {
+            "type": "service_account",
+            "project_id": "test"
+        }
+    }
+    
+    with patch('streamlit.secrets', fake_secrets), \
+         patch('google.oauth2.service_account.Credentials.from_service_account_info') as mock_creds, \
+         patch('streamlit.error') as mock_error:
+        
+        # Simular error en gspread.authorize
+        mock_creds.side_effect = Exception("gspread API error")
+        
+        # ACT
+        resultado = conectar_sheets()
+        
+        # ASSERT
+        assert resultado is None, "Debe retornar None cuando falla gspread"
+        assert mock_error.called, "Debe mostrar error"
+
+
+@pytest.mark.integration  
+def test_load_data_sin_conexion_usa_csv_fallback(tmp_path):
+    """
+    TEST: load_data() usa CSV cuando conectar_sheets() retorna None
+    
+    OBJETIVO: Cubrir líneas 183-184, 248-287 (fallback completo a CSV)
+    """
+    # ARRANGE: Crear CSVs temporales con datos
+    csv_cuentas = tmp_path / "cuentas.csv"
+    csv_metricas = tmp_path / "metricas.csv"
+    data_dir = tmp_path
+    
+    # Datos de prueba
+    pd.DataFrame({
+        'id_cuenta': ['csv_test'],
+        'entidad': ['CSV Entity'],
+        'plataforma': ['Instagram'],
+        'usuario_red': ['@csv']
+    }).to_csv(csv_cuentas, index=False)
+    
+    pd.DataFrame({
+        'id_cuenta': ['csv_test'],
+        'fecha': ['2024-06-01'],
+        'seguidores': [2000],
+        'alcance': [10000],
+        'interacciones': [500],
+        'likes_promedio': [100.0],
+        'engagement_rate': [25.0]
+    }).to_csv(csv_metricas, index=False)
+    
+    with patch('utils.data_manager.conectar_sheets', return_value=None), \
+         patch('utils.data_manager.CUENTAS_CSV', csv_cuentas), \
+         patch('utils.data_manager.METRICAS_CSV', csv_metricas), \
+         patch('utils.data_manager.DATA_DIR', data_dir), \
+         patch('streamlit.warning') as mock_warning:
+        
+        # ACT
+        df_cuentas, df_metricas = load_data()
+        
+        # ASSERT
+        assert mock_warning.called, "Debe mostrar warning al usar fallback"
+        assert len(df_cuentas) == 1, "Debe cargar datos desde CSV"
+        assert len(df_metricas) == 1, "Debe cargar métricas desde CSV"
+        assert df_cuentas.iloc[0]['id_cuenta'] == 'csv_test'
+
+
+@pytest.mark.integration
+def test_load_data_worksheet_no_encontrado_maneja_error(tmp_path):
+    """
+    TEST: load_data() maneja error cuando worksheet no existe
+    
+    OBJETIVO: Cubrir líneas 203-212, 231-240 (error en worksheet.get_all_records)
+    """
+    # ARRANGE: Mock spreadsheet donde worksheet() lanza excepción
+    mock_spreadsheet = MagicMock()
+    mock_spreadsheet.worksheet.side_effect = Exception("Worksheet 'cuentas' not found")
+    
+    # CSV de respaldo
+    csv_cuentas = tmp_path / "cuentas.csv"
+    csv_metricas = tmp_path / "metricas.csv"
+    
+    pd.DataFrame(columns=['id_cuenta', 'entidad', 'plataforma', 'usuario_red']).to_csv(csv_cuentas, index=False)
+    pd.DataFrame(columns=['id_cuenta', 'fecha', 'seguidores', 'alcance', 'interacciones', 'likes_promedio', 'engagement_rate']).to_csv(csv_metricas, index=False)
+    
+    with patch('utils.data_manager.conectar_sheets', return_value=mock_spreadsheet), \
+         patch('utils.data_manager.CUENTAS_CSV', csv_cuentas), \
+         patch('utils.data_manager.METRICAS_CSV', csv_metricas), \
+         patch('utils.data_manager.DATA_DIR', tmp_path), \
+         patch('streamlit.warning'):
+        
+        # ACT
+        df_cuentas, df_metricas = load_data()
+        
+        # ASSERT
+        # Debe cargar desde CSV sin crashear
+        assert isinstance(df_cuentas, pd.DataFrame)
+        assert isinstance(df_metricas, pd.DataFrame)
+
+
+@pytest.mark.integration
+def test_guardar_datos_falla_al_leer_columnas(mock_conectar_sheets, tmp_path):
+    """
+    TEST: guardar_datos() maneja error al procesar columnas de DataFrame
+    
+    OBJETIVO: Cubrir líneas 323-374 (try-except en guardar_datos)
+    """
+    # ARRANGE: DataFrame con columnas incorrectas
+    df_malo = pd.DataFrame({
+        'columna_invalida': ['test']
+    })
+    
+    with patch('utils.data_manager.load_data', side_effect=Exception("Load error")), \
+         patch('streamlit.error') as mock_error:
+        
+        # ACT
+        resultado = guardar_datos(df_malo)
+        
+        # ASSERT
+        assert resultado is False, "Debe retornar False cuando falla"
+        assert mock_error.called, "Debe registrar error"
+
+
+@pytest.mark.integration
+def test_guardar_datos_worksheet_append_falla(mock_conectar_sheets):
+    """
+    TEST: guardar_datos() maneja error en worksheet.append_rows()
+    
+    OBJETIVO: Cubrir líneas 330-333, 361-365 (errores en append_rows)
+    """
+    # ARRANGE
+    df_test = pd.DataFrame({
+        'id_cuenta': ['append_test'],
+        'entidad': ['Append Test'],
+        'plataforma': ['Facebook'],
+        'usuario_red': ['@append'],
+        'fecha': [datetime.now()],
+        'seguidores': [1500],
+        'alcance': [7500],
+        'interacciones': [300],
+        'likes_promedio': [60.0],
+        'engagement_rate': [20.0]
+    })
+    
+    # Mock spreadsheet donde append_rows falla
+    mock_spreadsheet = MagicMock()
+    mock_ws = MagicMock()
+    mock_ws.append_rows.side_effect = Exception("append_rows API error")
+    mock_spreadsheet.worksheet.return_value = mock_ws
+    
+    def fake_load():
+        return (
+            pd.DataFrame(columns=['id_cuenta', 'entidad', 'plataforma', 'usuario_red']),
+            pd.DataFrame(columns=['id_cuenta', 'fecha', 'seguidores', 'alcance', 'interacciones'])
+        )
+    
+    with patch('utils.data_manager.conectar_sheets', return_value=mock_spreadsheet), \
+         patch('utils.data_manager.load_data', fake_load), \
+         patch('streamlit.error') as mock_error:
+        
+        # ACT
+        resultado = guardar_datos(df_test)
+        
+        # ASSERT
+        assert resultado is False, "Debe retornar False cuando append falla"
+        # Error fue logueado
+        assert mock_error.called
+
+
+@pytest.mark.integration  
+def test_save_batch_con_csv_metricas_faltante(tmp_path):
+    """
+    TEST: save_batch() crea archivo CSV si no existe
+    
+    OBJETIVO: Cubrir líneas 413-458 (path cuando CSV no existe)
+    """
+    # ARRANGE - Mockear directamente los archivos CSV con patch
+    csv_cuentas = tmp_path / "cuentas.csv"
+    csv_metricas = tmp_path / "metricas_nuevo.csv"
+    
+    # Crear CSV de cuentas inicial vacío
+    pd.DataFrame(columns=['id_cuenta', 'entidad', 'plataforma', 'usuario_red']).to_csv(csv_cuentas, index=False)
+    
+    datos = [{
+        'id_cuenta': 'test123',
+        'entidad': 'Test Entity',
+        'plataforma': 'LinkedIn',
+        'usuario_red': '@test',
+        'fecha': '2024-07-01',
+        'seguidores': 500,
+        'alcance': 2000,
+        'interacciones': 100,
+        'likes_promedio': 20
+    }]
+    
+    with patch('utils.data_manager.CUENTAS_CSV', csv_cuentas), \
+         patch('utils.data_manager.METRICAS_CSV', csv_metricas), \
+         patch('utils.data_manager.conectar_sheets', return_value=None), \
+         patch('streamlit.cache_data.clear'), \
+         patch('streamlit.warning'):
+        
+        # ACT  
+        save_batch(datos)
+        
+        # ASSERT - Verificar que CSV se creó
+        assert csv_metricas.exists(), "Debe crear CSV de métricas cuando no existe"
+
+
+@pytest.mark.integration
+def test_save_batch_con_error_guardar_cuentas_csv(tmp_path):
+    """
+    TEST: save_batch() maneja error al guardar cuentas en CSV
+    
+    OBJETIVO: Cubrir líneas 437-447 (try-except al guardar cuentas CSV)
+    """
+    # ARRANGE
+    csv_cuentas = tmp_path / "cuentas_readonly.csv"
+    csv_metricas = tmp_path / "metricas.csv"
+    
+    datos = [{
+        'id_cuenta': 'error_cuenta',
+        'entidad': 'Error Entity',
+        'plataforma': 'TikTok',
+        'usuario_red': '@error',
+        'fecha': '2024-08-01',
+        'seguidores': 600,
+        'alcance': 3000,
+        'interacciones': 120,
+        'likes_promedio': 24
+    }]
+    
+    def fake_load():
+        return (
+            pd.DataFrame(columns=['id_cuenta', 'entidad', 'plataforma', 'usuario_red']),
+            pd.DataFrame(columns=['id_cuenta', 'fecha', 'seguidores', 'alcance', 'interacciones', 'likes_promedio', 'engagement_rate'])
+        )
+    
+    with patch('utils.data_manager.load_data', fake_load), \
+         patch('utils.data_manager.guardar_datos'), \
+         patch('utils.data_manager.CUENTAS_CSV', csv_cuentas), \
+         patch('utils.data_manager.METRICAS_CSV', csv_metricas), \
+         patch('pandas.DataFrame.to_csv', side_effect=Exception("CSV write error")), \
+         patch('streamlit.cache_data.clear'), \
+         patch('streamlit.warning'):
+        
+        # ACT & ASSERT
+        # No debe crashear, debe manejar el error
+        try:
+            save_batch(datos)
+            assert True, "Debe manejar error en to_csv sin crashear"
+        except Exception:
+            pytest.fail("save_batch() debe manejar errores de CSV internamente")
+
+
+@pytest.mark.integration
+def test_get_id_con_columnas_faltantes_en_dataframe():
+    """
+    TEST: get_id() maneja DataFrame sin columnas 'entidad' o 'plataforma'
+    
+    OBJETIVO: Cubrir líneas 488-490 (manejo de columnas faltantes)
+    """
+    # ARRANGE: DataFrame sin columnas esperadas
+    df_incompleto = pd.DataFrame({
+        'id_cuenta': ['test123'],
+        'usuario_red': ['@test']
+        # Faltan 'entidad' y 'plataforma'
+    })
+    
+    # ACT
+    resultado = get_id("Nueva Entidad", "Instagram", "@nueva", df_cuentas_cache=df_incompleto)
+    
+    # ASSERT
+    assert isinstance(resultado, str)
+    assert len(resultado) == 32  # MD5 hash
+    assert resultado == resultado.lower()  # Normalizado
+
+
+@pytest.mark.integration
+def test_get_id_encuentra_cuenta_existente_case_insensitive():
+    """
+    TEST: get_id() encuentra cuenta existente (case-insensitive)
+    
+    OBJETIVO: Cubrir líneas 497-499 (búsqueda case-insensitive y retorno de ID)
+    """
+    # ARRANGE: DataFrame con cuenta existente
+    df_cuentas = pd.DataFrame({
+        'id_cuenta': ['existing123'],
+        'entidad': ['TEST ENTITY'],
+        'plataforma': ['FACEBOOK'],
+        'usuario_red': ['@test']
+    })
+    
+    # ACT: Buscar con diferentes mayúsculas/minúsculas
+    resultado = get_id("test entity", "facebook", "@test", df_cuentas_cache=df_cuentas)
+    
+    # ASSERT
+    assert resultado == 'existing123', "Debe encontrar cuenta existente (case-insensitive)"
+
+
+@pytest.mark.integration
+def test_reset_db_worksheet_clear_falla():
+    """
+    TEST: reset_db() maneja error cuando worksheet.clear() falla
+    
+    OBJETIVO: Cubrir líneas 539-540 (error en clear)
+    """
+    # ARRANGE
+    mock_spreadsheet = MagicMock()
+    mock_ws = MagicMock()
+    mock_ws.clear.side_effect = Exception("clear() API error")
+    mock_spreadsheet.worksheet.return_value = mock_ws
+    
+    with patch('utils.data_manager.conectar_sheets', return_value=mock_spreadsheet), \
+         patch('streamlit.error'), \
+         patch('streamlit.success'):
+        
+        # ACT & ASSERT
+        try:
+            reset_db()
+            assert True, "Debe manejar error en clear()"
+        except Exception:
+            pytest.fail("reset_db() no debe lanzar excepciones")
+
+
+@pytest.mark.integration
+def test_reset_db_worksheet_append_row_falla():
+    """
+    TEST: reset_db() maneja error cuando worksheet.append_row() falla
+    
+    OBJETIVO: Cubrir líneas 549-552 (error en append_row)
+    """
+    # ARRANGE
+    mock_spreadsheet = MagicMock()
+    mock_ws = MagicMock()
+    mock_ws.clear.return_value = None  # clear funciona
+    mock_ws.append_row.side_effect = Exception("append_row API error")
+    mock_spreadsheet.worksheet.return_value = mock_ws
+    
+    with patch('utils.data_manager.conectar_sheets', return_value=mock_spreadsheet), \
+         patch('streamlit.error'), \
+         patch('streamlit.success'):
+        
+        # ACT & ASSERT
+        try:
+            reset_db()
+            assert True, "Debe manejar error en append_row()"
+        except Exception:
+            pytest.fail("reset_db() no debe lanzar excepciones")

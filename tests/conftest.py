@@ -223,44 +223,75 @@ def mock_conectar_sheets(mock_gspread_client, monkeypatch):
 
 
 # ========================================
-# FIXTURE 4: MOCK DE STREAMLIT CACHE
+# FIXTURE 4: MOCK DE STREAMLIT CACHE (MEJORADO)
 # ========================================
 
-@pytest.fixture(autouse=True)
+@pytest.fixture(autouse=True, scope="function")
 def disable_streamlit_cache(monkeypatch):
     """
-    Desactiva @st.cache_resource y @st.cache_data
+    Desactiva COMPLETAMENTE @st.cache_resource y @st.cache_data
     
-    ¿Por qué?
+    ¿Por qué es CRÍTICO?
+    --------------------
+    - Los decoradores @st.cache_data y @st.cache_resource PREVIENEN que los tests
+      puedan simular diferentes escenarios de error
+    - El cache retorna el resultado de la PRIMERA ejecución, ignorando mocks subsecuentes
+    - Esto bloqueaba la cobertura en 72% porque los tests de error no podían ejecutarse
+    
+    Solución:
     ---------
-    - El cache de Streamlit no funciona bien en tests
-    - Queremos que cada test sea independiente (sin cache compartido)
-    - Tests deben ser rápidos (sin overhead de cache)
+    Este fixture reemplaza COMPLETAMENTE los decoradores con funciones identidad
+    que NO cachean nada. Simplemente devuelven la función original.
     
-    autouse=True: Se aplica automáticamente a TODOS los tests
+    autouse=True: Se aplica automáticamente a TODOS los tests sin necesidad de importarlo
+    scope="function": Se ejecuta antes de CADA test para garantizar aislamiento
     """
     
-    # Clase mock que simula el módulo cache con método clear()
-    class FakeCacheModule:
-        @staticmethod
-        def clear():
-            """Mock de clear() - no hace nada en tests"""
-            pass
+    def bypass_cache(*args, **kwargs):
+        """
+        Función bypass que reemplaza @st.cache_data y @st.cache_resource
         
-        def __call__(self, *args, **kwargs):
-            """Permite usar como decorador: @st.cache_data"""
-            def decorator(func):
-                return func  # Devuelve función sin modificar
-            
-            # Si se llama con función directamente: @st.cache_data
-            if len(args) == 1 and callable(args[0]):
-                return args[0]
-            # Si se llama con parámetros: @st.cache_data(ttl=300)
-            return decorator
+        Casos de uso:
+        1. @st.cache_data → Llama bypass_cache(func) → Retorna func sin modificar
+        2. @st.cache_data() → Llama bypass_cache() → Retorna decorator que devuelve func
+        3. @st.cache_data(ttl=300) → Llama bypass_cache(ttl=300) → Igual que caso 2
+        """
+        # Caso 1: Decorador directo sin paréntesis @st.cache_data
+        if len(args) == 1 and callable(args[0]) and not kwargs:
+            # args[0] es la función decorada
+            return args[0]
+        
+        # Caso 2 y 3: Decorador con paréntesis @st.cache_data() o @st.cache_data(ttl=300)
+        def identity_decorator(func):
+            """Decorador identidad: devuelve función sin modificar"""
+            return func
+        
+        return identity_decorator
     
-    # Reemplazar los decorators de Streamlit con objetos que tienen clear()
-    monkeypatch.setattr("streamlit.cache_resource", FakeCacheModule())
-    monkeypatch.setattr("streamlit.cache_data", FakeCacheModule())
+    # Agregar método clear() al bypass para compatibilidad con st.cache_data.clear()
+    bypass_cache.clear = lambda: None
+    
+    # Crear una copia para cache_resource
+    bypass_cache_resource = lambda *args, **kwargs: bypass_cache(*args, **kwargs)
+    bypass_cache_resource.clear = lambda: None
+    
+    # CRÍTICO: Parchear ANTES de que se importen los módulos de la aplicación
+    # Esto asegura que cuando utils.data_manager se importe, los decoradores
+    # ya están reemplazados por nuestras funciones bypass
+    monkeypatch.setattr("streamlit.cache_data", bypass_cache)
+    monkeypatch.setattr("streamlit.cache_resource", bypass_cache_resource)
+    
+    # BONUS: También parchear st.cache (deprecado pero puede estar en código legacy)
+    bypass_cache_legacy = lambda *args, **kwargs: bypass_cache(*args, **kwargs)
+    bypass_cache_legacy.clear = lambda: None
+    monkeypatch.setattr("streamlit.cache", bypass_cache_legacy)
+    
+    # Log para debugging (opcional, comentar en producción)
+    # print("✅ Streamlit cache DESACTIVADO para este test")
+    
+    yield  # Ejecutar el test
+    
+    # Cleanup: No es necesario revertir porque monkeypatch lo hace automáticamente
 
 
 # ========================================
