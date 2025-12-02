@@ -85,15 +85,13 @@ def render():
                 template='plotly_white', 
                 margin=dict(t=40, b=10, l=0, r=0),
                 hovermode='x unified',
-                legend=dict(orientation="h", y=1.1)
+                legend=dict(orientation="h", y=1.1),
+                yaxis=dict(ticksuffix="%")
             )
             st.plotly_chart(fig_qual, config={'displayModeBar': False})
         # Tabla resumen después de las gráficas
         st.markdown("### Resumen Mensual de Datos")
         st.dataframe(resumen, use_container_width=True, hide_index=True)
-                yaxis=dict(ticksuffix="%"),
-            )
-            st.plotly_chart(fig_qual, config={'displayModeBar': False})
 
     st.markdown("---")
     
