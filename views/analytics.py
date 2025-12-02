@@ -15,6 +15,18 @@ def render():
     st.title("ANÁLISIS DE TENDENCIAS")
     st.caption("Vista de evolución mensual y deltas MoM")
 
+    st.markdown("""
+    <span style='font-size:1.1em;'>
+    <b>¿Cómo funcionan estas gráficas?</b><br>
+    Las gráficas muestran la evolución mensual de las métricas clave de la red Marista. <br>
+    <ul>
+    <li><b>Volumen:</b> Seguidores e interacciones totales por mes. Permite identificar el crecimiento y la actividad general.</li>
+    <li><b>Engagement Rate:</b> Mide la calidad de la interacción, mostrando el porcentaje de usuarios que interactúan respecto al total de seguidores.</li>
+    </ul>
+    Utiliza las pestañas para alternar entre volumen y calidad. Las tendencias ayudan a detectar meses destacados, caídas o picos de actividad.
+    </span>
+    """, unsafe_allow_html=True)
+
     cuentas, metricas = load_data()
 
     if cuentas.empty or metricas.empty:
@@ -38,18 +50,13 @@ def render():
         return
 
     # --- SECCIÓN GLOBAL ---
-    st.markdown("### Resumen Mensual (Global)")
     resumen = calculate_growth_metrics(metricas)
-    
+
     if resumen.empty:
         st.info("Aún no hay suficientes datos para calcular tendencias mensuales.")
     else:
-        # Eliminado width='stretch' (deprecated)
-        st.dataframe(resumen, use_container_width=True, hide_index=True)
-
-        # Separamos en dos gráficos para evitar problemas de escala (0-100% vs Miles)
+        # Gráficas primero
         tab_vol, tab_qual = st.tabs(["Volumen (Seguidores/Interacciones)", "Calidad (Engagement)"])
-        
         with tab_vol:
             fig_vol = px.line(
                 resumen,
@@ -65,7 +72,6 @@ def render():
                 legend=dict(orientation="h", y=1.1)
             )
             st.plotly_chart(fig_vol, config={'displayModeBar': False})
-            
         with tab_qual:
             fig_qual = px.line(
                 resumen,
@@ -79,6 +85,12 @@ def render():
                 template='plotly_white', 
                 margin=dict(t=40, b=10, l=0, r=0),
                 hovermode='x unified',
+                legend=dict(orientation="h", y=1.1)
+            )
+            st.plotly_chart(fig_qual, config={'displayModeBar': False})
+        # Tabla resumen después de las gráficas
+        st.markdown("### Resumen Mensual de Datos")
+        st.dataframe(resumen, use_container_width=True, hide_index=True)
                 yaxis=dict(ticksuffix="%"),
             )
             st.plotly_chart(fig_qual, config={'displayModeBar': False})
