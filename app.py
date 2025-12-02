@@ -2,6 +2,8 @@ import streamlit as st
 from utils.data_manager import COLEGIOS_MARISTAS
 from components import styles
 from views import dashboard, analytics, data_entry, settings, landing, changelog
+from utils.report_templates import render_report_generator
+import pandas as pd
 
 # 1. Configuración de Página
 st.set_page_config(
@@ -18,11 +20,7 @@ def main():
     # --- SIDEBAR GLOBAL ---
     with st.sidebar:
         st.markdown("## CHAMPILYTICS")
-        
-        # Selector Global de Institución
         opciones_institucion = ["Todas las Instituciones"] + list(COLEGIOS_MARISTAS.keys())
-        
-        # Recuperar estado anterior si existe
         idx_actual = 0
         if "global_institution_filter" in st.session_state:
             if st.session_state.global_institution_filter in opciones_institucion:
@@ -34,20 +32,18 @@ def main():
             index=idx_actual,
             key="global_institution_filter"
         )
-        
         st.divider()
-        
-        # Menú de Navegación
+
+        # Menú adaptativo según filtro
         menu_options = [
             "🏠 Inicio",
             "📊 Dashboard Global",
-            "🔍 Análisis Individual",
+            "🔍 Comparativas Globales",
             "📝 Captura Manual",
             "⚙️ Configuración",
             "📋 Historial de Versiones"
         ]
-        
-        # Mapeo para recuperar el índice si ya hay una selección
+
         idx_menu = 0
         if "page_selection" in st.session_state:
             if st.session_state.page_selection in menu_options:
@@ -59,16 +55,16 @@ def main():
             index=idx_menu,
             key="page_selection"
         )
-
         st.divider()
         st.caption("v2.1.0 • Sprint 5")
 
     # --- ENRUTADOR DE VISTAS ---
+    filtro = st.session_state.get("global_institution_filter", "Todas las Instituciones")
     if selected == "🏠 Inicio":
         landing.render()
     elif selected == "📊 Dashboard Global":
         dashboard.render()
-    elif selected == "🔍 Análisis Individual":
+    elif selected == "🔍 Comparativas Globales":
         analytics.render()
     elif selected == "📝 Captura Manual":
         data_entry.render()
@@ -78,6 +74,16 @@ def main():
         changelog.render()
     else:
         landing.render()
+
+    # Datos de ejemplo para el generador de reportes
+    data = pd.DataFrame({
+        "entidad": ["Institución A", "Institución B", "Institución C"],
+        "seguidores": [1000, 1500, 1200],
+        "engagement": [5.2, 4.8, 6.1]
+    })
+
+    # Renderizar el generador de reportes
+    render_report_generator(data)
 
 if __name__ == "__main__":
     main()
