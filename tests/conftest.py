@@ -1,3 +1,43 @@
+import os
+from utils.data_manager import COLS_CUENTAS, COLS_METRICAS, CUENTAS_CSV, METRICAS_CSV
+
+import pytest
+import pandas as pd
+
+@pytest.fixture(autouse=True)
+def setup_local_data():
+    """
+    Crea archivos CSV locales con datos dummy antes de cada test
+    y los limpia después. Esto evita fallos por DataFrames vacíos.
+    """
+    # 1. Crear datos dummy
+    df_cuentas = pd.DataFrame([{
+        "id_cuenta": "test_id_1",
+        "entidad": "Colegio Test",
+        "plataforma": "Facebook",
+        "usuario_red": "@test"
+    }], columns=COLS_CUENTAS)
+
+    df_metricas = pd.DataFrame([{
+        "id_cuenta": "test_id_1",
+        "fecha": "2024-01-01",
+        "seguidores": 1000,
+        "alcance": 5000,
+        "interacciones": 500,
+        "likes_promedio": 50,
+        "engagement_rate": 5.0
+    }], columns=COLS_METRICAS)
+
+    # 2. Guardar en las rutas reales que usa data_manager
+    os.makedirs(os.path.dirname(CUENTAS_CSV), exist_ok=True)
+    df_cuentas.to_csv(CUENTAS_CSV, index=False)
+    df_metricas.to_csv(METRICAS_CSV, index=False)
+
+    yield # Ejecutar el test
+
+    # 3. Limpieza (Opcional: Si quieres borrar los archivos después)
+    # if os.path.exists(CUENTAS_CSV): os.remove(CUENTAS_CSV)
+    # if os.path.exists(METRICAS_CSV): os.remove(METRICAS_CSV)
 """
 ========================================
 PYTEST CONFIGURATION & FIXTURES

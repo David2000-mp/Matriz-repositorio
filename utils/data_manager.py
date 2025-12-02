@@ -31,6 +31,7 @@ METRICAS_CSV = DATA_DIR / "metricas.csv"
 # Columnas de las tablas
 COLS_CUENTAS = ["id_cuenta", "entidad", "plataforma", "usuario_red"]
 COLS_METRICAS = ["id_cuenta", "fecha", "seguidores", "alcance", "interacciones", "likes_promedio", "engagement_rate"]
+COLS_CONFIG = ["entidad", "meta_seguidores", "meta_engagement"]
 
 # Catálogo de instituciones Maristas y sus redes sociales
 COLEGIOS_MARISTAS: Dict[str, Dict[str, str]] = {
@@ -127,6 +128,7 @@ def conectar_sheets() -> Optional[gspread.Spreadsheet]:
             error_msg = "No se encontraron credenciales en st.secrets. Crea .streamlit/secrets.toml con gcp_service_account"
             logger.error(error_msg)
             st.error(f"❌ {error_msg}")
+            st.warning("⚠️ Usando datos locales por error de conexión a Sheets.")
             return None
         
         # Definimos los permisos
@@ -146,6 +148,7 @@ def conectar_sheets() -> Optional[gspread.Spreadsheet]:
         # Capturar cualquier excepción y loguear
         logger.error(f"Error conectando a Google Sheets: {e}")
         st.error(f"❌ Error al conectar con Google Sheets: {e}")
+        st.warning("⚠️ Usando datos locales por error de conexión a Sheets.")
         return None
 
 
@@ -162,7 +165,7 @@ def init_files() -> None:
 # FUNCIONES DE CARGA
 # ===========================
 
-@st.cache_data(ttl=600)
+@st.cache_data(ttl=300)
 def load_data() -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
     Carga datos desde Google Sheets con normalización estricta de IDs.
@@ -175,24 +178,32 @@ def load_data() -> Tuple[pd.DataFrame, pd.DataFrame]:
     Returns:
         Tuple[DataFrame cuentas, DataFrame metricas]
     """
+
+
     try:
+        # --- NUEVO: INTERRUPTOR DE MODO LOCAL ---
+        # Si configuramos esto en secrets, ignoramos Google Sheets y usamos CSV
+        if st.secrets.get("general", {}).get("use_local_data", False):
+            logger.info("🔧 MODO LOCAL ACTIVADO: Usando CSVs directamente.")
+            raise Exception("Modo local forzado por configuración.")
+        # ----------------------------------------
+
         spreadsheet = conectar_sheets()
-        
         # Si client es None, lanzar excepción para usar fallback CSV
         if spreadsheet is None:
             logger.warning("conectar_sheets() retornó None. Usando fallback CSV.")
             raise Exception("No se pudo conectar a Google Sheets")
-        
+
         # Variables para almacenar los DataFrames
         c = pd.DataFrame(columns=COLS_CUENTAS)
         m = pd.DataFrame(columns=COLS_METRICAS)
-        
+
         # Leer HOJA 1: cuentas
         try:
             sheet_cuentas = spreadsheet.worksheet('cuentas')
             data_cuentas = sheet_cuentas.get_all_records(expected_headers=[])
             c = pd.DataFrame(data_cuentas) if data_cuentas else pd.DataFrame(columns=COLS_CUENTAS)
-            
+
             # Limpiar nombres de columnas
             if not c.empty:
                 c.columns = c.columns.str.strip().str.lower()  # Normalizar nombres
@@ -210,23 +221,23 @@ def load_data() -> Tuple[pd.DataFrame, pd.DataFrame]:
             else:
                 logger.error(f"Error leyendo hoja 'cuentas': {e}")
                 c = pd.DataFrame(columns=COLS_CUENTAS)
-        
+
         # Leer HOJA 2: metricas
         try:
             sheet_metricas = spreadsheet.worksheet('metricas')
             data_metricas = sheet_metricas.get_all_records(expected_headers=[])
             m = pd.DataFrame(data_metricas) if data_metricas else pd.DataFrame(columns=COLS_METRICAS)
-            
+
             # Limpiar nombres y normalizar id_cuenta
             if not m.empty:
                 m.columns = m.columns.str.strip().str.lower()
                 if 'id_cuenta' in m.columns:
                     m['id_cuenta'] = m['id_cuenta'].astype(str).str.strip().str.lower()
-                
+
                 # Convertir fecha a datetime si no lo es
                 if 'fecha' in m.columns:
                     m['fecha'] = pd.to_datetime(m['fecha'], errors='coerce')
-                
+
                 logger.info(f"Métricas cargadas: {len(m)} registros")
         except Exception as e:
             # Detectar error de cuota API (429 o Quota exceeded)
@@ -238,52 +249,62 @@ def load_data() -> Tuple[pd.DataFrame, pd.DataFrame]:
             else:
                 logger.error(f"Error leyendo hoja 'metricas': {e}")
                 m = pd.DataFrame(columns=COLS_METRICAS)
-        
+
         # FILTRO DE SEGURIDAD
         if not c.empty and not m.empty:
             m = m[m['id_cuenta'].isin(c['id_cuenta'])]
-        
+
         return c, m
 
     except Exception as e:
         error_msg = str(e)
         logger.error(f"Error detallado leyendo Sheets: {error_msg}")
-        
         # Manejo específico de error 429 (Quota exceeded)
         if "429" in error_msg or "Quota" in error_msg:
             st.error("⛔ Límite de Google API alcanzado. Espera 1 minuto y recarga la página.")
             logger.warning("Error 429: Quota de Google Sheets excedida")
+            # Solo mostrar advertencia si no es modo local
+            if not st.secrets.get("general", {}).get("use_local_data", False):
+                st.warning("⚠️ Usando datos locales por límite de cuota.")
         else:
-            st.warning(f"⚠️ Error de lectura en la nube: {e}. Usando datos locales.")
-
+            if not st.secrets.get("general", {}).get("use_local_data", False):
+                st.warning(f"⚠️ Usando datos locales por error de conexión a Sheets: {e}")
     # --- FALLBACK A CSV LOCAL ---
     init_files()
     try:
         c = pd.read_csv(CUENTAS_CSV, dtype=str)
-        if not c.empty:
+        if len(c) == 0:
+            c = pd.DataFrame(columns=COLS_CUENTAS)
+        else:
             c.columns = c.columns.str.strip().str.lower()
             if 'id_cuenta' in c.columns:
                 c['id_cuenta'] = c['id_cuenta'].astype(str).str.strip().str.lower()
-        
+
         m = pd.read_csv(METRICAS_CSV)
-        
-        # Validar que CSV tiene datos
-        if not m.empty:
+        if len(m) == 0:
+            m = pd.DataFrame(columns=COLS_METRICAS)
+        else:
             m.columns = m.columns.str.strip().str.lower()
             if 'id_cuenta' in m.columns:
                 m['id_cuenta'] = m['id_cuenta'].astype(str).str.strip().str.lower()
             m['fecha'] = pd.to_datetime(m['fecha'], errors='coerce')
-            m = m.dropna(subset=['fecha'])
+            filas_invalidas = m['fecha'].isna().sum() if 'fecha' in m.columns else 0
+            if filas_invalidas > 0:
+                st.warning(f"⚠️ Se ignoraron {filas_invalidas} filas con fechas inválidas en métricas.")
+                m = m.dropna(subset=['fecha'])
             for col in ['seguidores', 'alcance', 'interacciones', 'likes_promedio', 'engagement_rate']:
                 if col in m.columns:
                     m[col] = pd.to_numeric(m[col], errors='coerce').fillna(0)
-        
+
         # FILTRO DE SEGURIDAD
         if not c.empty and not m.empty:
             m = m[m['id_cuenta'].isin(c['id_cuenta'])]
-            
+
         return c, m
+    except FileNotFoundError:
+        return pd.DataFrame(columns=COLS_CUENTAS), pd.DataFrame(columns=COLS_METRICAS)
     except Exception as e:
+        print(f"Error crítico cargando datos: {e}")
         return pd.DataFrame(columns=COLS_CUENTAS), pd.DataFrame(columns=COLS_METRICAS)
 
 
@@ -302,31 +323,30 @@ def guardar_datos(nuevo_df: pd.DataFrame, modo: str = 'completo') -> bool:
     Returns:
         True si fue exitoso, False si hubo error
     """
+    # Validación de columnas
+    cols_cuentas = ['id_cuenta', 'entidad', 'plataforma', 'usuario_red']
+    cols_metricas = ['id_cuenta', 'fecha', 'seguidores', 'alcance', 'interacciones', 'likes_promedio', 'engagement_rate']
+    expected_cols = set(cols_cuentas + cols_metricas)
+    if not expected_cols.issubset(set(nuevo_df.columns)):
+        logger.error("guardar_datos: El DataFrame no contiene las columnas requeridas.")
+        st.error("❌ Error: El DataFrame no contiene las columnas requeridas para guardar datos.")
+        return False
     try:
         spreadsheet = conectar_sheets()
         if spreadsheet is not None:
-            # Convertir fecha a string para Google Sheets
             df_to_save = nuevo_df.copy()
             if 'fecha' in df_to_save.columns:
                 df_to_save['fecha'] = df_to_save['fecha'].dt.strftime('%Y-%m-%d')
-            
-            # GUARDAR EN HOJA 1: cuentas (sin duplicados) - MERGE CON EXISTENTES
+            # GUARDAR EN HOJA 1: cuentas
             cols_cuentas = ['id_cuenta', 'entidad', 'plataforma', 'usuario_red']
             if all(col in df_to_save.columns for col in cols_cuentas):
-                # Cargar cuentas existentes
                 cuentas_existentes, _ = load_data()
-                
-                # Extraer cuentas nuevas
                 df_cuentas_nuevas = df_to_save[cols_cuentas].drop_duplicates().reset_index(drop=True)
-                
-                # Identificar SOLO las cuentas realmente nuevas (no duplicadas)
                 if not cuentas_existentes.empty:
                     ids_existentes = set(cuentas_existentes['id_cuenta'].tolist())
                     cuentas_a_agregar = df_cuentas_nuevas[~df_cuentas_nuevas['id_cuenta'].isin(ids_existentes)]
                 else:
                     cuentas_a_agregar = df_cuentas_nuevas
-                
-                # Agregar solo las nuevas (evita sobrescribir todo)
                 if not cuentas_a_agregar.empty:
                     try:
                         sheet_cuentas = spreadsheet.worksheet('cuentas')
@@ -335,41 +355,34 @@ def guardar_datos(nuevo_df: pd.DataFrame, modo: str = 'completo') -> bool:
                         logger.info(f"Hoja 'cuentas': {len(cuentas_a_agregar)} cuentas nuevas agregadas")
                     except Exception as e:
                         logger.error(f"Error al actualizar 'cuentas': {e}")
+                        st.error(f"❌ Error al actualizar 'cuentas': {e}")
+                        return False
                 else:
                     logger.info("Hoja 'cuentas': No hay cuentas nuevas para agregar")
-            
-            # GUARDAR EN HOJA 2: metricas (OPTIMIZADO CON APPEND)
+            # GUARDAR EN HOJA 2: metricas
             cols_metricas = ['id_cuenta', 'fecha', 'seguidores', 'alcance', 'interacciones', 'likes_promedio', 'engagement_rate']
             if all(col in df_to_save.columns for col in cols_metricas):
-                # 1. Cargar métricas existentes para no duplicar
                 _, metricas_existentes = load_data()
-                
-                # 2. Crear columna clave única (ID + Fecha) para filtrar
                 df_to_save['key'] = df_to_save['id_cuenta'] + df_to_save['fecha']
                 if not metricas_existentes.empty:
                     metricas_existentes['key'] = metricas_existentes['id_cuenta'] + metricas_existentes['fecha'].astype(str)
                     keys_existentes = set(metricas_existentes['key'].tolist())
                 else:
                     keys_existentes = set()
-
-                # 3. Filtrar solo las filas que NO existen
                 metricas_nuevas = df_to_save[~df_to_save['key'].isin(keys_existentes)].copy()
-                
-                # 4. Limpiar y preparar para subir
-                metricas_nuevas = metricas_nuevas[cols_metricas]  # Quitar columna key temporal
-                
+                metricas_nuevas = metricas_nuevas[cols_metricas]
                 if not metricas_nuevas.empty:
                     try:
                         sheet_metricas = spreadsheet.worksheet('metricas')
                         datos_append = metricas_nuevas.astype(str).values.tolist()
-                        sheet_metricas.append_rows(datos_append)  # <--- APPEND EN LUGAR DE CLEAR+UPDATE
+                        sheet_metricas.append_rows(datos_append)
                         logger.info(f"Hoja 'metricas': {len(metricas_nuevas)} registros nuevos agregados")
                     except Exception as e:
                         logger.error(f"Error append métricas: {e}")
-                        raise
+                        st.error(f"❌ Error al guardar métricas: {e}")
+                        return False
                 else:
                     logger.info("No hay métricas nuevas para subir")
-            
             st.cache_data.clear()
             return True
     except Exception as e:
@@ -424,37 +437,34 @@ def save_batch(datos: List[Dict]) -> None:
     
     result = result[cols_necesarias]  # Ordenar columnas
     
-    # OPTIMIZACIÓN: Primero guardar en CSV (rápido y sin límites)
-    result.to_csv(METRICAS_CSV, index=False)
-    
-    # También guardar cuentas CSV (extraer y combinar con existentes)
+    # Guardar en CSV local con manejo de errores
+    try:
+        result.to_csv(METRICAS_CSV, index=False)
+    except Exception as e:
+        logger.error(f"Error guardando métricas CSV: {e}")
+        st.warning(f"⚠️ Error al guardar métricas localmente: {e}")
+    # Guardar cuentas CSV con manejo de errores
     try:
         cols_cuentas = ['id_cuenta', 'entidad', 'plataforma', 'usuario_red']
         cuentas_nuevas = result[cols_cuentas].drop_duplicates()
-        
-        # Leer cuentas existentes del CSV
         if os.path.exists(CUENTAS_CSV):
             cuentas_csv = pd.read_csv(CUENTAS_CSV, dtype=str)
             cuentas_completas = pd.concat([cuentas_csv, cuentas_nuevas], ignore_index=True)
             cuentas_completas = cuentas_completas.drop_duplicates(subset=['id_cuenta']).reset_index(drop=True)
         else:
             cuentas_completas = cuentas_nuevas
-        
         cuentas_completas.to_csv(CUENTAS_CSV, index=False)
     except Exception as e:
         logger.error(f"Error guardando cuentas CSV: {e}")
-    
-    # Luego intentar sincronizar con Google Sheets (una sola operación)
+        st.warning(f"⚠️ Error al guardar cuentas localmente: {e}")
+    # Sincronizar con Google Sheets
     try:
-        guardar_datos(result)
+        sync_ok = guardar_datos(result)
+        if not sync_ok:
+            st.warning("⚠️ Datos guardados localmente. Error al sincronizar con Google Sheets.")
     except Exception as e:
-        # Si falla Google Sheets, al menos ya tenemos el CSV guardado
-        if "429" in str(e):
-            st.warning("⚠️ Datos guardados localmente. Google Sheets temporalmente no disponible (límite de API).")
-        else:
-            st.warning(f"⚠️ Datos guardados localmente. Error al sincronizar con Google Sheets: {e}")
-    
-    # Limpiar caché después de guardar
+        logger.error(f"Excepción en guardar_datos: {e}")
+        st.warning(f"⚠️ Datos guardados localmente. Error al sincronizar con Google Sheets: {e}")
     st.cache_data.clear()
 
 
@@ -548,8 +558,136 @@ def reset_db() -> None:
                 logger.info("Hoja 'metricas' reseteada")
             except Exception as e:
                 logger.error(f"Error reseteando 'metricas': {e}")
+            
+            # Limpiar hoja 'config' (metas personalizadas)
+            try:
+                sheet_config = spreadsheet.worksheet('config')
+                sheet_config.clear()
+                headers_config = ['entidad', 'meta_seguidores', 'meta_engagement']
+                sheet_config.update('A1', [headers_config])
+                logger.info("Hoja 'config' reseteada")
+            except Exception as e:
+                # Si no existe, no es un error crítico
+                if "not found" in str(e).lower() or "worksheet" in str(e).lower():
+                    logger.info("Hoja 'config' no existe, saltando reseteo")
+                else:
+                    logger.error(f"Error reseteando 'config': {e}")
     except Exception as e:
         logger.error(f"Error general reseteando Google Sheets: {e}")
     
     st.cache_data.clear()
     st.cache_resource.clear()
+
+
+# ===========================
+# FUNCIONES DE CONFIGURACIÓN
+# ===========================
+
+@st.cache_data(ttl=600)
+def load_configs() -> pd.DataFrame:
+    """
+    Carga configuraciones personalizadas de metas desde Google Sheets.
+    
+    Returns:
+        DataFrame con columnas: entidad, meta_seguidores, meta_engagement
+    """
+    try:
+        spreadsheet = conectar_sheets()
+        
+        if spreadsheet is None:
+            logger.warning("No se pudo conectar a Sheets para cargar configs. Usando DataFrame vacío.")
+            return pd.DataFrame(columns=COLS_CONFIG)
+        
+        try:
+            sheet_config = spreadsheet.worksheet('config')
+            data_config = sheet_config.get_all_records(expected_headers=[])
+            df_config = pd.DataFrame(data_config) if data_config else pd.DataFrame(columns=COLS_CONFIG)
+            
+            if not df_config.empty:
+                df_config.columns = df_config.columns.str.strip().str.lower()
+                # Convertir a tipos numéricos
+                for col in ['meta_seguidores', 'meta_engagement']:
+                    if col in df_config.columns:
+                        df_config[col] = pd.to_numeric(df_config[col], errors='coerce').fillna(0)
+                
+                logger.info(f"Configuraciones cargadas: {len(df_config)} instituciones con metas")
+            
+            return df_config
+            
+        except Exception as e:
+            # Si la hoja no existe, crearla
+            if "not found" in str(e).lower() or "worksheet" in str(e).lower():
+                logger.info("Hoja 'config' no encontrada. Creando...")
+                try:
+                    new_sheet = spreadsheet.add_worksheet(title='config', rows=100, cols=3)
+                    new_sheet.update('A1', [COLS_CONFIG])
+                    logger.info("Hoja 'config' creada exitosamente")
+                    return pd.DataFrame(columns=COLS_CONFIG)
+                except Exception as create_error:
+                    logger.error(f"Error creando hoja 'config': {create_error}")
+                    return pd.DataFrame(columns=COLS_CONFIG)
+            else:
+                logger.error(f"Error leyendo hoja 'config': {e}")
+                return pd.DataFrame(columns=COLS_CONFIG)
+    
+    except Exception as e:
+        logger.error(f"Error general en load_configs: {e}")
+        return pd.DataFrame(columns=COLS_CONFIG)
+
+
+def save_config(entidad: str, meta_seguidores: int, meta_engagement: float) -> bool:
+    """
+    Guarda o actualiza la configuración de metas de una institución.
+    
+    Args:
+        entidad: Nombre de la institución
+        meta_seguidores: Meta objetivo de seguidores
+        meta_engagement: Meta objetivo de engagement rate (%)
+    
+    Returns:
+        True si fue exitoso, False si hubo error
+    """
+    try:
+        spreadsheet = conectar_sheets()
+        
+        if spreadsheet is None:
+            st.error("❌ No se pudo conectar a Google Sheets")
+            return False
+        
+        # Obtener la hoja de config
+        try:
+            sheet_config = spreadsheet.worksheet('config')
+        except Exception as e:
+            # Si no existe, crearla
+            logger.info("Hoja 'config' no encontrada. Creando...")
+            sheet_config = spreadsheet.add_worksheet(title='config', rows=100, cols=3)
+            sheet_config.update('A1', [COLS_CONFIG])
+        
+        # Cargar configuraciones existentes
+        configs_existentes = load_configs()
+        
+        # Buscar si la entidad ya tiene configuración
+        if not configs_existentes.empty and entidad in configs_existentes['entidad'].values:
+            # ACTUALIZAR fila existente
+            row_idx = configs_existentes[configs_existentes['entidad'] == entidad].index[0] + 2  # +2 porque sheets empieza en 1 y tiene header
+            
+            sheet_config.update(
+                f'A{row_idx}',
+                [[entidad, str(meta_seguidores), str(meta_engagement)]]
+            )
+            logger.info(f"Configuración ACTUALIZADA para {entidad}")
+        else:
+            # AGREGAR nueva fila
+            nueva_fila = [entidad, str(meta_seguidores), str(meta_engagement)]
+            sheet_config.append_row(nueva_fila)
+            logger.info(f"Configuración CREADA para {entidad}")
+        
+        # Limpiar caché para reflejar cambios
+        st.cache_data.clear()
+        
+        return True
+        
+    except Exception as e:
+        logger.error(f"Error en save_config: {e}")
+        st.error(f"❌ Error al guardar configuración: {e}")
+        return False

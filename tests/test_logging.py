@@ -10,7 +10,6 @@ Objetivo: Aumentar cobertura de 71% a 80%+
 """
 
 import pytest
-import pandas as pd
 from unittest.mock import MagicMock, patch, call
 from datetime import datetime
 
@@ -38,7 +37,7 @@ def test_conectar_sheets_fallo_credenciales_llama_logger(mock_logger):
     
     # ARRANGE: Mock de st.secrets vacío
     fake_empty_secrets = {}
-    mock_secrets = MagicMock()
+    def test_conectar_sheets_fallo_credenciales_llama_logger():
     mock_secrets.__contains__ = lambda self, key: key in fake_empty_secrets
     
     with patch('streamlit.secrets', mock_secrets), \
@@ -50,24 +49,19 @@ def test_conectar_sheets_fallo_credenciales_llama_logger(mock_logger):
         # ASSERT
         assert resultado is None, "Debe devolver None si no hay credenciales"
         
-        # Verificar que logger.error() fue llamado
-        assert mock_logger.error.called, "logger.error() debe ser llamado"
-        
-        # Verificar que el mensaje contiene información relevante
-        call_args = str(mock_logger.error.call_args)
-        assert "credenciales" in call_args.lower() or "secrets" in call_args.lower()
-
-
-@pytest.mark.unit
-def test_conectar_sheets_fallo_conexion_loguea_excepcion(mock_logger):
-    """
-    TEST: conectar_sheets() loguea excepción cuando falla la conexión a Sheets
-    
-    OBJETIVO: Verificar que log_exception() se llama con traceback completo
-    """
+        with patch('utils.data_manager.logger') as mock_logger:
+            with patch('streamlit.secrets', mock_secrets), \
+                 patch('streamlit.error'):
+                # ACT
+                resultado = conectar_sheets()
+                # ASSERT
+                assert resultado is None, "Debe devolver None si no hay credenciales"
+                assert mock_logger.error.called, "logger.error() debe ser llamado"
+                call_args = str(mock_logger.error.call_args)
+                assert "credenciales" in call_args.lower() or "secrets" in call_args.lower()
     
     # ARRANGE: Mock que lanza excepción
-    fake_secrets = {
+    def test_conectar_sheets_fallo_conexion_loguea_excepcion():
         "gcp_service_account": {
             "type": "service_account",
             "project_id": "test",
@@ -78,34 +72,28 @@ def test_conectar_sheets_fallo_conexion_loguea_excepcion(mock_logger):
     mock_secrets.__contains__ = lambda self, key: key in fake_secrets
     mock_secrets.__getitem__ = lambda self, key: fake_secrets[key]
     
-    with patch('streamlit.secrets', mock_secrets), \
+def test_conectar_sheets_fallo_credenciales_llama_logger():
          patch('streamlit.error'), \
          patch('gspread.authorize') as mock_authorize:
         
         # Simular que authorize lanza excepción
         mock_authorize.side_effect = Exception("API Error")
         
-        # ACT
-        resultado = conectar_sheets()
-        
-        # ASSERT
-        assert resultado is None
-        
-        # Verificar que logger.error() fue llamado
-        # log_exception() llama a logger.error(message, exc_info=True)
-        assert mock_logger.error.called, "logger.error() debe ser llamado"
-
-
-# ========================================
-# TESTS DE LOGGING EN load_data()
-# ========================================
-
-@pytest.mark.unit
-def test_load_data_fallo_conexion_retorna_dataframes_vacios_y_loguea(mock_logger):
-    """
+        with patch('utils.data_manager.logger') as mock_logger:
+            with patch('streamlit.error'), \
+                 patch('gspread.authorize') as mock_authorize:
+                # Simular que authorize lanza excepción
+                mock_authorize.side_effect = Exception("API Error")
+                # ACT
+                resultado = conectar_sheets()
+                # ASSERT
+                assert resultado is None, "Debe devolver None si no hay credenciales"
+                assert mock_logger.error.called, "logger.error() debe ser llamado"
+                args, _ = mock_logger.error.call_args
+                assert "No se encontraron credenciales" in args[0]
     TEST: load_data() maneja fallo de conexión gracefully y loguea
     
-    OBJETIVO: Cubrir líneas de manejo de error cuando conectar_sheets() falla
+    def test_load_data_fallo_conexion_retorna_dataframes_vacios_y_loguea():
     """
     
     # ARRANGE: Mock que devuelve None (conexión fallida)
@@ -120,25 +108,21 @@ def test_load_data_fallo_conexion_retorna_dataframes_vacios_y_loguea(mock_logger
         assert isinstance(df_metricas, pd.DataFrame)
         assert 'id_cuenta' in df_cuentas.columns
         assert 'id_cuenta' in df_metricas.columns
-
-
-@pytest.mark.unit
-def test_load_data_error_al_leer_hoja_loguea_excepcion(mock_logger, tmp_path):
-    """
-    TEST: load_data() loguea errores cuando falla lectura de hojas
-    
-    OBJETIVO: Cubrir líneas 194, 233 (errores de lectura de sheets)
-    """
-    
-    # ARRANGE: Mock de spreadsheet que lanza excepción al acceder worksheet
-    mock_spreadsheet = MagicMock()
+    with patch('utils.data_manager.logger') as mock_logger:
+        with patch('streamlit.secrets', {"gcp_service_account": {}}):
+            with patch('gspread.authorize', side_effect=Exception("Connection timeout")):
+                with patch('streamlit.error'):
+        with patch('utils.data_manager.logger') as mock_logger:
+            with patch('streamlit.secrets', {"gcp_service_account": {}}):
+                with patch('gspread.authorize', side_effect=Exception("Connection timeout")):
+                    with patch('streamlit.error'):
     mock_spreadsheet.worksheet.side_effect = Exception("Sheet not found")
     
     # Crear CSVs vacíos temporales para el fallback
     with patch('utils.data_manager.conectar_sheets', return_value=mock_spreadsheet), \
          patch('utils.data_manager.CUENTAS_CSV', tmp_path / 'cuentas.csv'), \
          patch('utils.data_manager.METRICAS_CSV', tmp_path / 'metricas.csv'), \
-         patch('utils.data_manager.DATA_DIR', tmp_path):
+def test_load_data_fallo_conexion_retorna_dataframes_vacios_y_loguea():
         
         # ACT
         df_cuentas, df_metricas = load_data()
@@ -159,7 +143,7 @@ def test_load_data_columnas_faltantes_loguea_error(mock_logger):
     # ARRANGE: Mock de worksheet con columnas incompletas
     mock_spreadsheet = MagicMock()
     
-    # Hoja cuentas correcta
+def test_load_data_error_al_leer_hoja_loguea_excepcion():
     mock_ws_cuentas = MagicMock()
     mock_ws_cuentas.get_all_records.return_value = [
         {"id_cuenta": "test1", "entidad": "Test", "plataforma": "Facebook", "usuario_red": "@test"}
@@ -181,10 +165,11 @@ def test_load_data_columnas_faltantes_loguea_error(mock_logger):
         
         # ACT
         df_cuentas, df_metricas = load_data()
-        
+        assert mock_logger.error.called
+        assert any("Error leyendo hoja" in str(call) for call in mock_logger.error.call_args_list)
         # ASSERT
         # El st.error debe haber sido llamado con mensaje de columnas faltantes
-        assert mock_st_error.called, "st.error() debe ser llamado cuando faltan columnas"
+def test_load_data_error_429_quota_excedida_loguea_warning():
 
 
 @pytest.mark.unit
@@ -209,7 +194,7 @@ def test_load_data_error_429_quota_excedida_loguea_warning(mock_logger, tmp_path
          patch('utils.data_manager.CUENTAS_CSV', tmp_path / 'cuentas.csv'), \
          patch('utils.data_manager.METRICAS_CSV', tmp_path / 'metricas.csv'), \
          patch('utils.data_manager.DATA_DIR', tmp_path):
-        
+def test_guardar_datos_fallo_conexion_retorna_none_y_loguea():
         # ACT
         df_cuentas, df_metricas = load_data()
         

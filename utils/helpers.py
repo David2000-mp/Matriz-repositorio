@@ -86,16 +86,19 @@ def get_banner_css(image_filename: str, height: str = "200px") -> str:
 # SIMULACIÓN DE DATOS
 # ===========================
 
-def simular(n: int = 100, colegios_maristas: Dict[str, Dict[str, str]] = None) -> List[Dict]:
+def simular(n: int = 100, colegios_maristas: Dict[str, Dict[str, str]] = None, generar_metas: bool = True) -> tuple:
     """
     Genera datos sintéticos para testing.
     
     Args:
         n: Número de registros a generar
         colegios_maristas: Diccionario de instituciones y sus redes
+        generar_metas: Si True, también genera metas aleatorias para cada institución
         
     Returns:
-        Lista de diccionarios con datos simulados
+        Tupla (datos, metas) donde:
+        - datos: Lista de diccionarios con métricas simuladas
+        - metas: Lista de diccionarios con metas por institución (vacía si generar_metas=False)
     """
     if colegios_maristas is None:
         from .data_manager import COLEGIOS_MARISTAS
@@ -141,7 +144,31 @@ def simular(n: int = 100, colegios_maristas: Dict[str, Dict[str, str]] = None) -
         })
     
     logging.info(f"Simulación generada: {n} registros para {len(set(d['entidad'] for d in data))} entidades")
-    return data
+    
+    # Generar metas aleatorias si se solicita
+    metas = []
+    if generar_metas:
+        entidades_unicas = list(set(d['entidad'] for d in data))
+        for entidad in entidades_unicas:
+            # Calcular seguidores promedio de esta institución para generar meta realista
+            seguidores_entidad = [d['seguidores'] for d in data if d['entidad'] == entidad]
+            promedio_seguidores = sum(seguidores_entidad) // len(seguidores_entidad) if seguidores_entidad else 10000
+            
+            # Meta entre 110% y 150% del promedio actual
+            meta_seguidores = int(promedio_seguidores * random.uniform(1.1, 1.5))
+            
+            # Meta de engagement entre 3% y 8% (valores realistas)
+            meta_engagement = round(random.uniform(3.0, 8.0), 2)
+            
+            metas.append({
+                "entidad": entidad,
+                "meta_seguidores": meta_seguidores,
+                "meta_engagement": meta_engagement
+            })
+        
+        logging.info(f"Metas generadas: {len(metas)} instituciones con objetivos personalizados")
+    
+    return data, metas
 
 
 # ===========================

@@ -11,6 +11,7 @@ Estructura:
 """
 
 import streamlit as st
+from utils.data_manager import COLEGIOS_MARISTAS
 import logging
 from pathlib import Path
 
