@@ -8,6 +8,7 @@ Archivos generados:
 - test_error_columnas.csv: Falta 'seguidores'.
 - test_error_vacio.csv: Encabezados sin datos.
 """
+
 from __future__ import annotations
 import os
 from pathlib import Path
@@ -35,16 +36,18 @@ def build_valid_dataframe(rows: int = 5) -> pd.DataFrame:
         "Colegio Marista Poniente",
     ]
     for i in range(rows):
-        data.append({
-            "entidad": entidades[i % len(entidades)],
-            "plataforma": plataformas[i % len(plataformas)],
-            "fecha": (today - timedelta(days=i)).strftime("%Y-%m-%d"),
-            "seguidores": 1000 + i * 50,
-            "alcance": 3000 + i * 200,
-            "interacciones": 120 + i * 10,
-            "likes_promedio": round(25 + i * 1.5, 2),
-            "engagement_rate": round(((120 + i * 10) / (1000 + i * 50)) * 100, 2),
-        })
+        data.append(
+            {
+                "entidad": entidades[i % len(entidades)],
+                "plataforma": plataformas[i % len(plataformas)],
+                "fecha": (today - timedelta(days=i)).strftime("%Y-%m-%d"),
+                "seguidores": 1000 + i * 50,
+                "alcance": 3000 + i * 200,
+                "interacciones": 120 + i * 10,
+                "likes_promedio": round(25 + i * 1.5, 2),
+                "engagement_rate": round(((120 + i * 10) / (1000 + i * 50)) * 100, 2),
+            }
+        )
     return pd.DataFrame(data)
 
 
@@ -61,25 +64,29 @@ def build_missing_columns_dataframe(rows: int = 5) -> pd.DataFrame:
         "Colegio Marista Poniente",
     ]
     for i in range(rows):
-        data.append({
-            "entidad": entidades[i % len(entidades)],
-            "plataforma": plataformas[i % len(plataformas)],
-            "fecha": (today - timedelta(days=i)).strftime("%Y-%m-%d"),
-            # "seguidores" intencionalmente ausente
-            "alcance": 3000 + i * 200,
-            "interacciones": 120 + i * 10,
-        })
+        data.append(
+            {
+                "entidad": entidades[i % len(entidades)],
+                "plataforma": plataformas[i % len(plataformas)],
+                "fecha": (today - timedelta(days=i)).strftime("%Y-%m-%d"),
+                # "seguidores" intencionalmente ausente
+                "alcance": 3000 + i * 200,
+                "interacciones": 120 + i * 10,
+            }
+        )
     return pd.DataFrame(data)
 
 
 def build_empty_dataframe() -> pd.DataFrame:
     """Encabezados correctos pero sin registros."""
-    return pd.DataFrame({
-        "entidad": pd.Series(dtype="string"),
-        "plataforma": pd.Series(dtype="string"),
-        "fecha": pd.Series(dtype="string"),
-        "seguidores": pd.Series(dtype="int"),
-    })
+    return pd.DataFrame(
+        {
+            "entidad": pd.Series(dtype="string"),
+            "plataforma": pd.Series(dtype="string"),
+            "fecha": pd.Series(dtype="string"),
+            "seguidores": pd.Series(dtype="int"),
+        }
+    )
 
 
 def main() -> None:

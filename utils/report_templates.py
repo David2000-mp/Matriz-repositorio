@@ -7,6 +7,7 @@ import streamlit as st
 import pandas as pd
 from typing import List
 
+
 def generate_report(sections: List[str], data: pd.DataFrame) -> None:
     """
     Genera un reporte personalizado basado en las secciones seleccionadas.
@@ -53,8 +54,13 @@ def render_report_generator(data: pd.DataFrame) -> None:
 
     sections = st.sidebar.multiselect(
         "Secciones Disponibles",
-        ["Resumen General", "Gráficos de Tendencias", "Análisis por Institución", "Conclusiones"],
-        default=["Resumen General", "Gráficos de Tendencias"]
+        [
+            "Resumen General",
+            "Gráficos de Tendencias",
+            "Análisis por Institución",
+            "Conclusiones",
+        ],
+        default=["Resumen General", "Gráficos de Tendencias"],
     )
 
     if st.sidebar.button("Generar Reporte"):

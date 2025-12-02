@@ -24,12 +24,13 @@ COLOR_MAP = {
     "TikTok": "#000000",
     "Twitter/X": "#1DA1F2",
     "LinkedIn": "#0A66C2",
-    "YouTube": "#FF0000"
+    "YouTube": "#FF0000",
 }
 
 # ===========================
 # FUNCIÓN DE INYECCIÓN CSS
 # ===========================
+
 
 def inject_custom_css():
     """Inyecta el CSS previo simple (pre-mejoras)."""

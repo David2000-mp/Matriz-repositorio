@@ -8,6 +8,7 @@ Archivos:
 - 03_error_columnas.csv: Falta 'seguidores'.
 - 04_datos_sucios.csv: Nombres de plataforma con mayúsculas mezcladas para probar normalización.
 """
+
 from __future__ import annotations
 from pathlib import Path
 from datetime import date, timedelta
@@ -43,16 +44,18 @@ def build_month_dataframe(rows: int = 5) -> pd.DataFrame:
         alcance = 2500 + i * 300
         likes_promedio = round(20 + i * 1.2, 2)
         engagement_rate = round((interacciones / seguidores) * 100, 2)
-        data.append({
-            "entidad": entidades[i % len(entidades)],
-            "plataforma": plataformas[i % len(plataformas)],
-            "fecha": fecha,
-            "seguidores": seguidores,
-            "alcance": alcance,
-            "interacciones": interacciones,
-            "likes_promedio": likes_promedio,
-            "engagement_rate": engagement_rate,
-        })
+        data.append(
+            {
+                "entidad": entidades[i % len(entidades)],
+                "plataforma": plataformas[i % len(plataformas)],
+                "fecha": fecha,
+                "seguidores": seguidores,
+                "alcance": alcance,
+                "interacciones": interacciones,
+                "likes_promedio": likes_promedio,
+                "engagement_rate": engagement_rate,
+            }
+        )
     return pd.DataFrame(data)
 
 

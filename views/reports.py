@@ -7,6 +7,7 @@ import pandas as pd
 from utils.data_manager import load_data
 from utils.report_generator import ReportBuilder
 
+
 def render_report_view(df_metricas, trend_figures):
     """
     Renderiza la vista de reportes en la aplicación Streamlit.
@@ -24,14 +25,18 @@ def render_report_view(df_metricas, trend_figures):
     required_columns = ["entidad", "id_cuenta"]
     for col in required_columns:
         if col not in cuentas.columns:
-            st.error(f"❌ La columna '{col}' no está disponible en los datos de cuentas. Verifica los datos de entrada.")
+            st.error(
+                f"❌ La columna '{col}' no está disponible en los datos de cuentas. Verifica los datos de entrada."
+            )
             return
 
     # Selección de entidad
     entidad = st.selectbox("Selecciona una entidad:", cuentas["entidad"].unique())
 
     # Filtrar métricas por entidad seleccionada
-    metricas_filtradas = metricas[metricas["id_cuenta"].isin(cuentas[cuentas["entidad"] == entidad]["id_cuenta"])]
+    metricas_filtradas = metricas[
+        metricas["id_cuenta"].isin(cuentas[cuentas["entidad"] == entidad]["id_cuenta"])
+    ]
 
     if metricas_filtradas.empty:
         st.warning("⚠️ No hay métricas disponibles para la entidad seleccionada.")
@@ -67,7 +72,7 @@ def render_report_view(df_metricas, trend_figures):
                     label="Descargar Reporte",
                     data=pdf_bytes,
                     file_name=f"{entidad}_reporte.pdf",
-                    mime="application/pdf"
+                    mime="application/pdf",
                 )
             except Exception as e:
                 st.error(f"❌ Error al generar el reporte: {e}")

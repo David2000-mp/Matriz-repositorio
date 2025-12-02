@@ -18,19 +18,22 @@ print("\n[TEST 1] Verificando importaciones en dashboard.py...")
 try:
     from views import dashboard
     import inspect
-    
+
     source = inspect.getsource(dashboard.render)
-    
+
     # Verificar que importa load_configs
     dashboard_module_source = inspect.getsource(dashboard)
-    assert "load_configs" in dashboard_module_source, "dashboard.py no importa load_configs"
-    
+    assert (
+        "load_configs" in dashboard_module_source
+    ), "dashboard.py no importa load_configs"
+
     print("✅ Importaciones correctas")
     print("   - load_configs importado ✓")
-    
+
 except Exception as e:
     print(f"❌ Error en importaciones: {e}")
     import traceback
+
     traceback.print_exc()
     sys.exit(1)
 
@@ -41,9 +44,9 @@ print("\n[TEST 2] Verificando carga de metas en render()...")
 try:
     from views import dashboard
     import inspect
-    
+
     source = inspect.getsource(dashboard.render)
-    
+
     checks = {
         "Llama load_configs()": "load_configs()" in source,
         "Define meta_seguidores": "meta_seguidores" in source,
@@ -51,20 +54,20 @@ try:
         "Busca en df_configs": "df_configs" in source,
         "Extrae metas de institución": "config_inst" in source or "iloc[0]" in source,
     }
-    
+
     all_passed = True
     for check, result in checks.items():
         status = "✅" if result else "❌"
         print(f"   {status} {check}")
         if not result:
             all_passed = False
-    
+
     if not all_passed:
         print("\n❌ Algunas verificaciones de carga fallaron")
         sys.exit(1)
     else:
         print("\n✅ Carga de metas implementada correctamente")
-    
+
 except Exception as e:
     print(f"❌ Error verificando carga: {e}")
     sys.exit(1)
@@ -76,31 +79,32 @@ print("\n[TEST 3] Verificando visualización de progreso...")
 try:
     from views import dashboard
     import inspect
-    
+
     source = inspect.getsource(dashboard.render)
-    
+
     checks = {
         "Calcula progreso_seg": "progreso_seg" in source,
         "Calcula progreso_eng": "progreso_eng" in source,
         "Usa st.progress()": "st.progress" in source or ".progress(" in source,
         "Muestra meta con caption": ".caption(" in source and "Meta:" in source,
-        "Mensaje de meta cumplida": "Meta cumplida" in source or "¡Meta cumplida!" in source,
+        "Mensaje de meta cumplida": "Meta cumplida" in source
+        or "¡Meta cumplida!" in source,
         "Usa emojis 🎯 y 🎉": "🎯" in source and "🎉" in source,
     }
-    
+
     all_passed = True
     for check, result in checks.items():
         status = "✅" if result else "❌"
         print(f"   {status} {check}")
         if not result:
             all_passed = False
-    
+
     if not all_passed:
         print("\n❌ Algunas verificaciones de visualización fallaron")
         sys.exit(1)
     else:
         print("\n✅ Visualización de progreso implementada correctamente")
-    
+
 except Exception as e:
     print(f"❌ Error verificando visualización: {e}")
     sys.exit(1)
@@ -118,19 +122,23 @@ try:
         {"actual": 2.5, "meta": 3.5, "esperado": 0.714, "cumplida": False},
         {"actual": 4.0, "meta": 3.5, "esperado": 1.143, "cumplida": True},
     ]
-    
+
     print("   Probando casos de uso:")
     for i, caso in enumerate(test_cases, 1):
         progreso = caso["actual"] / caso["meta"]
         cumplida = progreso >= 1.0
-        
+
         assert abs(progreso - caso["esperado"]) < 0.01, f"Caso {i}: Progreso incorrecto"
-        assert cumplida == caso["cumplida"], f"Caso {i}: Estado de cumplimiento incorrecto"
-        
-        print(f"   ✅ Caso {i}: {caso['actual']}/{caso['meta']} = {progreso:.1%} (Cumplida: {cumplida})")
-    
+        assert (
+            cumplida == caso["cumplida"]
+        ), f"Caso {i}: Estado de cumplimiento incorrecto"
+
+        print(
+            f"   ✅ Caso {i}: {caso['actual']}/{caso['meta']} = {progreso:.1%} (Cumplida: {cumplida})"
+        )
+
     print("\n✅ Lógica de progreso validada")
-    
+
 except Exception as e:
     print(f"❌ Error en lógica: {e}")
     sys.exit(1)

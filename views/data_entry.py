@@ -9,6 +9,7 @@ from datetime import date
 import logging
 from utils import load_data, save_batch, get_id, COLEGIOS_MARISTAS
 
+
 def render():
     """
     Renderiza la vista de captura de datos con pestañas para Captura Manual, Carga Masiva y Captura Anual.
@@ -16,8 +17,7 @@ def render():
     # Configurar el sidebar
     st.sidebar.title("Opciones de Captura")
     opcion = st.sidebar.radio(
-        "Selecciona una opción:",
-        ["Captura Manual", "Carga Masiva", "Captura Anual"]
+        "Selecciona una opción:", ["Captura Manual", "Carga Masiva", "Captura Anual"]
     )
 
     st.title("📝 Captura de Datos")
@@ -26,7 +26,9 @@ def render():
 
     if opcion == "Captura Manual":
         st.subheader("Registro Individual")
-        st.info("💡 **Instrucciones**: Selecciona la institución y plataforma, ingresa las métricas del período y guarda.")
+        st.info(
+            "💡 **Instrucciones**: Selecciona la institución y plataforma, ingresa las métricas del período y guarda."
+        )
 
         # Formulario de captura
         with st.form("capture_form", clear_on_submit=True):
@@ -38,7 +40,7 @@ def render():
                 entidad = st.selectbox(
                     "Institución Marista",
                     list(COLEGIOS_MARISTAS.keys()),
-                    help="Selecciona la institución educativa"
+                    help="Selecciona la institución educativa",
                 )
 
             with col2:
@@ -47,7 +49,7 @@ def render():
                     plataforma = st.selectbox(
                         "Plataforma Social",
                         plataformas_disponibles,
-                        help="Selecciona la red social"
+                        help="Selecciona la red social",
                     )
                     # Obtener usuario automáticamente
                     usuario_red = COLEGIOS_MARISTAS[entidad][plataforma]
@@ -66,7 +68,7 @@ def render():
                     min_value=0,
                     value=0,
                     step=10,
-                    help="Número total de seguidores al final del período"
+                    help="Número total de seguidores al final del período",
                 )
 
             with col2:
@@ -75,7 +77,7 @@ def render():
                     min_value=0,
                     value=0,
                     step=10,
-                    help="Número de personas únicas que vieron el contenido"
+                    help="Número de personas únicas que vieron el contenido",
                 )
 
             with col3:
@@ -84,7 +86,7 @@ def render():
                     min_value=0,
                     value=0,
                     step=1,
-                    help="Suma de likes, comentarios, shares, etc."
+                    help="Suma de likes, comentarios, shares, etc.",
                 )
 
             col1, col2 = st.columns(2)
@@ -95,14 +97,14 @@ def render():
                     min_value=0,
                     value=0,
                     step=1,
-                    help="Promedio de likes por publicación"
+                    help="Promedio de likes por publicación",
                 )
 
             with col2:
                 fecha_captura = st.date_input(
                     "Fecha del Reporte",
                     value=date.today(),
-                    help="Fecha del período reportado"
+                    help="Fecha del período reportado",
                 )
 
             st.divider()
@@ -110,19 +112,21 @@ def render():
             # Campo adicional para comentarios contextuales
             comentarios = st.text_area(
                 "Comentarios Contextuales",
-                help="Agrega cualquier información adicional relevante para este registro."
+                help="Agrega cualquier información adicional relevante para este registro.",
             )
 
             # Mostrar preview del engagement rate calculado
             if seguidores > 0:
-                engagement_preview = (interacciones / seguidores * 100)
+                engagement_preview = interacciones / seguidores * 100
                 st.metric(
                     "Engagement Rate Calculado",
                     f"{engagement_preview:.2f}%",
-                    help="Se calcula automáticamente: (Interacciones / Seguidores) × 100"
+                    help="Se calcula automáticamente: (Interacciones / Seguidores) × 100",
                 )
 
-            submitted = st.form_submit_button("💾 Guardar Datos", use_container_width=True, type="primary")
+            submitted = st.form_submit_button(
+                "💾 Guardar Datos", use_container_width=True, type="primary"
+            )
 
             if submitted:
                 # Validación de datos
@@ -136,25 +140,36 @@ def render():
                         cuentas_cache, _ = load_data()
 
                         # Obtener o crear ID de cuenta
-                        id_cuenta = get_id(entidad, plataforma, usuario_red, df_cuentas_cache=cuentas_cache)
+                        id_cuenta = get_id(
+                            entidad,
+                            plataforma,
+                            usuario_red,
+                            df_cuentas_cache=cuentas_cache,
+                        )
 
                         # Calcular engagement rate
-                        engagement_rate = round((interacciones / seguidores * 100), 2) if seguidores > 0 else 0
+                        engagement_rate = (
+                            round((interacciones / seguidores * 100), 2)
+                            if seguidores > 0
+                            else 0
+                        )
 
                         # Crear registro
-                        nuevo_registro = [{
-                            "id_cuenta": id_cuenta,
-                            "entidad": entidad,
-                            "plataforma": plataforma,
-                            "usuario_red": usuario_red,
-                            "fecha": pd.to_datetime(fecha_captura),
-                            "seguidores": int(seguidores),
-                            "alcance": int(alcance),
-                            "interacciones": int(interacciones),
-                            "likes_promedio": int(likes_promedio),
-                            "engagement_rate": engagement_rate,
-                            "comentarios": comentarios
-                        }]
+                        nuevo_registro = [
+                            {
+                                "id_cuenta": id_cuenta,
+                                "entidad": entidad,
+                                "plataforma": plataforma,
+                                "usuario_red": usuario_red,
+                                "fecha": pd.to_datetime(fecha_captura),
+                                "seguidores": int(seguidores),
+                                "alcance": int(alcance),
+                                "interacciones": int(interacciones),
+                                "likes_promedio": int(likes_promedio),
+                                "engagement_rate": engagement_rate,
+                                "comentarios": comentarios,
+                            }
+                        ]
 
                         with st.spinner("Guardando registro..."):
                             save_batch(nuevo_registro)

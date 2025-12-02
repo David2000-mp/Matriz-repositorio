@@ -10,16 +10,16 @@ from .styles import (
     COLOR_CARD,
     COLOR_TEXT,
     COLOR_CAPTION,
-    COLOR_MAP
+    COLOR_MAP,
 )
 
 __all__ = [
-    'inject_custom_css',
-    'COLOR_PRIMARY',
-    'COLOR_SECONDARY',
-    'COLOR_BG',
-    'COLOR_CARD',
-    'COLOR_TEXT',
-    'COLOR_CAPTION',
-    'COLOR_MAP'
+    "inject_custom_css",
+    "COLOR_PRIMARY",
+    "COLOR_SECONDARY",
+    "COLOR_BG",
+    "COLOR_CARD",
+    "COLOR_TEXT",
+    "COLOR_CAPTION",
+    "COLOR_MAP",
 ]

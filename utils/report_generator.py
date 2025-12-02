@@ -9,6 +9,7 @@ import os
 import pandas as pd
 import uuid
 
+
 class ReportBuilder(FPDF):
     def __init__(self, df: pd.DataFrame, entity_name: str = "Reporte"):
         """
@@ -18,8 +19,8 @@ class ReportBuilder(FPDF):
         self.df = df
         # Validación de seguridad: Si entity_name es None, usar string por defecto
         self.entity_name = entity_name if entity_name else "Entidad Desconocida"
-        self.output_path = f"reporte_temp_{uuid.uuid4().hex}.pdf" # Nombre único para evitar colisiones
-        
+        self.output_path = f"reporte_temp_{uuid.uuid4().hex}.pdf"  # Nombre único para evitar colisiones
+
         # Configuración inicial del PDF
         self.set_auto_page_break(auto=True, margin=15)
         self.add_page()
@@ -28,7 +29,14 @@ class ReportBuilder(FPDF):
     def header(self):
         # Encabezado en todas las páginas
         self.set_font("Arial", "B", 10)
-        self.cell(0, 10, f"Reporte de Desempeño: {self.encode_text(self.entity_name)}", 0, 1, "R")
+        self.cell(
+            0,
+            10,
+            f"Reporte de Desempeño: {self.encode_text(self.entity_name)}",
+            0,
+            1,
+            "R",
+        )
         self.ln(5)
 
     def encode_text(self, text):
@@ -38,7 +46,7 @@ class ReportBuilder(FPDF):
         if not isinstance(text, str):
             text = str(text)
         try:
-            return text.encode('latin-1', 'replace').decode('latin-1')
+            return text.encode("latin-1", "replace").decode("latin-1")
         except Exception:
             return text  # Fallback si falla la codificación
 
@@ -52,7 +60,7 @@ class ReportBuilder(FPDF):
         self.ln(10)
         self.set_font("Arial", size=16)
         self.cell(0, 10, "Reporte Mensual de Redes Sociales", ln=True, align="C")
-        self.add_page() # Salto de página para lo siguiente
+        self.add_page()  # Salto de página para lo siguiente
 
     def add_kpis_table(self):
         """Agrega una tabla de KPIs basada en el DF."""
@@ -62,16 +70,23 @@ class ReportBuilder(FPDF):
         self.ln(5)
 
         # Seleccionar columnas clave para que quepan
-        cols_to_show = [c for c in self.df.columns if c in ['fecha', 'plataforma', 'seguidores', 'interacciones', 'engagement_rate']]
+        cols_to_show = [
+            c
+            for c in self.df.columns
+            if c
+            in ["fecha", "plataforma", "seguidores", "interacciones", "engagement_rate"]
+        ]
         if not cols_to_show:
-            cols_to_show = self.df.columns[:5] # Fallback
-            
-        df_table = self.df[cols_to_show].head(15) # Solo las primeras 15 filas para no saturar
+            cols_to_show = self.df.columns[:5]  # Fallback
+
+        df_table = self.df[cols_to_show].head(
+            15
+        )  # Solo las primeras 15 filas para no saturar
 
         # Configuración de celdas
         col_width = 190 / len(cols_to_show)
         self.set_font("Arial", size=10, style="B")
-        
+
         # Cabeceras
         for col in cols_to_show:
             self.cell(col_width, 10, self.encode_text(col.upper()), border=1, align="C")
@@ -83,10 +98,11 @@ class ReportBuilder(FPDF):
             for col in cols_to_show:
                 val = str(row[col])
                 # Truncar si es muy largo
-                if len(val) > 15: val = val[:12] + "..."
+                if len(val) > 15:
+                    val = val[:12] + "..."
                 self.cell(col_width, 10, self.encode_text(val), border=1, align="C")
             self.ln()
-        
+
         self.add_page()
 
     def add_analysis_summary(self):
@@ -103,17 +119,25 @@ class ReportBuilder(FPDF):
             # Extraer métricas clave
             seguidores_inicio = first_row["seguidores"]
             seguidores_fin = last_row["seguidores"]
-            crecimiento = ((seguidores_fin - seguidores_inicio) / seguidores_inicio) * 100 if seguidores_inicio > 0 else 0
+            crecimiento = (
+                ((seguidores_fin - seguidores_inicio) / seguidores_inicio) * 100
+                if seguidores_inicio > 0
+                else 0
+            )
 
             # Agregar texto al PDF
             self.set_font("Arial", size=12)
             self.cell(0, 10, "Análisis Automático", ln=True, align="L")
             self.ln(5)
             self.set_font("Arial", size=10)
-            self.multi_cell(0, 10, self.encode_text(
-                f"La institución {self.entity_name} inició con {seguidores_inicio:,} seguidores y finalizó con {seguidores_fin:,}, "
-                f"representando un crecimiento del {crecimiento:.2f}%."
-            ))
+            self.multi_cell(
+                0,
+                10,
+                self.encode_text(
+                    f"La institución {self.entity_name} inició con {seguidores_inicio:,} seguidores y finalizó con {seguidores_fin:,}, "
+                    f"representando un crecimiento del {crecimiento:.2f}%."
+                ),
+            )
             self.ln(10)
         except Exception as e:
             print(f"   [ERROR ANALISIS]: {e}")
@@ -130,7 +154,9 @@ class ReportBuilder(FPDF):
             import plotly.express as px
 
             # Gráfica 1: Seguidores
-            fig1 = px.line(self.df, x="fecha", y="seguidores", title="Evolución de Seguidores")
+            fig1 = px.line(
+                self.df, x="fecha", y="seguidores", title="Evolución de Seguidores"
+            )
             img_path1 = "temp_chart_1.png"
             pio.write_image(fig1, img_path1, format="png", width=800, height=400)
 

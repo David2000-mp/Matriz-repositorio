@@ -19,18 +19,18 @@ print("=" * 80)
 print("\n[PASO 1] Verificando estado inicial...")
 try:
     from utils.data_manager import load_data, load_configs
-    
+
     cuentas_antes, metricas_antes = load_data()
     configs_antes = load_configs()
-    
+
     print(f"✅ Datos iniciales:")
     print(f"   - Cuentas: {len(cuentas_antes)}")
     print(f"   - Métricas: {len(metricas_antes)}")
     print(f"   - Configuraciones de metas: {len(configs_antes)}")
-    
+
     if not configs_antes.empty:
         print(f"   - Instituciones con metas: {configs_antes['entidad'].tolist()}")
-    
+
 except Exception as e:
     print(f"❌ Error verificando estado inicial: {e}")
     sys.exit(1)
@@ -62,9 +62,9 @@ print("\n[PASO 3] Verificando código de reset_db()...")
 try:
     import inspect
     from utils.data_manager import reset_db
-    
+
     source = inspect.getsource(reset_db)
-    
+
     # Verificaciones
     checks = {
         "Limpia cuentas.csv": "CUENTAS_CSV" in source and "remove" in source,
@@ -73,22 +73,22 @@ try:
         "Limpia hoja 'metricas'": "'metricas'" in source and "clear()" in source,
         "Limpia hoja 'config'": "'config'" in source and "sheet_config" in source,
         "Restaura headers": "update('A1'" in source,
-        "Limpia cache": "cache_data.clear()" in source
+        "Limpia cache": "cache_data.clear()" in source,
     }
-    
+
     all_passed = True
     for check, result in checks.items():
         status = "✅" if result else "❌"
         print(f"   {status} {check}")
         if not result:
             all_passed = False
-    
+
     if all_passed:
         print("\n✅ Todas las verificaciones de código pasaron")
     else:
         print("\n❌ Algunas verificaciones fallaron")
         sys.exit(1)
-        
+
 except Exception as e:
     print(f"❌ Error verificando código: {e}")
     sys.exit(1)
@@ -100,17 +100,17 @@ print("\n[PASO 4] Verificando integración en UI...")
 try:
     from views import settings
     import inspect
-    
+
     # Verificar que settings.py importa reset_db
     settings_source = inspect.getsource(settings.render)
-    
+
     has_reset = "reset_db" in settings_source
     print(f"   {'✅' if has_reset else '❌'} Vista de Configuración usa reset_db()")
-    
+
     # Verificar que hay botones de reseteo
     has_buttons = "Resetear" in settings_source or "Reset" in settings_source
     print(f"   {'✅' if has_buttons else '❌'} Botones de reseteo presentes en UI")
-    
+
 except Exception as e:
     print(f"⚠️  Advertencia verificando UI: {e}")
 
