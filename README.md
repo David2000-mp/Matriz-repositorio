@@ -1,4 +1,3 @@
-
 # CHAMPILYTICS - Maristas Analytics Platform
 
 ![Version](https://img.shields.io/badge/version-12.0-blue)
@@ -182,6 +181,11 @@ Para entender la evolución y el estado actual del proyecto, consulta los siguie
 - Tabs con contraste corregido
 - Responsive design mejorado
 - Animaciones suaves
+
+### Actualización 2025-12-02
+- **Corrección de UI**: Se ajustaron los colores del menú desplegable para mejorar la visibilidad.
+- **Gestión de Instituciones**: Ahora es posible agregar nuevas instituciones y redes sociales, con sincronización automática en Google Sheets.
+- **Sincronización en Tiempo Real**: Las gráficas se actualizan automáticamente al agregar nuevas cuentas.
 
 ## 👨‍💻 Autor
 

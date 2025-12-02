@@ -35,7 +35,7 @@ Mapa estratégico de evolución del proyecto siguiendo metodología ágil con sp
 
 ---
 
-## 🧠 Sprint 3: Motor de Análisis
+## 🧠 Sprint 3: Motor de Análisis y Predicción
 **Status**: ✅ **COMPLETADO** (100%)  
 **Objetivo**: Hacer que los datos generen valor mediante cálculos matemáticos.
 
@@ -72,14 +72,12 @@ Mapa estratégico de evolución del proyecto siguiendo metodología ágil con sp
 **Objetivo**: Que la aplicación se adapte a quién la está viendo (Director vs. Analista).
 
 ### Semana 9: Identidad y Preferencias
-- [x] **Selectores Persistentes**: `st.session_state` para recordar métrica de tendencia seleccionada
-- [ ] **Vista "Mi Colegio"**: Botón rápido que filtre automáticamente al colegio del usuario
-- [ ] **Configuración de Usuario**: Panel para definir metas propias (KPIs personalizados)
-- [ ] **Guardado de Configs**: Persistencia de preferencias en hoja separada o JSON local
+- [x] **Selectores Persistentes**: `st.session_state` para recordar filtros y métricas
+- [x] **Constructor de Vistas**: Permitir elegir qué 3 gráficas ver en pantalla de inicio
+- [x] **Configuración de Usuario**: Panel para definir metas propias (KPIs personalizados) y guardado en hoja separada de configs
 
 ### Semana 10: Reportes a Medida
-- [ ] **Constructor de Vistas**: Permitir elegir qué 3 gráficas ver en pantalla de inicio
-- [ ] **Comentarios Contextuales**: Agregar notas de texto sobre mes específico (ej: "Campaña de inscripciones")
+- [x] **Comentarios Contextuales**: Agregar notas de texto sobre mes específico (ej: "Campaña de inscripciones")
 - [ ] **Exportación Personalizada**: Plantillas de reporte con secciones seleccionables
 
 ---
@@ -100,7 +98,7 @@ Mapa estratégico de evolución del proyecto siguiendo metodología ágil con sp
 
 ---
 
-## 📤 Sprint 7: Integración y Automatización
+## 📤 Sprint 7: Integración, Seguridad y Entrega Final
 **Status**: ⬜ **PENDIENTE** (0%)  
 **Objetivo**: Conexión con sistemas externos y automatización de procesos.
 
@@ -184,19 +182,19 @@ Mapa estratégico de evolución del proyecto siguiendo metodología ágil con sp
 ## 🎯 Prioridades Actuales (Diciembre 2025)
 
 ### 🔥 Crítico
-1. **Vista "Mi Colegio"**: Filtrado automático para directores de institución
-2. **Configuración de Usuario**: Guardar preferencias y metas personalizadas
-3. **README Completo**: Documentación de instalación y setup
+1. **Sincronización Bidireccional**
+2. **Promedios Móviles**
+3. **Score de Salud Digital**
 
 ### 🚀 Importante
-4. **Constructor de Vistas**: Dashboard personalizable
-5. **Comentarios Contextuales**: Anotaciones en línea de tiempo
-6. **Temas Personalizables**: Modo oscuro
+4. **Detección de Anomalías + Alertas**
+5. **Forecasting con Prophet**
+6. **Selectores Persistentes**
 
 ### 💡 Deseado
-7. **Heatmaps Interactivos**: Visualización avanzada
-8. **API REST**: Acceso programático a datos
-9. **Forecasting**: Predicciones con ML
+7. **Vista "Mi Colegio"**
+8. **Configuración de KPIs**
+9. **Scheduler de Reportes**
 
 ---
 
@@ -226,3 +224,8 @@ Para agregar nuevas funcionalidades:
 **Última actualización**: 2025-12-01  
 **Versión actual**: v2.1.0  
 **Sprint activo**: Sprint 5 - Personalización y Roles
+
+### Actualización 2025-12-02
+- Se corrigieron problemas de visibilidad en el menú desplegable de la vista institucional.
+- Se agregó la funcionalidad para guardar nuevas instituciones y redes sociales directamente en Google Sheets.
+- Se mejoró la sincronización de datos para reflejar cambios en tiempo real en las gráficas.

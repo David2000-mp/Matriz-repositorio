@@ -2,7 +2,6 @@ import streamlit as st
 from utils.data_manager import COLEGIOS_MARISTAS
 from components import styles
 from views import dashboard, analytics, data_entry, settings, landing, changelog
-from utils.report_templates import render_report_generator
 import pandas as pd
 
 # 1. Configuración de Página
@@ -74,16 +73,6 @@ def main():
         changelog.render()
     else:
         landing.render()
-
-    # Datos de ejemplo para el generador de reportes
-    data = pd.DataFrame({
-        "entidad": ["Institución A", "Institución B", "Institución C"],
-        "seguidores": [1000, 1500, 1200],
-        "engagement": [5.2, 4.8, 6.1]
-    })
-
-    # Renderizar el generador de reportes
-    render_report_generator(data)
 
 if __name__ == "__main__":
     main()

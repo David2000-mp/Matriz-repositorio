@@ -181,100 +181,101 @@ def render_changelog():
 def render_roadmap():
     """Renderiza el roadmap de desarrollo con cálculo automático de progreso."""
     st.markdown("### 🗺️ Hoja de Ruta del Proyecto")
-    
+
     # Leer el archivo ROADMAP.md
     roadmap_path = Path(__file__).parent.parent / "ROADMAP.md"
-    
+
     if not roadmap_path.exists():
         st.error("❌ No se encontró el archivo ROADMAP.md")
         st.info("💡 El archivo debería estar en la raíz del proyecto")
         return
-    
+
     try:
         with open(roadmap_path, 'r', encoding='utf-8') as f:
             roadmap_content = f.read()
     except Exception as e:
         st.error(f"❌ Error al leer el roadmap: {e}")
         return
-    
+
     # Calcular progreso global automáticamente
     total_tasks = roadmap_content.count('- [')
     completed_tasks = roadmap_content.count('- [x]')
     progress_percentage = (completed_tasks / total_tasks * 100) if total_tasks > 0 else 0
-    
+
     # Header con métricas globales
     st.markdown("---")
     col_a, col_b, col_c, col_d = st.columns(4)
-    
+
     with col_a:
         st.metric("📊 Progreso Global", f"{progress_percentage:.1f}%")
-    
+
     with col_b:
         st.metric("✅ Tareas Completadas", completed_tasks)
-    
+
     with col_c:
         st.metric("📋 Tareas Totales", total_tasks)
-    
+
     with col_d:
         st.metric("⏳ Tareas Pendientes", total_tasks - completed_tasks)
-    
+
     # Barra de progreso global
     st.progress(progress_percentage / 100)
-    
+
     st.markdown("---")
-    
+
     # Extraer sprints y calcular progreso individual
     sprint_pattern = r'## (.+?Sprint \d+:.+?)\n\*\*Status\*\*: (.+?)\n.*?(?=##|$)'
     sprints = re.findall(sprint_pattern, roadmap_content, re.DOTALL)
-    
-    # Mostrar resumen de sprints
+
+    # Mostrar resumen de sprints con lógica de colores
     st.markdown("### 📊 Estado de los Sprints")
-    
+
     for sprint_full_text in re.finditer(r'## (.+?Sprint \d+:.+?)\n\*\*Status\*\*: (.+?) \*\*(.+?)\*\*.*?\n(.*?)(?=##|---|\Z)', roadmap_content, re.DOTALL):
         sprint_title = sprint_full_text.group(1).strip()
         status_emoji = sprint_full_text.group(2).strip()
         status_text = sprint_full_text.group(3).strip()
         sprint_content = sprint_full_text.group(4)
-        
+
         # Calcular progreso del sprint
         sprint_total = sprint_content.count('- [')
         sprint_completed = sprint_content.count('- [x]')
         sprint_progress = (sprint_completed / sprint_total * 100) if sprint_total > 0 else 0
-        
+
+        # Ordenar tareas por estado (rojo, amarillo, verde)
+        tasks = re.findall(r'- \[([ x])\] \*\*(.+?)\*\*:(.+?)(?=\n-|\n\n|$)', sprint_content, re.DOTALL)
+        sorted_tasks = sorted(tasks, key=lambda t: (t[0] == ' ', t[0] == 'x'))
+
         # Expandible por sprint
         with st.expander(f"{status_emoji} {sprint_title} — {sprint_progress:.0f}%", expanded=(status_emoji == "🟡")):
             # Barra de progreso del sprint
             st.progress(sprint_progress / 100)
             st.caption(f"**{status_text}** • {sprint_completed}/{sprint_total} tareas")
-            
-            # Mostrar tareas del sprint
-            tasks = re.findall(r'- \[([ x])\] \*\*(.+?)\*\*:(.+?)(?=\n-|\n\n|$)', sprint_content, re.DOTALL)
-            
-            if tasks:
-                for checked, task_name, task_desc in tasks:
-                    is_done = (checked == 'x')
-                    checkbox_emoji = "✅" if is_done else "⬜"
-                    st.markdown(f"{checkbox_emoji} **{task_name.strip()}**: {task_desc.strip()}")
-    
+
+            # Mostrar tareas del sprint con colores
+            for checked, task_name, task_desc in sorted_tasks:
+                is_done = (checked == 'x')
+                checkbox_emoji = "✅" if is_done else ("🟡" if checked == ' ' else "🔴")
+                st.markdown(f"{checkbox_emoji} **{task_name.strip()}**: {task_desc.strip()}")
+
     st.markdown("---")
-    
+
     # Sección de prioridades actuales
     st.markdown("### 🎯 Prioridades Actuales")
-    
+
     priority_section = re.search(r'## 🎯 Prioridades Actuales.*?\n(.*?)(?=##|---|\Z)', roadmap_content, re.DOTALL)
     if priority_section:
         st.markdown(priority_section.group(1))
-    
+
     st.markdown("---")
-    
+
     # Contenido completo en expandible
     with st.expander("📄 Ver Roadmap Completo", expanded=False):
         st.markdown(roadmap_content)
-    
+
     # Botón de descarga
     st.markdown("---")
     st.markdown("### 📥 Exportar Roadmap")
-    
+
     st.download_button(
         label="📊 Descargar Roadmap Completo (MD)",
         data=roadmap_content,
@@ -282,17 +283,17 @@ def render_roadmap():
         mime="text/markdown",
         use_container_width=True
     )
-    
+
     # Footer informativo
     st.markdown("---")
     st.info("""
     **ℹ️ Sobre la Metodología Ágil**
-    
+
     Este proyecto sigue sprints de 2 semanas con objetivos claros y entregas incrementales.
-    
+
     - **Sprint**: Ciclo de desarrollo de 2 semanas
     - **Backlog**: Lista priorizada de funcionalidades pendientes
     - **Retrospectiva**: Al final de cada sprint se evalúa qué mejorar
-    
+
     El progreso se actualiza automáticamente al marcar tareas como completadas en `ROADMAP.md`.
     """)

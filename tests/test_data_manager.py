@@ -33,7 +33,8 @@ from utils.data_manager import (
     reset_db,
     COLEGIOS_MARISTAS,
     COLS_CUENTAS,
-    COLS_METRICAS
+    COLS_METRICAS,
+    reload_colegios_maristas
 )
 
 
@@ -597,3 +598,55 @@ def test_reset_db_limpia_cache(mock_conectar_sheets):
         assert True  # Si llegamos aquí, funcionó correctamente
     except Exception as e:
         pytest.fail(f"reset_db() lanzó excepción: {e}")
+
+
+# ========================================
+# TESTS DE reload_colegios_maristas()
+# ========================================
+
+def test_reload_colegios_maristas_from_csv():
+    # Mock the CSV file
+    mock_data = pd.DataFrame({
+        'entidad': ['Instituto A', 'Instituto B'],
+        'plataforma': ['Facebook', 'Instagram'],
+        'usuario_red': ['@institutoA', '@institutoB']
+    })
+
+    with patch('pandas.read_csv', return_value=mock_data):
+        reload_colegios_maristas()
+
+    assert 'Instituto A' in COLEGIOS_MARISTAS
+    assert COLEGIOS_MARISTAS['Instituto A']['Facebook'] == '@institutoA'
+    assert 'Instituto B' in COLEGIOS_MARISTAS
+    assert COLEGIOS_MARISTAS['Instituto B']['Instagram'] == '@institutoB'
+
+
+def test_reload_colegios_maristas_from_google_sheets():
+    # Mock Google Sheets data
+    mock_data = [
+        {'entidad': 'Instituto C', 'plataforma': 'Twitter', 'usuario_red': '@institutoC'},
+        {'entidad': 'Instituto D', 'plataforma': 'LinkedIn', 'usuario_red': '@institutoD'}
+    ]
+
+    mock_sheet = MagicMock()
+    mock_sheet.get_all_records.return_value = mock_data
+
+    mock_spreadsheet = MagicMock()
+    mock_spreadsheet.worksheet.return_value = mock_sheet
+
+    with patch('utils.data_manager.conectar_sheets', return_value=mock_spreadsheet):
+        reload_colegios_maristas()
+
+    assert 'Instituto C' in COLEGIOS_MARISTAS
+    assert COLEGIOS_MARISTAS['Instituto C']['Twitter'] == '@institutoC'
+    assert 'Instituto D' in COLEGIOS_MARISTAS
+    assert COLEGIOS_MARISTAS['Instituto D']['LinkedIn'] == '@institutoD'
+
+
+def test_reload_colegios_maristas_fallback_to_empty():
+    # Simulate no data available
+    with patch('utils.data_manager.conectar_sheets', return_value=None), \
+         patch('pandas.read_csv', side_effect=FileNotFoundError()):
+        reload_colegios_maristas()
+
+    assert COLEGIOS_MARISTAS == {}

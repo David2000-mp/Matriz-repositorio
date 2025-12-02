@@ -14,6 +14,7 @@ import utils.data_manager as dm
 from utils import save_batch, reset_db, COLEGIOS_MARISTAS
 from utils.helpers import simular
 from utils.report_generator import ReportBuilder
+from utils.data_manager import CUENTAS_CSV
 
 def render():
     """
@@ -279,3 +280,44 @@ def render():
                         st.error(f"Error de formato: {e}")
                 else:
                     st.error("Por favor completa todos los campos.")
+
+        with st.expander("🗑️ Eliminar Institución del Catálogo"):
+            st.warning("Esta acción eliminará permanentemente la institución seleccionada del catálogo.")
+            instituciones_existentes = list(COLEGIOS_MARISTAS.keys())
+
+            if not instituciones_existentes:
+                st.info("No hay instituciones para eliminar.")
+            else:
+                institucion_a_eliminar = st.selectbox("Selecciona la institución a eliminar:", instituciones_existentes)
+
+                if st.button("Eliminar Institución", type="primary"):
+                    try:
+                        # Eliminar de la variable global
+                        if institucion_a_eliminar in COLEGIOS_MARISTAS:
+                            del COLEGIOS_MARISTAS[institucion_a_eliminar]
+
+                        # Eliminar del archivo CSV local
+                        if CUENTAS_CSV.exists():
+                            cuentas_df = pd.read_csv(CUENTAS_CSV)
+                            cuentas_df = cuentas_df[cuentas_df['entidad'] != institucion_a_eliminar]
+                            cuentas_df.to_csv(CUENTAS_CSV, index=False, encoding='utf-8-sig')
+
+                        # Eliminar de Google Sheets
+                        spreadsheet = dm.conectar_sheets()
+                        if spreadsheet:
+                            try:
+                                sheet_cuentas = spreadsheet.worksheet('cuentas')
+                                data = sheet_cuentas.get_all_records()
+                                cuentas_df = pd.DataFrame(data)
+                                cuentas_df = cuentas_df[cuentas_df['entidad'] != institucion_a_eliminar]
+                                sheet_cuentas.clear()
+                                sheet_cuentas.append_row(dm.COLS_CUENTAS)
+                                sheet_cuentas.append_rows(cuentas_df.values.tolist())
+                            except Exception as e:
+                                st.warning("No se pudo actualizar Google Sheets. Cambios aplicados solo localmente.")
+                                dm.logger.error(f"Error eliminando institución de Sheets: {e}")
+
+                        st.success(f"✅ La institución '{institucion_a_eliminar}' ha sido eliminada correctamente.")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"❌ Error al eliminar la institución: {e}")

@@ -54,7 +54,7 @@ def render():
     # 3. VALIDACIÓN DE INTEGRIDAD (Ahora sí pasará) ✅
     required_cols = ['fecha', 'entidad', 'engagement_rate']
     missing = [c for c in required_cols if c not in df.columns]
-    
+
     if missing:
         st.error(f"⚠️ Error de Datos: Faltan columnas críticas en el archivo fusionado: {missing}")
         st.write("Columnas disponibles:", df.columns.tolist())
@@ -75,11 +75,13 @@ def render():
         default=["Torta de Seguidores"],
         max_selections=3
     )
+
     # KPIs rápidos
     st.markdown("### Resumen Ejecutivo")
     col1, col2, col3 = st.columns(3)
     col1.metric("Total Seguidores", f"{df['seguidores'].sum():,.0f}")
     col2.metric("Total Interacciones", f"{df['interacciones'].sum():,.0f}")
+
     # Renderizar gráficas seleccionadas
     for graf in seleccionadas:
         tipo = opciones_graficas[graf]
@@ -114,3 +116,27 @@ def render():
                 df_hist['Mes'] = pd.to_datetime(df_hist['fecha']).dt.to_period('M').astype(str)
                 fig = px.box(df_hist, x='Mes', y='seguidores', title='Distribución Histórica de Seguidores')
                 st.plotly_chart(fig, use_container_width=True)
+
+    # --- Tablas de datos retractiles al final ---
+    with st.expander("🔍 Ver datos de cuentas"):
+        st.dataframe(cuentas, use_container_width=True)
+
+    with st.expander("🔍 Ver datos de métricas"):
+        st.dataframe(metricas, use_container_width=True)
+
+    # --- Tabla de resumen mensual retractil ---
+    if 'fecha' in df.columns:
+        df_mes = df.copy()
+        df_mes['Mes'] = pd.to_datetime(df_mes['fecha']).dt.to_period('M').astype(str)
+        resumen_mensual = df_mes.groupby('Mes').agg({
+            'seguidores': 'sum',
+            'interacciones': 'sum',
+            'engagement_rate': 'mean'
+        }).reset_index()
+
+        with st.expander("📊 Resumen Mensual de Datos"):
+            st.dataframe(resumen_mensual, use_container_width=True)
+
+    # --- Tabla de datos detallados retractil ---
+    with st.expander("📋 Datos Detallados"):
+        st.dataframe(df, use_container_width=True)

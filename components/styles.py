@@ -103,6 +103,25 @@ def inject_custom_css():
             color: var(--primary-color) !important;
             font-weight: 700;
         }
+        [data-baseweb="select"] {
+            color: black !important; /* Cambia el color del texto a negro */
+            background-color: white !important; /* Asegura el fondo blanco */
+        }
+        [data-baseweb="select"]:hover {
+            border-color: var(--primary-color) !important; /* Resalta el borde al pasar el cursor */
+        }
+        [data-baseweb="select"] .css-1uccc91-singleValue {
+            color: black !important; /* Asegura que la opción seleccionada sea negra */
+        }
+        [data-baseweb="select"] .css-1wa3eu0-placeholder {
+            color: black !important; /* Asegura que el texto seleccionado y el placeholder sean negros */
+        }
+        .st-bm {
+            color: black !important; /* Asegura que el texto dentro del div seleccionado sea negro */
+        }
+        .st-bm input {
+            color: black !important; /* Asegura que el texto del input sea negro */
+        }
         </style>
         """,
         unsafe_allow_html=True,
