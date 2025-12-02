@@ -1,8 +1,24 @@
+
 # CHAMPILYTICS - Maristas Analytics Platform
 
 ![Version](https://img.shields.io/badge/version-12.0-blue)
 ![Python](https://img.shields.io/badge/python-3.13-green)
 ![Streamlit](https://img.shields.io/badge/streamlit-1.51.0-red)
+
+---
+
+## 📑 Índice de Documentación
+
+1. [Descripción General](#descripción)
+2. [Características Principales](#características-principales)
+3. [Métricas Monitoreadas](#métricas-monitoreadas)
+4. [Instalación](#instalación)
+5. [Uso](#uso)
+6. [Estructura del Proyecto](#estructura-del-proyecto)
+7. [Recorrido de Desarrollo](#recorrido-de-desarrollo)
+8. [Documentos Clave](#documentos-clave)
+
+---
 
 ## 📊 Descripción
 
@@ -16,7 +32,7 @@ CHAMPILYTICS es una plataforma de inteligencia digital diseñada para la Red Mar
 - ⚙️ **Configuración**: Simulador de datos y gestión de instituciones
 - 🎨 **UI Minimalista**: Diseño profesional con glassmorphism y animaciones
 
-### 🎯 Métricas Monitoreadas
+### 🏁 Métricas Monitoreadas
 
 - Seguidores totales por plataforma
 - Alcance de publicaciones
@@ -79,7 +95,29 @@ social_media_matrix/
 │   ├── cuentas.csv           # Catálogo de cuentas
 │   └── metricas.csv          # Métricas históricas
 ├── images/                    # Recursos visuales
-│   ├── logo_maristas.png
+```
+
+---
+
+## 🗺️ Recorrido de Desarrollo
+
+Para entender la evolución y el estado actual del proyecto, consulta los siguientes documentos:
+
+- [Roadmap de Desarrollo](ROADMAP.md): Sprints, objetivos y tareas completadas/pending.
+- [Guía de Refactorización](REFACTORING_GUIDE.md): Migración a arquitectura modular y estado de cada módulo.
+- [Resumen de Logging](LOGGING_IMPLEMENTATION_SUMMARY.md): Implementación y configuración del sistema de logs.
+- [Guía de Build y Release](BUILD_RELEASE.md): Proceso de despliegue, testing y rollback.
+- [Reporte QA](QA_REPORT.md): Estado de la cobertura de tests y calidad del código.
+
+---
+
+## 📚 Documentos Clave
+
+- [ROADMAP.md](ROADMAP.md)
+- [REFACTORING_GUIDE.md](REFACTORING_GUIDE.md)
+- [LOGGING_IMPLEMENTATION_SUMMARY.md](LOGGING_IMPLEMENTATION_SUMMARY.md)
+- [BUILD_RELEASE.md](BUILD_RELEASE.md)
+- [QA_REPORT.md](QA_REPORT.md)
 │   ├── banner_landing.jpg
 │   └── icon_maristas.png
 └── README.md                  # Este archivo
