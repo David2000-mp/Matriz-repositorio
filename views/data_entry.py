@@ -10,7 +10,7 @@ import logging
 from utils import load_data, save_batch, get_id, COLEGIOS_MARISTAS
 
 
-def render():
+def render(df=None):
     """
     Renderiza la vista de captura de datos con pestañas para Captura Manual, Carga Masiva y Captura Anual.
     """
@@ -125,7 +125,7 @@ def render():
                 )
 
             submitted = st.form_submit_button(
-                "💾 Guardar Datos", use_container_width=True, type="primary"
+                "💾 Guardar Datos", width="stretch", type="primary"
             )
 
             if submitted:
@@ -171,11 +171,18 @@ def render():
                             }
                         ]
 
-                        with st.spinner("Guardando registro..."):
+                        with st.status("Guardando entrada..."):
                             save_batch(nuevo_registro)
 
-                        st.success("✅ ¡Registro guardado exitosamente!")
-                        st.balloons()
+                        try:
+                            st.toast("✅ ¡Registro guardado con éxito!", icon="Ⓜ️")
+                        except Exception:
+                            # Fallback a success si st.toast no está disponible
+                            st.success("✅ ¡Registro guardado exitosamente!")
+                        try:
+                            st.balloons()
+                        except Exception:
+                            pass
                     except Exception as e:
                         st.error(f"⚠️ Error al guardar el registro: {e}")
                         logging.error(f"Error al guardar registro: {e}", exc_info=True)

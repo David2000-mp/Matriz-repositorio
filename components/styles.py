@@ -104,26 +104,188 @@ def inject_custom_css():
             color: var(--primary-color) !important;
             font-weight: 700;
         }
+        /* Asegurar texto negro en todos los contenedores principales */
+        .element-container, .stMarkdown, .stText {
+            color: #212529 !important;
+        }
+        /* Headers y títulos - texto oscuro */
+        .stApp h1, .stApp h2, .stApp h3, .stApp h4, .stApp h5, .stApp h6 {
+            color: #212529 !important;
+        }
+        /* Párrafos y texto general - solo aplicar donde no haya override específico */
+        .stApp p {
+            color: #212529 !important;
+        }
+        /* Excepciones para sidebar que debe mantener texto blanco */
+        [data-testid="stSidebar"] h1,
+        [data-testid="stSidebar"] h2,
+        [data-testid="stSidebar"] h3,
+        [data-testid="stSidebar"] p,
+        [data-testid="stSidebar"] span,
+        [data-testid="stSidebar"] div,
+        [data-testid="stSidebar"] label {
+            color: white !important;
+        }
+        /* Cajas de información, advertencia, etc. - texto negro */
+        .stAlert {
+            background-color: white !important;
+        }
+        .stAlert p, .stAlert div, .stAlert span {
+            color: black !important;
+        }
+        /* Info boxes específicos */
+        [data-testid="stAlert"] {
+            background-color: white !important;
+        }
+        [data-testid="stAlert"] p,
+        [data-testid="stAlert"] div,
+        [data-testid="stAlert"] span {
+            color: black !important;
+        }
+        /* Success, warning, error, info messages */
+        .element-container .stAlert {
+            color: black !important;
+        }
+        /* Tablas - fondo blanco, texto negro */
+        .stDataFrame, [data-testid="stDataFrame"] {
+            background-color: white !important;
+        }
+        .stDataFrame th, .stDataFrame td {
+            color: black !important;
+            background-color: white !important;
+        }
+        /* Labels de formularios */
+        label {
+            color: black !important;
+        }
+        [data-testid="stSidebar"] label {
+            color: white !important;
+        }
+        /* Selectbox - texto negro sobre fondo blanco */
         [data-baseweb="select"] {
-            color: black !important; /* Cambia el color del texto a negro */
-            background-color: white !important; /* Asegura el fondo blanco */
+            color: black !important;
+            background-color: white !important;
         }
         [data-baseweb="select"]:hover {
-            border-color: var(--primary-color) !important; /* Resalta el borde al pasar el cursor */
+            border-color: var(--primary-color) !important;
         }
-        [data-baseweb="select"] .css-1uccc91-singleValue {
-            color: black !important; /* Asegura que la opción seleccionada sea negra */
+        [data-baseweb="select"] > div {
+            color: black !important;
+            background-color: white !important;
         }
-        [data-baseweb="select"] .css-1wa3eu0-placeholder {
-            color: black !important; /* Asegura que el texto seleccionado y el placeholder sean negros */
+        [data-baseweb="select"] input {
+            color: black !important;
         }
-        .st-bm {
-            color: black !important; /* Asegura que el texto dentro del div seleccionado sea negro */
+        /* Opciones del dropdown */
+        [data-baseweb="menu"] {
+            background-color: white !important;
         }
-        .st-bm input {
-            color: black !important; /* Asegura que el texto del input sea negro */
+        [data-baseweb="menu"] li {
+            color: black !important;
+            background-color: white !important;
+        }
+        [data-baseweb="menu"] li:hover {
+            background-color: #f0f0f0 !important;
+        }
+        /* Text input, number input, date input */
+        .stTextInput input, .stNumberInput input, .stDateInput input {
+            color: black !important;
+            background-color: white !important;
+        }
+        .stTextInput input::placeholder {
+            color: #666 !important;
+        }
+        /* Text area */
+        .stTextArea textarea {
+            color: black !important;
+            background-color: white !important;
+        }
+        .stTextArea textarea::placeholder {
+            color: #666 !important;
+        }
+        /* Multiselect */
+        [data-baseweb="tag"] {
+            color: black !important;
+            background-color: #e6eeff !important;
+        }
+        /* Radio buttons y checkboxes */
+        .stRadio label, .stCheckbox label {
+            color: black !important;
+        }
+        /* Slider */
+        .stSlider [data-baseweb="slider"] {
+            color: black !important;
+        }
+        /* Tabs - texto negro */
+        .stTabs [data-baseweb="tab-list"] button {
+            color: black !important;
+        }
+        .stTabs [data-baseweb="tab-list"] button[aria-selected="true"] {
+            color: var(--primary-color) !important;
+        }
+        /* Expanders */
+        .streamlit-expanderHeader {
+            color: black !important;
+            background-color: white !important;
+        }
+        .streamlit-expanderContent {
+            background-color: white !important;
+        }
+        .streamlit-expanderContent p,
+        .streamlit-expanderContent div {
+            color: black !important;
+        }
+        /* File uploader */
+        .stFileUploader label,
+        .stFileUploader section {
+            color: black !important;
+        }
+        /* Download button */
+        .stDownloadButton button {
+            color: white !important;
+            background-color: var(--primary-color) !important;
+        }
+        /* Caption text */
+        .caption, [data-testid="stCaptionContainer"] {
+            color: #6c757d !important;
         }
         </style>
         """,
         unsafe_allow_html=True,
     )
+
+    # Animación fade-in para tarjetas KPI y micro-interacciones
+    FADE_IN_CSS = """
+    .kpi-card {
+      animation: fadeInUp 600ms ease both;
+      opacity: 0;
+    }
+
+    @keyframes fadeInUp {
+      from { transform: translateY(8px); opacity: 0; }
+      to   { transform: translateY(0); opacity: 1; }
+    }
+
+    .kpi-card .stCard { transition: transform 160ms ease, box-shadow 160ms ease; }
+    .kpi-card:hover { transform: translateY(-4px); box-shadow: 0 6px 18px rgba(0,0,0,0.08); }
+        /* Aplicar fade-in a métricas nativas de Streamlit para compatibilidad */
+        [data-testid="stMetric"] {
+            animation: fadeInUp 600ms ease both;
+            opacity: 0;
+        }
+
+        /* Fade-in para contenedores de gráficos (Plotly/Altair) */
+        .stPlotlyChart, .js-plotly-plot, [data-testid="stPlotlyChart"] {
+            animation: fadeInUp 650ms ease both;
+            opacity: 0;
+        }
+        .element-container {
+            animation: fadeInUp 500ms ease both;
+            opacity: 0;
+        }
+    """
+    try:
+        st.markdown(f"<style>{FADE_IN_CSS}</style>", unsafe_allow_html=True)
+    except Exception:
+        # No crítico; continuar si no se puede inyectar CSS
+        pass

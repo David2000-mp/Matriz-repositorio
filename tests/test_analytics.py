@@ -144,3 +144,44 @@ def test_orden_cronologico_sobre_datos_desordenados():
 
     res = calculate_growth_metrics(df)
     assert list(res["Mes"]) == ["2024-01", "2024-02", "2024-03"]
+
+
+def test_calculate_growth_handles_nans_gracefully():
+    """
+    Caso sucio: filas con NaN en seguidores/interacciones y fechas mezcladas.
+    La función no debe lanzar excepción y debe devolver estructura válida.
+    """
+    df = make_df(
+        [
+            {
+                "id_cuenta": "A",
+                "fecha": "2024-01-10",
+                "seguidores": 100,
+                "alcance": 1000,
+                "interacciones": 10,
+                "engagement_rate": 10.0,
+            },
+            {
+                "id_cuenta": "A",
+                "fecha": "2024-02-10",
+                "seguidores": float("nan"),
+                "alcance": float("nan"),
+                "interacciones": float("nan"),
+                "engagement_rate": float("nan"),
+            },
+            {
+                "id_cuenta": "A",
+                "fecha": "2024-03-10",
+                "seguidores": 200,
+                "alcance": 2000,
+                "interacciones": 20,
+                "engagement_rate": 10.0,
+            },
+        ]
+    )
+
+    res = calculate_growth_metrics(df)
+    # Debe devolver meses ordenados y sin excepción
+    assert list(res["Mes"]) == ["2024-01", "2024-02", "2024-03"]
+    # Los NaN no deben provocar valores infinitos en deltas
+    assert all((pd.isna(x) or np.isfinite(x)) for x in res["Delta_Seguidores"]) 

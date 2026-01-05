@@ -6,6 +6,7 @@ Maneja conexiones a Google Sheets, carga, guardado de datos y comentarios contex
 import streamlit as st
 import pandas as pd
 import gspread
+from gspread.exceptions import APIError, SpreadsheetNotFound
 from google.oauth2.service_account import Credentials
 from pathlib import Path
 from typing import Tuple, Optional, Dict, List
@@ -122,30 +123,66 @@ def conectar_sheets() -> Optional[gspread.Spreadsheet]:
     """
     Conecta con Google Sheets usando credenciales de Streamlit secrets.
     """
-    try:
-        if "gcp_service_account" not in st.secrets:
-            error_msg = "No se encontraron credenciales en st.secrets."
-            logger.error(error_msg)
-            try:
-                st.error(error_msg)
-            except Exception:
-                pass
-            return None
+    # Validar presencia de credenciales
+    if "gcp_service_account" not in st.secrets:
+        msg = "ERROR DE CREDENCIALES: No se encontraron credenciales en st.secrets."
+        logger.error(msg)
+        try:
+            st.error(msg)
+        except Exception as e:
+            logger.warning(f"No se pudo mostrar st.error en conectar_sheets: {e}")
+        return None
 
-        scope = [
-            "https://www.googleapis.com/auth/spreadsheets",
-            "https://www.googleapis.com/auth/drive",
-        ]
-        creds_dict = st.secrets["gcp_service_account"]
+    scope = [
+        "https://www.googleapis.com/auth/spreadsheets",
+        "https://www.googleapis.com/auth/drive",
+    ]
+
+    # Copiar diccionario para no mutar st.secrets
+    try:
+        creds_dict = dict(st.secrets["gcp_service_account"])
+        if "private_key" in creds_dict:
+            creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
         creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
         client = gspread.authorize(creds)
+    except Exception as e:
+        msg = "ERROR DE AUTENTICACIÓN: Llave privada mal pegada o inválida."
+        logger.error(f"{msg} Detalle: {e}")
+        try:
+            st.error(msg)
+        except Exception:
+            pass
+        return None
 
+    # Abrir spreadsheet con diagnóstico de permisos/nombre
+    try:
         spreadsheet = client.open("BaseDatosMatriz")
         return spreadsheet
-    except Exception as e:
-        logger.error(f"Error conectando a Google Sheets: {e}")
+    except SpreadsheetNotFound:
+        msg = "HOJA NO ENCONTRADA: El nombre 'BaseDatosMatriz' no coincide exactamente."
+        logger.error(msg)
         try:
-            st.error(f"Error conectando a Google Sheets: {e}")
+            st.error(msg)
+        except Exception:
+            pass
+        return None
+    except APIError as e:
+        code = getattr(getattr(e, "response", None), "status_code", None)
+        if code == 403:
+            msg = "ERROR DE PERMISOS: La hoja no se ha compartido con el email del bot."
+        else:
+            msg = f"ERROR DE PERMISOS: {e}"
+        logger.error(msg)
+        try:
+            st.error(msg)
+        except Exception:
+            pass
+        return None
+    except Exception as e:
+        msg = f"Error conectando a Google Sheets: {e}"
+        logger.error(msg)
+        try:
+            st.error(msg)
         except Exception:
             pass
         return None
@@ -189,23 +226,20 @@ def validate_and_fill_columns(
 # ===========================
 
 
+@st.cache_data(ttl=60 * 60)
 def load_data() -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
     Carga datos desde Google Sheets con normalización estricta.
     Fallback a CSV local si falla la conexión.
     """
-    # 1. Estructuras vacías por defecto (Plan B anti-crash)
     cuentas = pd.DataFrame(columns=COLS_CUENTAS)
     metricas = pd.DataFrame(columns=COLS_METRICAS)
+    origin = "cloud"
 
     try:
-        # Modo local forzado
-        if st.secrets.get("general", {}).get("use_local_data", False):
-            raise Exception("Modo local forzado.")
-
         spreadsheet = conectar_sheets()
         if spreadsheet is None:
-            raise Exception("No se pudo conectar a Google Sheets")
+            raise RuntimeError("No se pudo establecer conexión con Google Sheets")
 
         # Leer HOJA: cuentas
         try:
@@ -213,15 +247,13 @@ def load_data() -> Tuple[pd.DataFrame, pd.DataFrame]:
             data_cuentas = sheet_cuentas.get_all_records(expected_headers=[])
             if data_cuentas:
                 cuentas = pd.DataFrame(data_cuentas)
-                # Limpieza de columnas y datos
                 cuentas.columns = cuentas.columns.str.strip().str.lower()
                 cuentas = validate_and_fill_columns(cuentas, COLS_CUENTAS)
                 if "id_cuenta" in cuentas.columns:
-                    cuentas["id_cuenta"] = (
-                        cuentas["id_cuenta"].astype(str).str.strip().str.lower()
-                    )
+                    cuentas["id_cuenta"] = cuentas["id_cuenta"].astype(str).str.strip().str.lower()
         except Exception as e:
             logger.error(f"Error hoja 'cuentas': {e}")
+            st.warning(f"Error leyendo hoja 'cuentas': {e}")
 
         # Leer HOJA: metricas
         try:
@@ -229,26 +261,23 @@ def load_data() -> Tuple[pd.DataFrame, pd.DataFrame]:
             data_metricas = sheet_metricas.get_all_records(expected_headers=[])
             if data_metricas:
                 metricas = pd.DataFrame(data_metricas)
-                # Limpieza
                 metricas.columns = metricas.columns.str.strip().str.lower()
                 metricas = validate_and_fill_columns(metricas, COLS_METRICAS)
                 if "id_cuenta" in metricas.columns:
-                    metricas["id_cuenta"] = (
-                        metricas["id_cuenta"].astype(str).str.strip().str.lower()
-                    )
+                    metricas["id_cuenta"] = metricas["id_cuenta"].astype(str).str.strip().str.lower()
                 if "fecha" in metricas.columns:
-                    metricas["fecha"] = pd.to_datetime(
-                        metricas["fecha"], errors="coerce"
-                    )
+                    metricas["fecha"] = pd.to_datetime(metricas["fecha"], errors="coerce")
         except Exception as e:
             logger.error(f"Error hoja 'metricas': {e}")
+            st.warning(f"Error leyendo hoja 'metricas': {e}")
 
-        # Filtro de consistencia (Metric must have Account)
+        # Filtro de consistencia
         if not cuentas.empty and not metricas.empty:
             metricas = metricas[metricas["id_cuenta"].isin(cuentas["id_cuenta"])]
 
     except Exception as e:
-        logger.warning(f"Usando datos locales por error en Sheets: {e}")
+        origin = "local"
+        logger.info(f"Fallo conexión cloud, usando locales: {e}")
         init_files()
         try:
             if CUENTAS_CSV.exists():
@@ -263,11 +292,24 @@ def load_data() -> Tuple[pd.DataFrame, pd.DataFrame]:
                 if "id_cuenta" in metricas.columns:
                     metricas["id_cuenta"] = metricas["id_cuenta"].astype(str)
                 if "fecha" in metricas.columns:
-                    metricas["fecha"] = pd.to_datetime(
-                        metricas["fecha"], errors="coerce"
-                    )
+                    metricas["fecha"] = pd.to_datetime(metricas["fecha"], errors="coerce")
         except Exception as local_err:
             logger.error(f"Error crítico cargando locales: {local_err}")
+
+        # Avisar modo local con toast animado
+        try:
+            st.toast("⚠️ Usando modo local por fallo en conexión", icon="⚠️")
+        except Exception:
+            logger.info("Modo local por fallo en conexión")
+
+    # Blindaje: asegurar conversión de fechas tras la carga
+    if "fecha" in metricas.columns:
+        metricas["fecha"] = pd.to_datetime(metricas["fecha"], errors="coerce")
+
+    try:
+        st.session_state["data_origin"] = origin
+    except Exception:
+        pass
 
     return cuentas, metricas
 
@@ -414,9 +456,19 @@ def load_configs() -> pd.DataFrame:
                     if col in df.columns:
                         df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
             return df
-        except:
+        except Exception as e:
+            logger.warning(f"Error load_configs (inner): {e}")
+            try:
+                st.warning(f"Error cargando configuraciones: {e}")
+            except Exception:
+                logger.warning("No se pudo mostrar warning en Streamlit para load_configs inner")
             return pd.DataFrame(columns=COLS_CONFIG)
-    except:
+    except Exception as e:
+        logger.warning(f"Error load_configs: {e}")
+        try:
+            st.warning(f"Error cargando configuraciones: {e}")
+        except Exception:
+            logger.warning("No se pudo mostrar warning en Streamlit para load_configs")
         return pd.DataFrame(columns=COLS_CONFIG)
 
 
@@ -428,9 +480,10 @@ def save_config(entidad: str, meta_seguidores: int, meta_engagement: float) -> b
             return False
         try:
             sheet = spreadsheet.worksheet("config")
-        except:
+        except Exception as e:
             sheet = spreadsheet.add_worksheet(title="config", rows=100, cols=3)
             sheet.update(range_name="A1", values=[COLS_CONFIG])
+            logger.info(f"Se creó hoja 'config' por defecto: {e}")
 
         configs = load_configs()
         if not configs.empty and entidad in configs["entidad"].values:
@@ -443,7 +496,12 @@ def save_config(entidad: str, meta_seguidores: int, meta_engagement: float) -> b
             sheet.append_row([entidad, str(meta_seguidores), str(meta_engagement)])
         st.cache_data.clear()
         return True
-    except:
+    except Exception as e:
+        logger.error(f"Error en save_config: {e}")
+        try:
+            st.error(f"Error guardando configuración: {e}")
+        except Exception:
+            logger.warning("No se pudo mostrar st.error para save_config")
         return False
 
 
@@ -471,8 +529,8 @@ def guardar_datos(nuevo_df: pd.DataFrame, modo: str = "completo") -> Optional[bo
         logger.error(msg)
         try:
             st.error(msg)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"No se pudo mostrar st.error en guardar_datos: {e}")
         return False
 
     try:
@@ -490,7 +548,14 @@ def guardar_datos(nuevo_df: pd.DataFrame, modo: str = "completo") -> Optional[bo
             success = True
             df = nuevo_df.copy()
             if "fecha" in df.columns:
-                df["fecha"] = df["fecha"].dt.strftime("%Y-%m-%d")
+                try:
+                    # Attempt to ensure 'fecha' is in datetime format
+                    df["fecha"] = pd.to_datetime(df["fecha"], errors="coerce")
+                    # Replace invalid dates with None
+                    df["fecha"] = df["fecha"].apply(lambda x: x.strftime("%Y-%m-%d") if pd.notnull(x) else None)
+                except Exception as e:
+                    logger.warning(f"Error procesando la columna 'fecha': {e}")
+                    df["fecha"] = None  # Default to None for invalid dates
 
             # 1. Guardar Cuentas
             cols_c = ["id_cuenta", "entidad", "plataforma", "usuario_red"]
@@ -531,8 +596,8 @@ def guardar_datos(nuevo_df: pd.DataFrame, modo: str = "completo") -> Optional[bo
                 logger.error(f"Error actualizando hoja 'metricas': {e}")
                 try:
                     st.error(f"Error actualizando hoja 'metricas': {e}")
-                except Exception:
-                    pass
+                except Exception as warn_exc:
+                    logger.warning(f"No se pudo mostrar st.error al actualizar 'metricas': {warn_exc}")
                 success = False
 
         st.cache_data.clear()
@@ -541,8 +606,8 @@ def guardar_datos(nuevo_df: pd.DataFrame, modo: str = "completo") -> Optional[bo
         logger.error(f"Error guardar_datos: {e}")
         try:
             st.error(f"Error guardar_datos: {e}")
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"No se pudo mostrar st.error en guardar_datos (outer): {e}")
         return False
 
 
@@ -579,8 +644,8 @@ def save_batch(datos: List[Dict]) -> None:
         logger.error(f"Error escribiendo METRICAS_CSV: {e}")
         try:
             st.error(f"Error escribiendo METRICAS_CSV: {e}")
-        except Exception:
-            pass
+        except Exception as warn_exc:
+            logger.warning(f"No se pudo mostrar st.error escribiendo METRICAS_CSV: {warn_exc}")
 
     # Guardar nuevas cuentas localmente
     cols_c = ["id_cuenta", "entidad", "plataforma", "usuario_red"]
@@ -597,8 +662,8 @@ def save_batch(datos: List[Dict]) -> None:
         logger.error(f"Error escribiendo CUENTAS_CSV: {e}")
         try:
             st.error(f"Error escribiendo CUENTAS_CSV: {e}")
-        except Exception:
-            pass
+        except Exception as warn_exc:
+            logger.warning(f"No se pudo mostrar st.error escribiendo CUENTAS_CSV: {warn_exc}")
 
     # Sincronizar Sheets (proteger de fallos)
     try:
@@ -609,14 +674,14 @@ def save_batch(datos: List[Dict]) -> None:
                 st.warning(
                     "Advertencia: No se pudo sincronizar datos con Google Sheets."
                 )
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"No se pudo mostrar st.warning en save_batch: {e}")
     except Exception as e:
         logger.error(f"Error sincronizando con Sheets en save_batch: {e}")
         try:
             st.warning(f"Error sincronizando con Sheets en save_batch: {e}")
-        except Exception:
-            pass
+        except Exception as warn_exc:
+            logger.warning(f"No se pudo mostrar st.warning en save_batch: {warn_exc}")
 
     st.cache_data.clear()
 

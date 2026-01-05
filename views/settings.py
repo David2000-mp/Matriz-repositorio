@@ -17,9 +17,11 @@ from utils.report_generator import ReportBuilder
 from utils.data_manager import CUENTAS_CSV
 
 
-def render():
+def render(df=None):
     """
     Renderiza la página de configuración y administración.
+
+    Acepta opcionalmente un `df` para compatibilidad con el entrypoint global.
     """
     st.title("⚙️ CONFIGURACIÓN Y ADMINISTRACIÓN")
     st.caption("🛠️ Herramientas de Gestión y Personalización del Sistema")
@@ -52,28 +54,55 @@ def render():
         registros_estimados = total_cuentas * meses
 
         if st.button(
-            "🚀 Generar Datos de Prueba", use_container_width=True, type="primary"
+            "🚀 Generar Datos de Prueba", width="stretch", type="primary"
         ):
             with st.spinner(
                 f"⏳ Creando {meses} meses de historia para {total_cuentas} cuentas..."
             ):
                 # Generar datos
-                datos, metas = simular(
+                resultados_simulacion = simular(
                     n=registros_estimados,
                     colegios_maristas=COLEGIOS_MARISTAS,
                     generar_metas=True,
                 )
 
-                # Guardar métricas (batch)
-                save_batch(datos)
+                # Desempaquetado flexible para compatibilidad con distintas firmas
+                datos = []
+                metas = []
+                try:
+                    if isinstance(resultados_simulacion, (list, tuple)):
+                        if len(resultados_simulacion) == 2:
+                            datos, metas = resultados_simulacion
+                        elif len(resultados_simulacion) == 3:
+                            # Forma: (cuentas, metricas, metas) -> tomamos metricas/metas
+                            datos = resultados_simulacion[0]
+                            metas = resultados_simulacion[2]
+                        else:
+                            # Assume it's a flat list of metric dicts
+                            datos = list(resultados_simulacion)
+                            metas = []
+                    else:
+                        # Single-object return (e.g., list of dicts)
+                        datos = resultados_simulacion
+                        metas = []
+                except Exception:
+                    datos = resultados_simulacion
+                    metas = []
 
-                # Guardar metas individuales
+                # Guardar métricas (batch)
+                save_batch(datos)  # type: ignore
+
+                # Guardar metas individuales si existen
                 for meta in metas:
-                    dm.save_config(
-                        entidad=meta["entidad"],
-                        meta_seguidores=meta["meta_seguidores"],
-                        meta_engagement=meta["meta_engagement"],
-                    )
+                    try:
+                        dm.save_config(
+                            entidad=meta["entidad"],
+                            meta_seguidores=meta["meta_seguidores"],
+                            meta_engagement=meta["meta_engagement"],
+                        )
+                    except Exception:
+                        # No interrumpir el flujo si una meta falla
+                        pass
 
             st.success(f"🎉 ¡{len(datos):,} registros generados exitosamente!")
             st.balloons()
@@ -91,12 +120,104 @@ def render():
             )
         with col_reset2:
             if st.button(
-                "Resetear Base de Datos", type="secondary", use_container_width=True
+                "Resetear Base de Datos", type="secondary", width="stretch"
             ):
                 reset_db()
                 st.cache_data.clear()
                 st.success("✅ Base de datos reiniciada.")
                 st.rerun()
+
+        st.divider()
+
+        # --- Sección: Carga de métricas por publicación ---
+        st.subheader("📤 Cargar métricas por publicación (CSV)")
+        st.info(
+            "Sube un archivo CSV con métricas por publicación. Columnas esperadas: `fecha`, `seguidores`, `alcance`, `interacciones`, y `id_cuenta` o (`entidad`,`plataforma`,`usuario_red`)."
+        )
+
+        with st.expander("Subir CSV de publicaciones"):
+            uploaded = st.file_uploader(
+                "Selecciona CSV de métricas por publicación",
+                type=["csv"],
+                accept_multiple_files=False,
+            )
+
+            if uploaded is not None:
+                try:
+                    df_posts = pd.read_csv(uploaded)
+                except Exception as e:
+                    st.error(f"Error leyendo CSV: {e}")
+                    df_posts = None
+
+                if df_posts is not None:
+                    st.write("Vista previa:")
+                    st.dataframe(df_posts.head(5))
+
+                    # Preparar datos: requerimos fecha y métricas numéricas
+                    if "fecha" not in df_posts.columns:
+                        st.error("El CSV debe contener la columna 'fecha'.")
+                    else:
+                        # Mapear id_cuenta si hace falta
+                        if "id_cuenta" not in df_posts.columns:
+                            if all(c in df_posts.columns for c in [
+                                "entidad",
+                                "plataforma",
+                                "usuario_red",
+                            ]):
+                                # Crear/recuperar id_cuenta por fila
+                                cuentas_cache, _ = dm.load_data()
+
+                                def _map_id(row):
+                                    try:
+                                        return dm.get_id(
+                                            entidad=str(row["entidad"]),
+                                            plat=str(row["plataforma"]),
+                                            user=str(row["usuario_red"]),
+                                            df_cuentas_cache=cuentas_cache,
+                                        )
+                                    except Exception:
+                                        return None
+
+                                df_posts["id_cuenta"] = df_posts.apply(_map_id, axis=1)  # type: ignore
+                            else:
+                                st.error(
+                                    "El CSV debe contener 'id_cuenta' o las columnas 'entidad','plataforma','usuario_red' para mapear IDs."
+                                )
+
+                        # Verificar que ahora exista id_cuenta
+                        if "id_cuenta" in df_posts.columns and not df_posts["id_cuenta"].isna().all():
+                            # Normalizar y convertir tipos
+                            df_posts["fecha"] = pd.to_datetime(df_posts["fecha"], errors="coerce")
+                            for col in ["seguidores", "alcance", "interacciones", "likes_promedio"]:
+                                if col in df_posts.columns:
+                                    df_posts[col] = pd.to_numeric(df_posts[col], errors="coerce").fillna(0)
+
+                            # Construir lista de dicts para save_batch
+                            datos_para_guardar = []
+                            for _, r in df_posts.iterrows():
+                                if pd.isna(r.get("fecha")):
+                                    continue
+                                datos_para_guardar.append(
+                                    {
+                                        "id_cuenta": str(r.get("id_cuenta")),
+                                        "fecha": r.get("fecha"),
+                                        "seguidores": int(r.get("seguidores", 0)),
+                                        "alcance": int(r.get("alcance", 0)) if not pd.isna(r.get("alcance")) else 0,
+                                        "interacciones": int(r.get("interacciones", 0)),
+                                        "likes_promedio": float(r.get("likes_promedio", 0)) if not pd.isna(r.get("likes_promedio")) else 0,
+                                    }
+                                )
+
+                            if datos_para_guardar:
+                                try:
+                                    save_batch(datos_para_guardar)
+                                    st.success(f"✅ {len(datos_para_guardar)} publicaciones guardadas correctamente.")
+                                    st.cache_data.clear()
+                                    st.rerun()
+                                except Exception as e:
+                                    st.error(f"Error guardando publicaciones: {e}")
+                            else:
+                                st.warning("No se encontraron publicaciones válidas para guardar.")
 
     # ==============================================================================
     # PESTAÑA 2: REPORTES (Versión Blindada contra KeyError)
@@ -182,8 +303,8 @@ def render():
                 inc_analisis = st.checkbox("Análisis (Texto Automático)", value=True)
 
                 # Botón Generar
-                if st.button("Generar PDF", type="primary", use_container_width=True):
-                    with st.spinner("🔨 Construyendo reporte..."):
+                if st.button("Generar PDF", type="primary", width="stretch"):
+                    with st.status("Generando PDF..."):
                         # Filtrar datos por la entidad seleccionada
                         df_filtrado = df_completo[
                             df_completo["entidad"] == entidad_selec
@@ -217,7 +338,11 @@ def render():
                                 f"Reporte_{nombre_limpio.replace(' ', '_')}.pdf"
                             )
 
-                            st.success("✅ Reporte listo")
+                            try:
+                                st.toast("✅ PDF generado", icon="Ⓜ️")
+                            except Exception:
+                                st.success("✅ Reporte listo")
+
                             st.download_button(
                                 label="⬇️ Descargar PDF",
                                 data=pdf_bytes,
@@ -239,7 +364,7 @@ def render():
                 if cols_existentes:
                     st.dataframe(
                         df_vista[cols_existentes].head(10),
-                        use_container_width=True,
+                        width="stretch",
                         hide_index=True,
                     )
                 else:

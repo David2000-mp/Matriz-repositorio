@@ -11,6 +11,17 @@ from datetime import datetime, timedelta
 from typing import List, Dict, Optional
 import logging
 
+# Intentar obtener colores institucionales desde components
+try:
+    from components import COLOR_PRIMARY, COLOR_MAP
+except Exception:
+    COLOR_PRIMARY = "#003696"
+    COLOR_MAP = {
+        "Facebook": "#1877F2",
+        "Instagram": "#E1306C",
+        "TikTok": "#000000",
+    }
+
 # Configuración de directorio base
 BASE_DIR = Path(__file__).parent.parent
 IMAGES_DIR = BASE_DIR / "images"
@@ -92,6 +103,7 @@ def simular(
     n: int = 100,
     colegios_maristas: Dict[str, Dict[str, str]] = None,
     generar_metas: bool = True,
+    months: int = 12,
 ) -> tuple:
     """
     Genera datos sintéticos para testing.
@@ -114,52 +126,71 @@ def simular(
     # Importar get_id para generar IDs válidos
     from .data_manager import get_id
 
-    data: List[Dict] = []
-    base = datetime.now() - timedelta(days=n)
-
-    # Precargar cuentas para optimizar get_id
+    # Construir cuentas a partir del catálogo y asegurar IDs
     from .data_manager import load_data
 
     cuentas_cache, _ = load_data()
 
-    for i in range(n):
-        entidad = random.choice(list(colegios_maristas.keys()))
-        redes_disponibles = colegios_maristas[entidad]
-        plataforma = random.choice(list(redes_disponibles.keys()))
-        usuario = redes_disponibles[plataforma]
+    cuentas = []
+    for entidad, redes in colegios_maristas.items():
+        for plataforma, usuario in redes.items():
+            id_cuenta = get_id(entidad, plataforma, usuario, df_cuentas_cache=cuentas_cache)
+            cuentas.append(
+                {
+                    "id_cuenta": id_cuenta,
+                    "entidad": entidad,
+                    "plataforma": plataforma,
+                    "usuario_red": usuario,
+                }
+            )
 
-        # Generar ID válido (reutilizar IDs existentes si ya hay cuentas creadas)
-        id_cuenta = get_id(entidad, plataforma, usuario, df_cuentas_cache=cuentas_cache)
+    # Generar serie de meses (inicio de mes) hacia atrás
+    end = datetime.now().replace(day=1)
+    months_list = []
+    for m in range(months - 1, -1, -1):
+        # month offset m months ago
+        month_dt = (end - pd.DateOffset(months=m)).to_pydatetime()
+        months_list.append(month_dt)
 
-        # Métricas simuladas con distribución realista
-        seguidores = random.randint(500, 50000)
-        alcance = int(seguidores * random.uniform(0.1, 0.5))  # 10-50% del alcance
-        interacciones = int(alcance * random.uniform(0.02, 0.08))  # 2-8% de engagement
-        likes_promedio = int(
-            interacciones * random.uniform(0.6, 0.9)
-        )  # 60-90% likes del total
-        engagement_rate = (
-            round((interacciones / seguidores * 100), 2) if seguidores > 0 else 0
-        )
+    data: List[Dict] = []
 
-        data.append(
-            {
-                "id_cuenta": id_cuenta,
-                "entidad": entidad,
-                "plataforma": plataforma,
-                "usuario_red": usuario,
-                "fecha": base + timedelta(days=i),
-                "seguidores": seguidores,
-                "alcance": alcance,
-                "interacciones": interacciones,
-                "likes_promedio": likes_promedio,
-                "engagement_rate": engagement_rate,
-            }
-        )
+    # Para cada cuenta, generar un seguidores_inicial y seguir la serie mensual
+    for c in cuentas:
+        seguidores_prev = random.randint(1000, 10000)
+        for month_dt in months_list:
+            # growth between -1% and +5% monthly
+            growth = random.uniform(-0.01, 0.05)
+            # aplicar crecimiento multiplicativo sobre el snapshot anterior
+            seguidores_actual = max(0, int(round(seguidores_prev * (1 + growth))))
 
-    logging.info(
-        f"Simulación generada: {n} registros para {len(set(d['entidad'] for d in data))} entidades"
-    )
+            # engagement rate entre 0.5% y 4%
+            engagement_rate = random.uniform(0.005, 0.04)
+            interacciones = int(round(seguidores_actual * engagement_rate))
+
+            # alcance proporcional razonable
+            alcance = int(round(seguidores_actual * random.uniform(0.1, 0.5)))
+
+            # likes promedio como fracción de interacciones
+            likes_promedio = int(round(interacciones * random.uniform(0.6, 0.9)))
+
+            data.append(
+                {
+                    "id_cuenta": c["id_cuenta"],
+                    "entidad": c["entidad"],
+                    "plataforma": c["plataforma"],
+                    "usuario_red": c["usuario_red"],
+                    "fecha": month_dt,
+                    "seguidores": seguidores_actual,
+                    "alcance": alcance,
+                    "interacciones": interacciones,
+                    "likes_promedio": likes_promedio,
+                    "engagement_rate": round(engagement_rate * 100, 2),
+                }
+            )
+
+            seguidores_prev = seguidores_actual
+
+    logging.info(f"Simulación generada: {len(data)} registros para {len(cuentas)} cuentas")
 
     # Generar metas aleatorias si se solicita
     metas = []
@@ -194,6 +225,8 @@ def simular(
             f"Metas generadas: {len(metas)} instituciones con objetivos personalizados"
         )
 
+    # Return both datos and metas to support callers that expect metas (settings)
+    # and update callsites to use the first element when only datos are needed.
     return data, metas
 
 
@@ -254,7 +287,32 @@ def generar_reporte_html(df: pd.DataFrame, titulo: str = "Reporte de Métricas")
     # Tabla de datos
     tabla_datos = df.to_html(index=False, classes="table table-striped", border=0)
 
+    # Intentar incluir logo si existe en IMAGES_DIR
+    logo_b64 = None
+    for name in ("logo_maristas.png", "logo.png", "logo_maristas.jpg", "logo.png"):
+        logo_b64 = load_image(name)
+        if logo_b64:
+            break
+
     # HTML completo
+    logo_html = ""
+    if logo_b64:
+        logo_html = f"<img src=\"data:image/png;base64,{logo_b64}\" alt=\"Logo\" style=\"height:60px; margin-right:16px; vertical-align:middle;\">"
+    else:
+        # SVG placeholder usando colores institucionales para evitar reporte roto
+        accent = list(COLOR_MAP.values())[0] if COLOR_MAP else "#1877F2"
+        svg = f'''<svg width="140" height="60" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Logo ChampiLeaks">
+            <defs>
+                <linearGradient id="g" x1="0" x2="1">
+                    <stop stop-color="{COLOR_PRIMARY}" offset="0"/>
+                    <stop stop-color="{accent}" offset="1"/>
+                </linearGradient>
+            </defs>
+            <rect rx="8" width="140" height="60" fill="url(#g)" />
+            <text x="16" y="38" font-family="Montserrat, Arial, sans-serif" font-size="20" fill="#ffffff" font-weight="700">CHAMPILYTICS</text>
+        </svg>'''
+        logo_html = svg
+
     html = f"""
     <!DOCTYPE html>
     <html lang="es">
@@ -315,9 +373,12 @@ def generar_reporte_html(df: pd.DataFrame, titulo: str = "Reporte de Métricas")
         </style>
     </head>
     <body>
-        <div class="header">
-            <h1>📊 {titulo}</h1>
-            <p>Generado el {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}</p>
+        <div class="header" style="display:flex; align-items:center; gap:12px;">
+            {logo_html}
+            <div>
+                <h1>📊 {titulo}</h1>
+                <p style="margin:0;">Generado el {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}</p>
+            </div>
         </div>
         
         <div class="stats">

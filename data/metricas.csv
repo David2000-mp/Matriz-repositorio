@@ -1,2 +1,469 @@
-id_cuenta,fecha,seguidores,alcance,interacciones,likes_promedio,engagement_rate
-test_id_1,2024-01-01,1000,5000,500,50,5.0
+id_cuenta,fecha,seguidores,alcance,interacciones,likes_promedio,engagement_rate,entidad,plataforma,usuario_red
+24eeadaac7cd4e6ab055256e17ab5eb0,2025-02-01 15:11:45.643483,4879,1556,130,96,2.66,Centro Universitario México,Facebook,@centrounivmx
+24eeadaac7cd4e6ab055256e17ab5eb0,2025-03-01 15:11:45.643483,5072,1086,149,104,2.94,Centro Universitario México,Facebook,@centrounivmx
+24eeadaac7cd4e6ab055256e17ab5eb0,2025-04-01 15:11:45.643483,5274,1866,170,118,3.22,Centro Universitario México,Facebook,@centrounivmx
+24eeadaac7cd4e6ab055256e17ab5eb0,2025-05-01 15:11:45.643483,5276,2321,94,64,1.78,Centro Universitario México,Facebook,@centrounivmx
+24eeadaac7cd4e6ab055256e17ab5eb0,2025-06-01 15:11:45.643483,5395,1004,38,33,0.7,Centro Universitario México,Facebook,@centrounivmx
+24eeadaac7cd4e6ab055256e17ab5eb0,2025-07-01 15:11:45.643483,5595,1439,32,21,0.57,Centro Universitario México,Facebook,@centrounivmx
+24eeadaac7cd4e6ab055256e17ab5eb0,2025-08-01 15:11:45.643483,5800,1806,43,26,0.74,Centro Universitario México,Facebook,@centrounivmx
+24eeadaac7cd4e6ab055256e17ab5eb0,2025-09-01 15:11:45.643483,5825,1981,182,124,3.12,Centro Universitario México,Facebook,@centrounivmx
+24eeadaac7cd4e6ab055256e17ab5eb0,2025-10-01 15:11:45.643483,5838,1330,42,33,0.72,Centro Universitario México,Facebook,@centrounivmx
+24eeadaac7cd4e6ab055256e17ab5eb0,2025-11-01 15:11:45.643483,5869,924,207,126,3.53,Centro Universitario México,Facebook,@centrounivmx
+24eeadaac7cd4e6ab055256e17ab5eb0,2025-12-01 15:11:45.643483,5908,1096,193,126,3.27,Centro Universitario México,Facebook,@centrounivmx
+24eeadaac7cd4e6ab055256e17ab5eb0,2026-01-01 15:11:45.643483,6060,1769,241,158,3.98,Centro Universitario México,Facebook,@centrounivmx
+7c55e7b12d5241559d76e17f588a7107,2025-02-01 15:11:45.643483,1116,485,22,15,1.97,Centro Universitario México,Instagram,@centrounivmx
+7c55e7b12d5241559d76e17f588a7107,2025-03-01 15:11:45.643483,1147,308,28,19,2.44,Centro Universitario México,Instagram,@centrounivmx
+7c55e7b12d5241559d76e17f588a7107,2025-04-01 15:11:45.643483,1164,444,11,7,0.95,Centro Universitario México,Instagram,@centrounivmx
+7c55e7b12d5241559d76e17f588a7107,2025-05-01 15:11:45.643483,1211,484,34,24,2.81,Centro Universitario México,Instagram,@centrounivmx
+7c55e7b12d5241559d76e17f588a7107,2025-06-01 15:11:45.643483,1202,371,10,8,0.83,Centro Universitario México,Instagram,@centrounivmx
+7c55e7b12d5241559d76e17f588a7107,2025-07-01 15:11:45.643483,1193,240,46,33,3.86,Centro Universitario México,Instagram,@centrounivmx
+7c55e7b12d5241559d76e17f588a7107,2025-08-01 15:11:45.643483,1225,366,40,31,3.27,Centro Universitario México,Instagram,@centrounivmx
+7c55e7b12d5241559d76e17f588a7107,2025-09-01 15:11:45.643483,1262,619,34,30,2.69,Centro Universitario México,Instagram,@centrounivmx
+7c55e7b12d5241559d76e17f588a7107,2025-10-01 15:11:45.643483,1286,586,37,33,2.88,Centro Universitario México,Instagram,@centrounivmx
+7c55e7b12d5241559d76e17f588a7107,2025-11-01 15:11:45.643483,1327,270,35,23,2.64,Centro Universitario México,Instagram,@centrounivmx
+7c55e7b12d5241559d76e17f588a7107,2025-12-01 15:11:45.643483,1358,555,52,37,3.83,Centro Universitario México,Instagram,@centrounivmx
+7c55e7b12d5241559d76e17f588a7107,2026-01-01 15:11:45.643483,1400,577,51,35,3.64,Centro Universitario México,Instagram,@centrounivmx
+378f8dfb5fef495b97edf1525a9e6f12,2025-02-01 15:11:45.643483,6478,3178,200,177,3.09,Centro Universitario México,TikTok,@centrounivmx
+378f8dfb5fef495b97edf1525a9e6f12,2025-03-01 15:11:45.643483,6596,978,138,119,2.09,Centro Universitario México,TikTok,@centrounivmx
+378f8dfb5fef495b97edf1525a9e6f12,2025-04-01 15:11:45.643483,6604,2382,64,53,0.97,Centro Universitario México,TikTok,@centrounivmx
+378f8dfb5fef495b97edf1525a9e6f12,2025-05-01 15:11:45.643483,6778,3051,205,166,3.02,Centro Universitario México,TikTok,@centrounivmx
+378f8dfb5fef495b97edf1525a9e6f12,2025-06-01 15:11:45.643483,6973,3049,85,65,1.22,Centro Universitario México,TikTok,@centrounivmx
+378f8dfb5fef495b97edf1525a9e6f12,2025-07-01 15:11:45.643483,7216,2032,94,62,1.3,Centro Universitario México,TikTok,@centrounivmx
+378f8dfb5fef495b97edf1525a9e6f12,2025-08-01 15:11:45.643483,7161,1481,253,153,3.53,Centro Universitario México,TikTok,@centrounivmx
+378f8dfb5fef495b97edf1525a9e6f12,2025-09-01 15:11:45.643483,7242,3415,280,250,3.87,Centro Universitario México,TikTok,@centrounivmx
+378f8dfb5fef495b97edf1525a9e6f12,2025-10-01 15:11:45.643483,7254,3141,263,177,3.63,Centro Universitario México,TikTok,@centrounivmx
+378f8dfb5fef495b97edf1525a9e6f12,2025-11-01 15:11:45.643483,7363,1181,146,123,1.98,Centro Universitario México,TikTok,@centrounivmx
+378f8dfb5fef495b97edf1525a9e6f12,2025-12-01 15:11:45.643483,7465,2786,203,141,2.72,Centro Universitario México,TikTok,@centrounivmx
+378f8dfb5fef495b97edf1525a9e6f12,2026-01-01 15:11:45.643483,7468,3030,141,91,1.89,Centro Universitario México,TikTok,@centrounivmx
+268e43b4784041f8bb18f2046ef0595a,2025-02-01 15:11:45.643483,3880,811,88,63,2.27,Colegio Jacona,Facebook,@colegiojacona
+268e43b4784041f8bb18f2046ef0595a,2025-03-01 15:11:45.643483,3877,1842,150,99,3.87,Colegio Jacona,Facebook,@colegiojacona
+268e43b4784041f8bb18f2046ef0595a,2025-04-01 15:11:45.643483,3949,729,90,79,2.28,Colegio Jacona,Facebook,@colegiojacona
+268e43b4784041f8bb18f2046ef0595a,2025-05-01 15:11:45.643483,4035,1290,61,52,1.51,Colegio Jacona,Facebook,@colegiojacona
+268e43b4784041f8bb18f2046ef0595a,2025-06-01 15:11:45.643483,4048,1535,67,47,1.66,Colegio Jacona,Facebook,@colegiojacona
+268e43b4784041f8bb18f2046ef0595a,2025-07-01 15:11:45.643483,4221,1038,74,56,1.75,Colegio Jacona,Facebook,@colegiojacona
+268e43b4784041f8bb18f2046ef0595a,2025-08-01 15:11:45.643483,4233,444,138,111,3.26,Colegio Jacona,Facebook,@colegiojacona
+268e43b4784041f8bb18f2046ef0595a,2025-09-01 15:11:45.643483,4419,1922,97,83,2.2,Colegio Jacona,Facebook,@colegiojacona
+268e43b4784041f8bb18f2046ef0595a,2025-10-01 15:11:45.643483,4424,1155,35,28,0.79,Colegio Jacona,Facebook,@colegiojacona
+268e43b4784041f8bb18f2046ef0595a,2025-11-01 15:11:45.643483,4531,1008,123,110,2.71,Colegio Jacona,Facebook,@colegiojacona
+268e43b4784041f8bb18f2046ef0595a,2025-12-01 15:11:45.643483,4518,1744,153,115,3.39,Colegio Jacona,Facebook,@colegiojacona
+268e43b4784041f8bb18f2046ef0595a,2026-01-01 15:11:45.643483,4677,2324,170,117,3.63,Colegio Jacona,Facebook,@colegiojacona
+f0de0baed0cb44e58d6b9b661e262106,2025-02-01 15:11:45.643483,9271,3556,243,185,2.62,Colegio Jacona,Instagram,@colegiojacona
+f0de0baed0cb44e58d6b9b661e262106,2025-03-01 15:11:45.643483,9355,2287,169,151,1.81,Colegio Jacona,Instagram,@colegiojacona
+f0de0baed0cb44e58d6b9b661e262106,2025-04-01 15:11:45.643483,9481,1657,264,177,2.78,Colegio Jacona,Instagram,@colegiojacona
+f0de0baed0cb44e58d6b9b661e262106,2025-05-01 15:11:45.643483,9508,3572,371,321,3.9,Colegio Jacona,Instagram,@colegiojacona
+f0de0baed0cb44e58d6b9b661e262106,2025-06-01 15:11:45.643483,9532,1280,249,216,2.61,Colegio Jacona,Instagram,@colegiojacona
+f0de0baed0cb44e58d6b9b661e262106,2025-07-01 15:11:45.643483,9567,4761,51,33,0.53,Colegio Jacona,Instagram,@colegiojacona
+f0de0baed0cb44e58d6b9b661e262106,2025-08-01 15:11:45.643483,10005,4984,306,263,3.06,Colegio Jacona,Instagram,@colegiojacona
+f0de0baed0cb44e58d6b9b661e262106,2025-09-01 15:11:45.643483,10030,3645,206,174,2.05,Colegio Jacona,Instagram,@colegiojacona
+f0de0baed0cb44e58d6b9b661e262106,2025-10-01 15:11:45.643483,10197,2040,240,180,2.35,Colegio Jacona,Instagram,@colegiojacona
+f0de0baed0cb44e58d6b9b661e262106,2025-11-01 15:11:45.643483,10309,4282,277,206,2.69,Colegio Jacona,Instagram,@colegiojacona
+f0de0baed0cb44e58d6b9b661e262106,2025-12-01 15:11:45.643483,10719,1953,280,209,2.61,Colegio Jacona,Instagram,@colegiojacona
+f0de0baed0cb44e58d6b9b661e262106,2026-01-01 15:11:45.643483,11049,4579,303,191,2.74,Colegio Jacona,Instagram,@colegiojacona
+4811954fd5af4dee9bb41fb64143631b,2025-02-01 15:11:45.643483,6802,904,190,152,2.79,Colegio Lic. Manuel Concha,Facebook,@manuelconcha
+4811954fd5af4dee9bb41fb64143631b,2025-03-01 15:11:45.643483,6809,1124,198,151,2.91,Colegio Lic. Manuel Concha,Facebook,@manuelconcha
+4811954fd5af4dee9bb41fb64143631b,2025-04-01 15:11:45.643483,6909,1820,59,46,0.85,Colegio Lic. Manuel Concha,Facebook,@manuelconcha
+4811954fd5af4dee9bb41fb64143631b,2025-05-01 15:11:45.643483,7165,1410,177,115,2.47,Colegio Lic. Manuel Concha,Facebook,@manuelconcha
+4811954fd5af4dee9bb41fb64143631b,2025-06-01 15:11:45.643483,7109,2275,242,204,3.4,Colegio Lic. Manuel Concha,Facebook,@manuelconcha
+4811954fd5af4dee9bb41fb64143631b,2025-07-01 15:11:45.643483,7136,2121,153,116,2.14,Colegio Lic. Manuel Concha,Facebook,@manuelconcha
+4811954fd5af4dee9bb41fb64143631b,2025-08-01 15:11:45.643483,7230,2650,220,156,3.04,Colegio Lic. Manuel Concha,Facebook,@manuelconcha
+4811954fd5af4dee9bb41fb64143631b,2025-09-01 15:11:45.643483,7279,1638,37,23,0.51,Colegio Lic. Manuel Concha,Facebook,@manuelconcha
+4811954fd5af4dee9bb41fb64143631b,2025-10-01 15:11:45.643483,7595,2821,233,208,3.07,Colegio Lic. Manuel Concha,Facebook,@manuelconcha
+4811954fd5af4dee9bb41fb64143631b,2025-11-01 15:11:45.643483,7528,1292,281,212,3.73,Colegio Lic. Manuel Concha,Facebook,@manuelconcha
+4811954fd5af4dee9bb41fb64143631b,2025-12-01 15:11:45.643483,7599,1721,161,114,2.12,Colegio Lic. Manuel Concha,Facebook,@manuelconcha
+4811954fd5af4dee9bb41fb64143631b,2026-01-01 15:11:45.643483,7885,2898,59,41,0.75,Colegio Lic. Manuel Concha,Facebook,@manuelconcha
+1ef1fed55a9b4f56b6fbf1a9a2f23b86,2025-02-01 15:11:45.643483,9715,3338,57,39,0.59,Colegio Lic. Manuel Concha,Instagram,@colegio_manuelconcha
+1ef1fed55a9b4f56b6fbf1a9a2f23b86,2025-03-01 15:11:45.643483,9740,3673,99,81,1.02,Colegio Lic. Manuel Concha,Instagram,@colegio_manuelconcha
+1ef1fed55a9b4f56b6fbf1a9a2f23b86,2025-04-01 15:11:45.643483,9833,2801,108,78,1.1,Colegio Lic. Manuel Concha,Instagram,@colegio_manuelconcha
+1ef1fed55a9b4f56b6fbf1a9a2f23b86,2025-05-01 15:11:45.643483,10096,4618,277,214,2.74,Colegio Lic. Manuel Concha,Instagram,@colegio_manuelconcha
+1ef1fed55a9b4f56b6fbf1a9a2f23b86,2025-06-01 15:11:45.643483,10472,3573,363,323,3.47,Colegio Lic. Manuel Concha,Instagram,@colegio_manuelconcha
+1ef1fed55a9b4f56b6fbf1a9a2f23b86,2025-07-01 15:11:45.643483,10441,4302,195,164,1.87,Colegio Lic. Manuel Concha,Instagram,@colegio_manuelconcha
+1ef1fed55a9b4f56b6fbf1a9a2f23b86,2025-08-01 15:11:45.643483,10468,4042,105,78,1.0,Colegio Lic. Manuel Concha,Instagram,@colegio_manuelconcha
+1ef1fed55a9b4f56b6fbf1a9a2f23b86,2025-09-01 15:11:45.643483,10377,2723,92,64,0.89,Colegio Lic. Manuel Concha,Instagram,@colegio_manuelconcha
+1ef1fed55a9b4f56b6fbf1a9a2f23b86,2025-10-01 15:11:45.643483,10826,4083,76,56,0.7,Colegio Lic. Manuel Concha,Instagram,@colegio_manuelconcha
+1ef1fed55a9b4f56b6fbf1a9a2f23b86,2025-11-01 15:11:45.643483,11081,1682,123,77,1.11,Colegio Lic. Manuel Concha,Instagram,@colegio_manuelconcha
+1ef1fed55a9b4f56b6fbf1a9a2f23b86,2025-12-01 15:11:45.643483,11043,1644,364,268,3.3,Colegio Lic. Manuel Concha,Instagram,@colegio_manuelconcha
+1ef1fed55a9b4f56b6fbf1a9a2f23b86,2026-01-01 15:11:45.643483,11522,3328,120,80,1.04,Colegio Lic. Manuel Concha,Instagram,@colegio_manuelconcha
+0d15d40aa9a0454798791a0faa510766,2025-02-01 15:11:45.643483,2832,1404,61,53,2.15,Colegio México (Roma),Facebook,@colegiomexicoroma
+0d15d40aa9a0454798791a0faa510766,2025-03-01 15:11:45.643483,2855,608,105,82,3.68,Colegio México (Roma),Facebook,@colegiomexicoroma
+0d15d40aa9a0454798791a0faa510766,2025-04-01 15:11:45.643483,2862,694,99,80,3.46,Colegio México (Roma),Facebook,@colegiomexicoroma
+0d15d40aa9a0454798791a0faa510766,2025-05-01 15:11:45.643483,2910,610,68,49,2.34,Colegio México (Roma),Facebook,@colegiomexicoroma
+0d15d40aa9a0454798791a0faa510766,2025-06-01 15:11:45.643483,3029,790,27,17,0.89,Colegio México (Roma),Facebook,@colegiomexicoroma
+0d15d40aa9a0454798791a0faa510766,2025-07-01 15:11:45.643483,3050,1180,64,49,2.1,Colegio México (Roma),Facebook,@colegiomexicoroma
+0d15d40aa9a0454798791a0faa510766,2025-08-01 15:11:45.643483,3137,404,50,34,1.59,Colegio México (Roma),Facebook,@colegiomexicoroma
+0d15d40aa9a0454798791a0faa510766,2025-09-01 15:11:45.643483,3123,404,23,20,0.74,Colegio México (Roma),Facebook,@colegiomexicoroma
+0d15d40aa9a0454798791a0faa510766,2025-10-01 15:11:45.643483,3102,941,108,97,3.48,Colegio México (Roma),Facebook,@colegiomexicoroma
+0d15d40aa9a0454798791a0faa510766,2025-11-01 15:11:45.643483,3115,652,64,56,2.05,Colegio México (Roma),Facebook,@colegiomexicoroma
+0d15d40aa9a0454798791a0faa510766,2025-12-01 15:11:45.643483,3145,393,87,55,2.77,Colegio México (Roma),Facebook,@colegiomexicoroma
+0d15d40aa9a0454798791a0faa510766,2026-01-01 15:11:45.643483,3272,568,70,56,2.14,Colegio México (Roma),Facebook,@colegiomexicoroma
+1b0bcf86b0ab421386a3bf53e9c74270,2025-02-01 15:11:45.643483,8318,3679,257,212,3.09,Colegio México (Roma),Instagram,@colegiomexicoroma
+1b0bcf86b0ab421386a3bf53e9c74270,2025-03-01 15:11:45.643483,8577,1920,144,100,1.68,Colegio México (Roma),Instagram,@colegiomexicoroma
+1b0bcf86b0ab421386a3bf53e9c74270,2025-04-01 15:11:45.643483,8828,1357,162,111,1.84,Colegio México (Roma),Instagram,@colegiomexicoroma
+1b0bcf86b0ab421386a3bf53e9c74270,2025-05-01 15:11:45.643483,8962,2793,184,152,2.05,Colegio México (Roma),Instagram,@colegiomexicoroma
+1b0bcf86b0ab421386a3bf53e9c74270,2025-06-01 15:11:45.643483,8905,3881,99,88,1.11,Colegio México (Roma),Instagram,@colegiomexicoroma
+1b0bcf86b0ab421386a3bf53e9c74270,2025-07-01 15:11:45.643483,8955,1924,97,71,1.08,Colegio México (Roma),Instagram,@colegiomexicoroma
+1b0bcf86b0ab421386a3bf53e9c74270,2025-08-01 15:11:45.643483,9050,4155,87,72,0.96,Colegio México (Roma),Instagram,@colegiomexicoroma
+1b0bcf86b0ab421386a3bf53e9c74270,2025-09-01 15:11:45.643483,9121,1386,353,267,3.87,Colegio México (Roma),Instagram,@colegiomexicoroma
+1b0bcf86b0ab421386a3bf53e9c74270,2025-10-01 15:11:45.643483,9269,4405,178,130,1.92,Colegio México (Roma),Instagram,@colegiomexicoroma
+1b0bcf86b0ab421386a3bf53e9c74270,2025-11-01 15:11:45.643483,9343,1263,220,132,2.35,Colegio México (Roma),Instagram,@colegiomexicoroma
+1b0bcf86b0ab421386a3bf53e9c74270,2025-12-01 15:11:45.643483,9337,2653,138,104,1.48,Colegio México (Roma),Instagram,@colegiomexicoroma
+1b0bcf86b0ab421386a3bf53e9c74270,2026-01-01 15:11:45.643483,9584,4634,65,47,0.68,Colegio México (Roma),Instagram,@colegiomexicoroma
+af6d7fae4de34368bccaa852d1dd6c4a,2025-02-01 15:11:45.643483,5689,2106,87,58,1.53,Colegio México (Roma),TikTok,@colegiomexico
+af6d7fae4de34368bccaa852d1dd6c4a,2025-03-01 15:11:45.643483,5805,1331,30,25,0.52,Colegio México (Roma),TikTok,@colegiomexico
+af6d7fae4de34368bccaa852d1dd6c4a,2025-04-01 15:11:45.643483,6025,2241,142,117,2.36,Colegio México (Roma),TikTok,@colegiomexico
+af6d7fae4de34368bccaa852d1dd6c4a,2025-05-01 15:11:45.643483,5991,1381,119,76,1.99,Colegio México (Roma),TikTok,@colegiomexico
+af6d7fae4de34368bccaa852d1dd6c4a,2025-06-01 15:11:45.643483,6139,2914,142,125,2.31,Colegio México (Roma),TikTok,@colegiomexico
+af6d7fae4de34368bccaa852d1dd6c4a,2025-07-01 15:11:45.643483,6088,2807,187,159,3.07,Colegio México (Roma),TikTok,@colegiomexico
+af6d7fae4de34368bccaa852d1dd6c4a,2025-08-01 15:11:45.643483,6266,2197,46,33,0.73,Colegio México (Roma),TikTok,@colegiomexico
+af6d7fae4de34368bccaa852d1dd6c4a,2025-09-01 15:11:45.643483,6370,2469,109,73,1.71,Colegio México (Roma),TikTok,@colegiomexico
+af6d7fae4de34368bccaa852d1dd6c4a,2025-10-01 15:11:45.643483,6545,2076,41,32,0.63,Colegio México (Roma),TikTok,@colegiomexico
+af6d7fae4de34368bccaa852d1dd6c4a,2025-11-01 15:11:45.643483,6789,871,75,51,1.1,Colegio México (Roma),TikTok,@colegiomexico
+af6d7fae4de34368bccaa852d1dd6c4a,2025-12-01 15:11:45.643483,7116,2164,144,114,2.02,Colegio México (Roma),TikTok,@colegiomexico
+af6d7fae4de34368bccaa852d1dd6c4a,2026-01-01 15:11:45.643483,7206,2196,69,44,0.96,Colegio México (Roma),TikTok,@colegiomexico
+bdde48ba96b4456bb87eae576ebf3c98,2025-02-01 15:11:45.643483,3599,859,127,79,3.53,Colegio México Bachillerato,Facebook,@colegiomexicobachillerato
+bdde48ba96b4456bb87eae576ebf3c98,2025-03-01 15:11:45.643483,3769,942,42,32,1.11,Colegio México Bachillerato,Facebook,@colegiomexicobachillerato
+bdde48ba96b4456bb87eae576ebf3c98,2025-04-01 15:11:45.643483,3890,1202,67,48,1.72,Colegio México Bachillerato,Facebook,@colegiomexicobachillerato
+bdde48ba96b4456bb87eae576ebf3c98,2025-05-01 15:11:45.643483,3993,660,91,60,2.28,Colegio México Bachillerato,Facebook,@colegiomexicobachillerato
+bdde48ba96b4456bb87eae576ebf3c98,2025-06-01 15:11:45.643483,4065,1071,111,84,2.73,Colegio México Bachillerato,Facebook,@colegiomexicobachillerato
+bdde48ba96b4456bb87eae576ebf3c98,2025-07-01 15:11:45.643483,4204,1647,151,116,3.59,Colegio México Bachillerato,Facebook,@colegiomexicobachillerato
+bdde48ba96b4456bb87eae576ebf3c98,2025-08-01 15:11:45.643483,4371,672,163,104,3.73,Colegio México Bachillerato,Facebook,@colegiomexicobachillerato
+bdde48ba96b4456bb87eae576ebf3c98,2025-09-01 15:11:45.643483,4342,2035,158,129,3.64,Colegio México Bachillerato,Facebook,@colegiomexicobachillerato
+bdde48ba96b4456bb87eae576ebf3c98,2025-10-01 15:11:45.643483,4537,1983,168,137,3.7,Colegio México Bachillerato,Facebook,@colegiomexicobachillerato
+bdde48ba96b4456bb87eae576ebf3c98,2025-11-01 15:11:45.643483,4575,2002,135,117,2.95,Colegio México Bachillerato,Facebook,@colegiomexicobachillerato
+bdde48ba96b4456bb87eae576ebf3c98,2025-12-01 15:11:45.643483,4538,1377,77,50,1.7,Colegio México Bachillerato,Facebook,@colegiomexicobachillerato
+bdde48ba96b4456bb87eae576ebf3c98,2026-01-01 15:11:45.643483,4591,674,123,77,2.68,Colegio México Bachillerato,Facebook,@colegiomexicobachillerato
+0b582c6e9875468d948cc318dfbb6812,2025-02-01 15:11:45.643483,1605,516,59,42,3.68,Colegio México Bachillerato,Instagram,@meximarista
+0b582c6e9875468d948cc318dfbb6812,2025-03-01 15:11:45.643483,1632,232,21,17,1.29,Colegio México Bachillerato,Instagram,@meximarista
+0b582c6e9875468d948cc318dfbb6812,2025-04-01 15:11:45.643483,1653,314,15,13,0.91,Colegio México Bachillerato,Instagram,@meximarista
+0b582c6e9875468d948cc318dfbb6812,2025-05-01 15:11:45.643483,1672,484,57,46,3.41,Colegio México Bachillerato,Instagram,@meximarista
+0b582c6e9875468d948cc318dfbb6812,2025-06-01 15:11:45.643483,1728,575,24,20,1.39,Colegio México Bachillerato,Instagram,@meximarista
+0b582c6e9875468d948cc318dfbb6812,2025-07-01 15:11:45.643483,1768,516,56,42,3.17,Colegio México Bachillerato,Instagram,@meximarista
+0b582c6e9875468d948cc318dfbb6812,2025-08-01 15:11:45.643483,1798,433,19,15,1.06,Colegio México Bachillerato,Instagram,@meximarista
+0b582c6e9875468d948cc318dfbb6812,2025-09-01 15:11:45.643483,1822,907,10,7,0.55,Colegio México Bachillerato,Instagram,@meximarista
+0b582c6e9875468d948cc318dfbb6812,2025-10-01 15:11:45.643483,1870,791,55,43,2.94,Colegio México Bachillerato,Instagram,@meximarista
+0b582c6e9875468d948cc318dfbb6812,2025-11-01 15:11:45.643483,1868,840,39,33,2.09,Colegio México Bachillerato,Instagram,@meximarista
+0b582c6e9875468d948cc318dfbb6812,2025-12-01 15:11:45.643483,1930,769,55,47,2.85,Colegio México Bachillerato,Instagram,@meximarista
+0b582c6e9875468d948cc318dfbb6812,2026-01-01 15:11:45.643483,1988,475,62,41,3.12,Colegio México Bachillerato,Instagram,@meximarista
+63c1d5b64fff4503a77f9a1cdbaf8644,2025-02-01 15:11:45.643483,9039,1866,264,160,2.92,Colegio México Orizaba,Facebook,@colegiomexori
+63c1d5b64fff4503a77f9a1cdbaf8644,2025-03-01 15:11:45.643483,8964,4313,320,239,3.57,Colegio México Orizaba,Facebook,@colegiomexori
+63c1d5b64fff4503a77f9a1cdbaf8644,2025-04-01 15:11:45.643483,9265,2536,144,113,1.55,Colegio México Orizaba,Facebook,@colegiomexori
+63c1d5b64fff4503a77f9a1cdbaf8644,2025-05-01 15:11:45.643483,9338,3907,64,54,0.69,Colegio México Orizaba,Facebook,@colegiomexori
+63c1d5b64fff4503a77f9a1cdbaf8644,2025-06-01 15:11:45.643483,9448,2916,191,144,2.02,Colegio México Orizaba,Facebook,@colegiomexori
+63c1d5b64fff4503a77f9a1cdbaf8644,2025-07-01 15:11:45.643483,9842,2293,337,216,3.42,Colegio México Orizaba,Facebook,@colegiomexori
+63c1d5b64fff4503a77f9a1cdbaf8644,2025-08-01 15:11:45.643483,9890,1557,242,171,2.45,Colegio México Orizaba,Facebook,@colegiomexori
+63c1d5b64fff4503a77f9a1cdbaf8644,2025-09-01 15:11:45.643483,10218,2174,277,223,2.71,Colegio México Orizaba,Facebook,@colegiomexori
+63c1d5b64fff4503a77f9a1cdbaf8644,2025-10-01 15:11:45.643483,10219,1346,145,91,1.42,Colegio México Orizaba,Facebook,@colegiomexori
+63c1d5b64fff4503a77f9a1cdbaf8644,2025-11-01 15:11:45.643483,10140,3482,351,295,3.46,Colegio México Orizaba,Facebook,@colegiomexori
+63c1d5b64fff4503a77f9a1cdbaf8644,2025-12-01 15:11:45.643483,10078,3078,351,236,3.48,Colegio México Orizaba,Facebook,@colegiomexori
+63c1d5b64fff4503a77f9a1cdbaf8644,2026-01-01 15:11:45.643483,10206,3140,214,170,2.1,Colegio México Orizaba,Facebook,@colegiomexori
+bce665c25f8547e2b6b37bcca8dd8573,2025-02-01 15:11:45.643483,9119,3035,199,147,2.18,Colegio México Orizaba,Instagram,@colegio.mexicoorizaba
+bce665c25f8547e2b6b37bcca8dd8573,2025-03-01 15:11:45.643483,9323,4053,75,52,0.8,Colegio México Orizaba,Instagram,@colegio.mexicoorizaba
+bce665c25f8547e2b6b37bcca8dd8573,2025-04-01 15:11:45.643483,9360,1466,366,249,3.91,Colegio México Orizaba,Instagram,@colegio.mexicoorizaba
+bce665c25f8547e2b6b37bcca8dd8573,2025-05-01 15:11:45.643483,9340,2292,340,264,3.64,Colegio México Orizaba,Instagram,@colegio.mexicoorizaba
+bce665c25f8547e2b6b37bcca8dd8573,2025-06-01 15:11:45.643483,9729,2924,190,125,1.95,Colegio México Orizaba,Instagram,@colegio.mexicoorizaba
+bce665c25f8547e2b6b37bcca8dd8573,2025-07-01 15:11:45.643483,10194,1675,70,49,0.69,Colegio México Orizaba,Instagram,@colegio.mexicoorizaba
+bce665c25f8547e2b6b37bcca8dd8573,2025-08-01 15:11:45.643483,10346,1063,102,79,0.99,Colegio México Orizaba,Instagram,@colegio.mexicoorizaba
+bce665c25f8547e2b6b37bcca8dd8573,2025-09-01 15:11:45.643483,10490,3912,248,166,2.36,Colegio México Orizaba,Instagram,@colegio.mexicoorizaba
+bce665c25f8547e2b6b37bcca8dd8573,2025-10-01 15:11:45.643483,10585,5235,116,86,1.1,Colegio México Orizaba,Instagram,@colegio.mexicoorizaba
+bce665c25f8547e2b6b37bcca8dd8573,2025-11-01 15:11:45.643483,11001,2982,408,325,3.71,Colegio México Orizaba,Instagram,@colegio.mexicoorizaba
+bce665c25f8547e2b6b37bcca8dd8573,2025-12-01 15:11:45.643483,11450,2958,80,70,0.7,Colegio México Orizaba,Instagram,@colegio.mexicoorizaba
+bce665c25f8547e2b6b37bcca8dd8573,2026-01-01 15:11:45.643483,11629,2895,388,291,3.34,Colegio México Orizaba,Instagram,@colegio.mexicoorizaba
+4b5d297dfe5c498ab4d2690f9e8abcbe,2025-02-01 15:11:45.643483,2878,524,85,63,2.95,Colegio Pedro Martínez Vázquez,Facebook,@colegiopedromartinezvazquez
+4b5d297dfe5c498ab4d2690f9e8abcbe,2025-03-01 15:11:45.643483,3003,852,79,57,2.63,Colegio Pedro Martínez Vázquez,Facebook,@colegiopedromartinezvazquez
+4b5d297dfe5c498ab4d2690f9e8abcbe,2025-04-01 15:11:45.643483,3100,319,86,65,2.77,Colegio Pedro Martínez Vázquez,Facebook,@colegiopedromartinezvazquez
+4b5d297dfe5c498ab4d2690f9e8abcbe,2025-05-01 15:11:45.643483,3176,924,74,66,2.33,Colegio Pedro Martínez Vázquez,Facebook,@colegiopedromartinezvazquez
+4b5d297dfe5c498ab4d2690f9e8abcbe,2025-06-01 15:11:45.643483,3220,724,92,78,2.86,Colegio Pedro Martínez Vázquez,Facebook,@colegiopedromartinezvazquez
+4b5d297dfe5c498ab4d2690f9e8abcbe,2025-07-01 15:11:45.643483,3201,1240,53,46,1.66,Colegio Pedro Martínez Vázquez,Facebook,@colegiopedromartinezvazquez
+4b5d297dfe5c498ab4d2690f9e8abcbe,2025-08-01 15:11:45.643483,3266,694,119,83,3.64,Colegio Pedro Martínez Vázquez,Facebook,@colegiopedromartinezvazquez
+4b5d297dfe5c498ab4d2690f9e8abcbe,2025-09-01 15:11:45.643483,3246,1499,129,82,3.97,Colegio Pedro Martínez Vázquez,Facebook,@colegiopedromartinezvazquez
+4b5d297dfe5c498ab4d2690f9e8abcbe,2025-10-01 15:11:45.643483,3391,1589,60,53,1.77,Colegio Pedro Martínez Vázquez,Facebook,@colegiopedromartinezvazquez
+4b5d297dfe5c498ab4d2690f9e8abcbe,2025-11-01 15:11:45.643483,3451,557,69,61,2.0,Colegio Pedro Martínez Vázquez,Facebook,@colegiopedromartinezvazquez
+4b5d297dfe5c498ab4d2690f9e8abcbe,2025-12-01 15:11:45.643483,3495,1648,112,97,3.2,Colegio Pedro Martínez Vázquez,Facebook,@colegiopedromartinezvazquez
+4b5d297dfe5c498ab4d2690f9e8abcbe,2026-01-01 15:11:45.643483,3490,1308,120,93,3.44,Colegio Pedro Martínez Vázquez,Facebook,@colegiopedromartinezvazquez
+d6c270089e1f4d6e8d60e2bdaabf65d3,2025-02-01 15:11:45.643483,3495,488,113,87,3.23,Colegio Pedro Martínez Vázquez,Instagram,@colegio_pedromartinez
+d6c270089e1f4d6e8d60e2bdaabf65d3,2025-03-01 15:11:45.643483,3504,1571,62,45,1.77,Colegio Pedro Martínez Vázquez,Instagram,@colegio_pedromartinez
+d6c270089e1f4d6e8d60e2bdaabf65d3,2025-04-01 15:11:45.643483,3610,1719,23,17,0.64,Colegio Pedro Martínez Vázquez,Instagram,@colegio_pedromartinez
+d6c270089e1f4d6e8d60e2bdaabf65d3,2025-05-01 15:11:45.643483,3703,586,50,32,1.35,Colegio Pedro Martínez Vázquez,Instagram,@colegio_pedromartinez
+d6c270089e1f4d6e8d60e2bdaabf65d3,2025-06-01 15:11:45.643483,3872,1311,25,20,0.65,Colegio Pedro Martínez Vázquez,Instagram,@colegio_pedromartinez
+d6c270089e1f4d6e8d60e2bdaabf65d3,2025-07-01 15:11:45.643483,3984,1590,53,45,1.33,Colegio Pedro Martínez Vázquez,Instagram,@colegio_pedromartinez
+d6c270089e1f4d6e8d60e2bdaabf65d3,2025-08-01 15:11:45.643483,4158,593,144,104,3.46,Colegio Pedro Martínez Vázquez,Instagram,@colegio_pedromartinez
+d6c270089e1f4d6e8d60e2bdaabf65d3,2025-09-01 15:11:45.643483,4308,1375,163,105,3.78,Colegio Pedro Martínez Vázquez,Instagram,@colegio_pedromartinez
+d6c270089e1f4d6e8d60e2bdaabf65d3,2025-10-01 15:11:45.643483,4496,620,169,120,3.76,Colegio Pedro Martínez Vázquez,Instagram,@colegio_pedromartinez
+d6c270089e1f4d6e8d60e2bdaabf65d3,2025-11-01 15:11:45.643483,4688,1758,119,74,2.54,Colegio Pedro Martínez Vázquez,Instagram,@colegio_pedromartinez
+d6c270089e1f4d6e8d60e2bdaabf65d3,2025-12-01 15:11:45.643483,4652,1135,28,24,0.6,Colegio Pedro Martínez Vázquez,Instagram,@colegio_pedromartinez
+d6c270089e1f4d6e8d60e2bdaabf65d3,2026-01-01 15:11:45.643483,4677,2196,68,56,1.45,Colegio Pedro Martínez Vázquez,Instagram,@colegio_pedromartinez
+872f3ac4f98849d4b31e1bc08121aed5,2025-02-01 15:11:45.643483,3447,965,31,25,0.9,Instituto Hidalguense,Facebook,@institutohidalguense
+872f3ac4f98849d4b31e1bc08121aed5,2025-03-01 15:11:45.643483,3553,431,31,20,0.87,Instituto Hidalguense,Facebook,@institutohidalguense
+872f3ac4f98849d4b31e1bc08121aed5,2025-04-01 15:11:45.643483,3597,499,46,34,1.28,Instituto Hidalguense,Facebook,@institutohidalguense
+872f3ac4f98849d4b31e1bc08121aed5,2025-05-01 15:11:45.643483,3729,1827,38,32,1.02,Instituto Hidalguense,Facebook,@institutohidalguense
+872f3ac4f98849d4b31e1bc08121aed5,2025-06-01 15:11:45.643483,3755,815,117,81,3.12,Instituto Hidalguense,Facebook,@institutohidalguense
+872f3ac4f98849d4b31e1bc08121aed5,2025-07-01 15:11:45.643483,3830,1027,139,87,3.63,Instituto Hidalguense,Facebook,@institutohidalguense
+872f3ac4f98849d4b31e1bc08121aed5,2025-08-01 15:11:45.643483,3897,533,105,92,2.69,Instituto Hidalguense,Facebook,@institutohidalguense
+872f3ac4f98849d4b31e1bc08121aed5,2025-09-01 15:11:45.643483,4078,1578,70,48,1.72,Instituto Hidalguense,Facebook,@institutohidalguense
+872f3ac4f98849d4b31e1bc08121aed5,2025-10-01 15:11:45.643483,4127,1400,129,84,3.13,Instituto Hidalguense,Facebook,@institutohidalguense
+872f3ac4f98849d4b31e1bc08121aed5,2025-11-01 15:11:45.643483,4323,686,24,19,0.56,Instituto Hidalguense,Facebook,@institutohidalguense
+872f3ac4f98849d4b31e1bc08121aed5,2025-12-01 15:11:45.643483,4537,544,84,74,1.85,Instituto Hidalguense,Facebook,@institutohidalguense
+872f3ac4f98849d4b31e1bc08121aed5,2026-01-01 15:11:45.643483,4752,1463,90,60,1.89,Instituto Hidalguense,Facebook,@institutohidalguense
+de4d8042c29f4037be6ddbc39db71067,2025-02-01 15:11:45.643483,4033,694,55,46,1.36,Instituto Hidalguense,Instagram,@institutohidalguense
+de4d8042c29f4037be6ddbc39db71067,2025-03-01 15:11:45.643483,4195,1389,132,100,3.15,Instituto Hidalguense,Instagram,@institutohidalguense
+de4d8042c29f4037be6ddbc39db71067,2025-04-01 15:11:45.643483,4205,1734,157,96,3.73,Instituto Hidalguense,Instagram,@institutohidalguense
+de4d8042c29f4037be6ddbc39db71067,2025-05-01 15:11:45.643483,4375,1590,100,79,2.29,Instituto Hidalguense,Instagram,@institutohidalguense
+de4d8042c29f4037be6ddbc39db71067,2025-06-01 15:11:45.643483,4447,830,125,109,2.81,Instituto Hidalguense,Instagram,@institutohidalguense
+de4d8042c29f4037be6ddbc39db71067,2025-07-01 15:11:45.643483,4599,1267,33,25,0.72,Instituto Hidalguense,Instagram,@institutohidalguense
+de4d8042c29f4037be6ddbc39db71067,2025-08-01 15:11:45.643483,4779,676,82,55,1.72,Instituto Hidalguense,Instagram,@institutohidalguense
+de4d8042c29f4037be6ddbc39db71067,2025-09-01 15:11:45.643483,4808,1403,71,59,1.48,Instituto Hidalguense,Instagram,@institutohidalguense
+de4d8042c29f4037be6ddbc39db71067,2025-10-01 15:11:45.643483,4802,2124,114,80,2.37,Instituto Hidalguense,Instagram,@institutohidalguense
+de4d8042c29f4037be6ddbc39db71067,2025-11-01 15:11:45.643483,4808,553,134,89,2.79,Instituto Hidalguense,Instagram,@institutohidalguense
+de4d8042c29f4037be6ddbc39db71067,2025-12-01 15:11:45.643483,4881,1007,58,41,1.19,Instituto Hidalguense,Instagram,@institutohidalguense
+de4d8042c29f4037be6ddbc39db71067,2026-01-01 15:11:45.643483,4949,1333,186,135,3.76,Instituto Hidalguense,Instagram,@institutohidalguense
+29eea4fbd29c4dcab47064d0aa5f6940,2025-02-01 15:11:45.643483,7544,2930,181,114,2.4,Instituto Hidalguense,TikTok,@institutohidalguense
+29eea4fbd29c4dcab47064d0aa5f6940,2025-03-01 15:11:45.643483,7830,3780,82,69,1.05,Instituto Hidalguense,TikTok,@institutohidalguense
+29eea4fbd29c4dcab47064d0aa5f6940,2025-04-01 15:11:45.643483,8055,1245,262,223,3.25,Instituto Hidalguense,TikTok,@institutohidalguense
+29eea4fbd29c4dcab47064d0aa5f6940,2025-05-01 15:11:45.643483,8288,2868,48,32,0.58,Instituto Hidalguense,TikTok,@institutohidalguense
+29eea4fbd29c4dcab47064d0aa5f6940,2025-06-01 15:11:45.643483,8618,3635,152,134,1.76,Instituto Hidalguense,TikTok,@institutohidalguense
+29eea4fbd29c4dcab47064d0aa5f6940,2025-07-01 15:11:45.643483,8672,885,331,244,3.82,Instituto Hidalguense,TikTok,@institutohidalguense
+29eea4fbd29c4dcab47064d0aa5f6940,2025-08-01 15:11:45.643483,8765,1790,343,236,3.91,Instituto Hidalguense,TikTok,@institutohidalguense
+29eea4fbd29c4dcab47064d0aa5f6940,2025-09-01 15:11:45.643483,8840,2329,259,166,2.93,Instituto Hidalguense,TikTok,@institutohidalguense
+29eea4fbd29c4dcab47064d0aa5f6940,2025-10-01 15:11:45.643483,9123,3703,263,197,2.88,Instituto Hidalguense,TikTok,@institutohidalguense
+29eea4fbd29c4dcab47064d0aa5f6940,2025-11-01 15:11:45.643483,9171,2406,83,66,0.91,Instituto Hidalguense,TikTok,@institutohidalguense
+29eea4fbd29c4dcab47064d0aa5f6940,2025-12-01 15:11:45.643483,9409,2304,139,90,1.48,Instituto Hidalguense,TikTok,@institutohidalguense
+29eea4fbd29c4dcab47064d0aa5f6940,2026-01-01 15:11:45.643483,9638,4690,299,258,3.1,Instituto Hidalguense,TikTok,@institutohidalguense
+1981f26ebe014877b10fff831af1f536,2025-02-01 15:11:45.643483,4888,574,183,131,3.74,Instituto México Primaria,Facebook,@institutomexicoprimaria
+1981f26ebe014877b10fff831af1f536,2025-03-01 15:11:45.643483,4960,1266,159,129,3.21,Instituto México Primaria,Facebook,@institutomexicoprimaria
+1981f26ebe014877b10fff831af1f536,2025-04-01 15:11:45.643483,5083,2182,121,74,2.38,Instituto México Primaria,Facebook,@institutomexicoprimaria
+1981f26ebe014877b10fff831af1f536,2025-05-01 15:11:45.643483,5117,1701,55,37,1.07,Instituto México Primaria,Facebook,@institutomexicoprimaria
+1981f26ebe014877b10fff831af1f536,2025-06-01 15:11:45.643483,5256,1333,197,124,3.75,Instituto México Primaria,Facebook,@institutomexicoprimaria
+1981f26ebe014877b10fff831af1f536,2025-07-01 15:11:45.643483,5373,2513,213,139,3.96,Instituto México Primaria,Facebook,@institutomexicoprimaria
+1981f26ebe014877b10fff831af1f536,2025-08-01 15:11:45.643483,5434,2369,67,43,1.23,Instituto México Primaria,Facebook,@institutomexicoprimaria
+1981f26ebe014877b10fff831af1f536,2025-09-01 15:11:45.643483,5676,1940,90,75,1.59,Instituto México Primaria,Facebook,@institutomexicoprimaria
+1981f26ebe014877b10fff831af1f536,2025-10-01 15:11:45.643483,5754,1533,129,112,2.24,Instituto México Primaria,Facebook,@institutomexicoprimaria
+1981f26ebe014877b10fff831af1f536,2025-11-01 15:11:45.643483,5853,1946,145,91,2.48,Instituto México Primaria,Facebook,@institutomexicoprimaria
+1981f26ebe014877b10fff831af1f536,2025-12-01 15:11:45.643483,5822,1435,95,70,1.63,Instituto México Primaria,Facebook,@institutomexicoprimaria
+1981f26ebe014877b10fff831af1f536,2026-01-01 15:11:45.643483,5818,1862,202,137,3.47,Instituto México Primaria,Facebook,@institutomexicoprimaria
+1ce3c003d14349199b10289c5d364603,2025-02-01 15:11:45.643483,4814,563,149,114,3.1,Instituto México Primaria,Instagram,@instmexico1stsection
+1ce3c003d14349199b10289c5d364603,2025-03-01 15:11:45.643483,4852,2189,184,132,3.79,Instituto México Primaria,Instagram,@instmexico1stsection
+1ce3c003d14349199b10289c5d364603,2025-04-01 15:11:45.643483,5055,1239,184,115,3.64,Instituto México Primaria,Instagram,@instmexico1stsection
+1ce3c003d14349199b10289c5d364603,2025-05-01 15:11:45.643483,5033,804,201,147,3.99,Instituto México Primaria,Instagram,@instmexico1stsection
+1ce3c003d14349199b10289c5d364603,2025-06-01 15:11:45.643483,4996,1626,195,127,3.9,Instituto México Primaria,Instagram,@instmexico1stsection
+1ce3c003d14349199b10289c5d364603,2025-07-01 15:11:45.643483,5036,704,64,39,1.27,Instituto México Primaria,Instagram,@instmexico1stsection
+1ce3c003d14349199b10289c5d364603,2025-08-01 15:11:45.643483,5116,2275,58,43,1.13,Instituto México Primaria,Instagram,@instmexico1stsection
+1ce3c003d14349199b10289c5d364603,2025-09-01 15:11:45.643483,5107,588,68,59,1.33,Instituto México Primaria,Instagram,@instmexico1stsection
+1ce3c003d14349199b10289c5d364603,2025-10-01 15:11:45.643483,5207,2211,199,141,3.82,Instituto México Primaria,Instagram,@instmexico1stsection
+1ce3c003d14349199b10289c5d364603,2025-11-01 15:11:45.643483,5183,1544,171,118,3.3,Instituto México Primaria,Instagram,@instmexico1stsection
+1ce3c003d14349199b10289c5d364603,2025-12-01 15:11:45.643483,5353,2082,58,44,1.08,Instituto México Primaria,Instagram,@instmexico1stsection
+1ce3c003d14349199b10289c5d364603,2026-01-01 15:11:45.643483,5387,620,98,83,1.82,Instituto México Primaria,Instagram,@instmexico1stsection
+6292088778174d0a991e0df1d9dd011c,2025-02-01 15:11:45.643483,7233,2543,140,96,1.94,Instituto México Secundaria,Facebook,@institutomexicosecundaria
+6292088778174d0a991e0df1d9dd011c,2025-03-01 15:11:45.643483,7262,1910,132,92,1.82,Instituto México Secundaria,Facebook,@institutomexicosecundaria
+6292088778174d0a991e0df1d9dd011c,2025-04-01 15:11:45.643483,7522,1267,219,178,2.91,Instituto México Secundaria,Facebook,@institutomexicosecundaria
+6292088778174d0a991e0df1d9dd011c,2025-05-01 15:11:45.643483,7711,2135,71,51,0.92,Instituto México Secundaria,Facebook,@institutomexicosecundaria
+6292088778174d0a991e0df1d9dd011c,2025-06-01 15:11:45.643483,8081,4009,131,101,1.62,Instituto México Secundaria,Facebook,@institutomexicosecundaria
+6292088778174d0a991e0df1d9dd011c,2025-07-01 15:11:45.643483,8158,3757,52,39,0.64,Instituto México Secundaria,Facebook,@institutomexicosecundaria
+6292088778174d0a991e0df1d9dd011c,2025-08-01 15:11:45.643483,8366,3914,106,79,1.27,Instituto México Secundaria,Facebook,@institutomexicosecundaria
+6292088778174d0a991e0df1d9dd011c,2025-09-01 15:11:45.643483,8453,3643,141,120,1.67,Instituto México Secundaria,Facebook,@institutomexicosecundaria
+6292088778174d0a991e0df1d9dd011c,2025-10-01 15:11:45.643483,8571,3046,234,160,2.73,Instituto México Secundaria,Facebook,@institutomexicosecundaria
+6292088778174d0a991e0df1d9dd011c,2025-11-01 15:11:45.643483,8941,2886,323,199,3.61,Instituto México Secundaria,Facebook,@institutomexicosecundaria
+6292088778174d0a991e0df1d9dd011c,2025-12-01 15:11:45.643483,8951,3054,88,55,0.98,Instituto México Secundaria,Facebook,@institutomexicosecundaria
+6292088778174d0a991e0df1d9dd011c,2026-01-01 15:11:45.643483,9294,4179,47,34,0.51,Instituto México Secundaria,Facebook,@institutomexicosecundaria
+6febced6cc6a42e38e5cd95d106a270f,2025-02-01 15:11:45.643483,1227,581,30,23,2.44,Instituto México Secundaria,Instagram,@institutomexico2daseccion
+6febced6cc6a42e38e5cd95d106a270f,2025-03-01 15:11:45.643483,1283,135,20,15,1.56,Instituto México Secundaria,Instagram,@institutomexico2daseccion
+6febced6cc6a42e38e5cd95d106a270f,2025-04-01 15:11:45.643483,1307,251,33,20,2.52,Instituto México Secundaria,Instagram,@institutomexico2daseccion
+6febced6cc6a42e38e5cd95d106a270f,2025-05-01 15:11:45.643483,1326,225,12,7,0.9,Instituto México Secundaria,Instagram,@institutomexico2daseccion
+6febced6cc6a42e38e5cd95d106a270f,2025-06-01 15:11:45.643483,1371,213,41,33,2.99,Instituto México Secundaria,Instagram,@institutomexico2daseccion
+6febced6cc6a42e38e5cd95d106a270f,2025-07-01 15:11:45.643483,1379,276,49,37,3.55,Instituto México Secundaria,Instagram,@institutomexico2daseccion
+6febced6cc6a42e38e5cd95d106a270f,2025-08-01 15:11:45.643483,1380,309,21,15,1.52,Instituto México Secundaria,Instagram,@institutomexico2daseccion
+6febced6cc6a42e38e5cd95d106a270f,2025-09-01 15:11:45.643483,1375,638,39,33,2.84,Instituto México Secundaria,Instagram,@institutomexico2daseccion
+6febced6cc6a42e38e5cd95d106a270f,2025-10-01 15:11:45.643483,1418,604,37,25,2.61,Instituto México Secundaria,Instagram,@institutomexico2daseccion
+6febced6cc6a42e38e5cd95d106a270f,2025-11-01 15:11:45.643483,1460,373,55,47,3.77,Instituto México Secundaria,Instagram,@institutomexico2daseccion
+6febced6cc6a42e38e5cd95d106a270f,2025-12-01 15:11:45.643483,1518,403,11,9,0.72,Instituto México Secundaria,Instagram,@institutomexico2daseccion
+6febced6cc6a42e38e5cd95d106a270f,2026-01-01 15:11:45.643483,1554,431,28,22,1.8,Instituto México Secundaria,Instagram,@institutomexico2daseccion
+d3bb2e2596264a3d81fdcb9529d88ca9,2025-02-01 15:11:45.643483,6635,2187,128,102,1.93,Instituto México Toluca,Facebook,@institutomexicotoluca
+d3bb2e2596264a3d81fdcb9529d88ca9,2025-03-01 15:11:45.643483,6810,1770,64,48,0.94,Instituto México Toluca,Facebook,@institutomexicotoluca
+d3bb2e2596264a3d81fdcb9529d88ca9,2025-04-01 15:11:45.643483,7032,2378,218,148,3.1,Instituto México Toluca,Facebook,@institutomexicotoluca
+d3bb2e2596264a3d81fdcb9529d88ca9,2025-05-01 15:11:45.643483,7117,1502,74,62,1.04,Instituto México Toluca,Facebook,@institutomexicotoluca
+d3bb2e2596264a3d81fdcb9529d88ca9,2025-06-01 15:11:45.643483,7256,2953,110,79,1.52,Instituto México Toluca,Facebook,@institutomexicotoluca
+d3bb2e2596264a3d81fdcb9529d88ca9,2025-07-01 15:11:45.643483,7526,2417,198,142,2.63,Instituto México Toluca,Facebook,@institutomexicotoluca
+d3bb2e2596264a3d81fdcb9529d88ca9,2025-08-01 15:11:45.643483,7769,3627,173,155,2.23,Instituto México Toluca,Facebook,@institutomexicotoluca
+d3bb2e2596264a3d81fdcb9529d88ca9,2025-09-01 15:11:45.643483,8083,3832,244,217,3.02,Instituto México Toluca,Facebook,@institutomexicotoluca
+d3bb2e2596264a3d81fdcb9529d88ca9,2025-10-01 15:11:45.643483,8325,2738,291,212,3.5,Instituto México Toluca,Facebook,@institutomexicotoluca
+d3bb2e2596264a3d81fdcb9529d88ca9,2025-11-01 15:11:45.643483,8588,1894,228,179,2.65,Instituto México Toluca,Facebook,@institutomexicotoluca
+d3bb2e2596264a3d81fdcb9529d88ca9,2025-12-01 15:11:45.643483,8812,2654,67,41,0.76,Instituto México Toluca,Facebook,@institutomexicotoluca
+d3bb2e2596264a3d81fdcb9529d88ca9,2026-01-01 15:11:45.643483,8742,2403,271,204,3.1,Instituto México Toluca,Facebook,@institutomexicotoluca
+addfc92154aa45968e5b6b45e4c8ea8c,2025-02-01 15:11:45.643483,7361,3240,269,223,3.65,Instituto México Toluca,Instagram,@institutomexicotoluca
+addfc92154aa45968e5b6b45e4c8ea8c,2025-03-01 15:11:45.643483,7409,889,78,54,1.05,Instituto México Toluca,Instagram,@institutomexicotoluca
+addfc92154aa45968e5b6b45e4c8ea8c,2025-04-01 15:11:45.643483,7633,1669,86,68,1.13,Instituto México Toluca,Instagram,@institutomexicotoluca
+addfc92154aa45968e5b6b45e4c8ea8c,2025-05-01 15:11:45.643483,7613,3493,195,136,2.56,Instituto México Toluca,Instagram,@institutomexicotoluca
+addfc92154aa45968e5b6b45e4c8ea8c,2025-06-01 15:11:45.643483,7941,2530,103,91,1.3,Instituto México Toluca,Instagram,@institutomexicotoluca
+addfc92154aa45968e5b6b45e4c8ea8c,2025-07-01 15:11:45.643483,8213,3987,117,103,1.42,Instituto México Toluca,Instagram,@institutomexicotoluca
+addfc92154aa45968e5b6b45e4c8ea8c,2025-08-01 15:11:45.643483,8410,2161,116,95,1.38,Instituto México Toluca,Instagram,@institutomexicotoluca
+addfc92154aa45968e5b6b45e4c8ea8c,2025-09-01 15:11:45.643483,8717,1608,73,61,0.84,Instituto México Toluca,Instagram,@institutomexicotoluca
+addfc92154aa45968e5b6b45e4c8ea8c,2025-10-01 15:11:45.643483,8839,2057,185,121,2.09,Instituto México Toluca,Instagram,@institutomexicotoluca
+addfc92154aa45968e5b6b45e4c8ea8c,2025-11-01 15:11:45.643483,8805,1983,257,156,2.92,Instituto México Toluca,Instagram,@institutomexicotoluca
+addfc92154aa45968e5b6b45e4c8ea8c,2025-12-01 15:11:45.643483,8848,3672,207,142,2.34,Instituto México Toluca,Instagram,@institutomexicotoluca
+addfc92154aa45968e5b6b45e4c8ea8c,2026-01-01 15:11:45.643483,8760,3584,266,204,3.04,Instituto México Toluca,Instagram,@institutomexicotoluca
+ec8170391f8b42df9d74d655045d4bb7,2025-02-01 15:11:45.643483,6974,1875,264,191,3.79,Instituto Potosino,Facebook,@institutopotosino
+ec8170391f8b42df9d74d655045d4bb7,2025-03-01 15:11:45.643483,7166,1868,215,142,3.0,Instituto Potosino,Facebook,@institutopotosino
+ec8170391f8b42df9d74d655045d4bb7,2025-04-01 15:11:45.643483,7470,3378,55,46,0.74,Instituto Potosino,Facebook,@institutopotosino
+ec8170391f8b42df9d74d655045d4bb7,2025-05-01 15:11:45.643483,7460,1779,124,96,1.66,Instituto Potosino,Facebook,@institutopotosino
+ec8170391f8b42df9d74d655045d4bb7,2025-06-01 15:11:45.643483,7456,3629,129,82,1.73,Instituto Potosino,Facebook,@institutopotosino
+ec8170391f8b42df9d74d655045d4bb7,2025-07-01 15:11:45.643483,7709,2310,70,53,0.91,Instituto Potosino,Facebook,@institutopotosino
+ec8170391f8b42df9d74d655045d4bb7,2025-08-01 15:11:45.643483,7751,1854,166,125,2.14,Instituto Potosino,Facebook,@institutopotosino
+ec8170391f8b42df9d74d655045d4bb7,2025-09-01 15:11:45.643483,8012,3361,156,113,1.95,Instituto Potosino,Facebook,@institutopotosino
+ec8170391f8b42df9d74d655045d4bb7,2025-10-01 15:11:45.643483,8201,2991,217,159,2.65,Instituto Potosino,Facebook,@institutopotosino
+ec8170391f8b42df9d74d655045d4bb7,2025-11-01 15:11:45.643483,8156,1390,115,97,1.41,Instituto Potosino,Facebook,@institutopotosino
+ec8170391f8b42df9d74d655045d4bb7,2025-12-01 15:11:45.643483,8205,986,122,88,1.49,Instituto Potosino,Facebook,@institutopotosino
+ec8170391f8b42df9d74d655045d4bb7,2026-01-01 15:11:45.643483,8214,2387,72,56,0.88,Instituto Potosino,Facebook,@institutopotosino
+5a69cf6a6b944f5d9c6563e78c21246a,2025-02-01 15:11:45.643483,1114,160,44,31,3.95,Instituto Potosino,Instagram,@institutopotosino
+5a69cf6a6b944f5d9c6563e78c21246a,2025-03-01 15:11:45.643483,1162,380,18,16,1.55,Instituto Potosino,Instagram,@institutopotosino
+5a69cf6a6b944f5d9c6563e78c21246a,2025-04-01 15:11:45.643483,1170,501,7,6,0.6,Instituto Potosino,Instagram,@institutopotosino
+5a69cf6a6b944f5d9c6563e78c21246a,2025-05-01 15:11:45.643483,1203,302,21,19,1.75,Instituto Potosino,Instagram,@institutopotosino
+5a69cf6a6b944f5d9c6563e78c21246a,2025-06-01 15:11:45.643483,1251,502,22,15,1.76,Instituto Potosino,Instagram,@institutopotosino
+5a69cf6a6b944f5d9c6563e78c21246a,2025-07-01 15:11:45.643483,1260,227,12,8,0.95,Instituto Potosino,Instagram,@institutopotosino
+5a69cf6a6b944f5d9c6563e78c21246a,2025-08-01 15:11:45.643483,1273,321,18,12,1.41,Instituto Potosino,Instagram,@institutopotosino
+5a69cf6a6b944f5d9c6563e78c21246a,2025-09-01 15:11:45.643483,1336,615,24,18,1.8,Instituto Potosino,Instagram,@institutopotosino
+5a69cf6a6b944f5d9c6563e78c21246a,2025-10-01 15:11:45.643483,1341,294,25,18,1.86,Instituto Potosino,Instagram,@institutopotosino
+5a69cf6a6b944f5d9c6563e78c21246a,2025-11-01 15:11:45.643483,1386,388,41,27,2.96,Instituto Potosino,Instagram,@institutopotosino
+5a69cf6a6b944f5d9c6563e78c21246a,2025-12-01 15:11:45.643483,1398,301,30,18,2.15,Instituto Potosino,Instagram,@institutopotosino
+5a69cf6a6b944f5d9c6563e78c21246a,2026-01-01 15:11:45.643483,1467,670,24,17,1.64,Instituto Potosino,Instagram,@institutopotosino
+b186f348e70b4a3d8ab0196c015bd64f,2025-02-01 15:11:45.643483,1084,143,18,14,1.66,Instituto Potosino,TikTok,@institutopotosino
+b186f348e70b4a3d8ab0196c015bd64f,2025-03-01 15:11:45.643483,1101,363,11,8,1.0,Instituto Potosino,TikTok,@institutopotosino
+b186f348e70b4a3d8ab0196c015bd64f,2025-04-01 15:11:45.643483,1146,378,19,14,1.66,Instituto Potosino,TikTok,@institutopotosino
+b186f348e70b4a3d8ab0196c015bd64f,2025-05-01 15:11:45.643483,1200,239,47,33,3.92,Instituto Potosino,TikTok,@institutopotosino
+b186f348e70b4a3d8ab0196c015bd64f,2025-06-01 15:11:45.643483,1238,590,15,12,1.21,Instituto Potosino,TikTok,@institutopotosino
+b186f348e70b4a3d8ab0196c015bd64f,2025-07-01 15:11:45.643483,1260,368,13,9,1.03,Instituto Potosino,TikTok,@institutopotosino
+b186f348e70b4a3d8ab0196c015bd64f,2025-08-01 15:11:45.643483,1286,211,14,12,1.09,Instituto Potosino,TikTok,@institutopotosino
+b186f348e70b4a3d8ab0196c015bd64f,2025-09-01 15:11:45.643483,1314,459,46,29,3.5,Instituto Potosino,TikTok,@institutopotosino
+b186f348e70b4a3d8ab0196c015bd64f,2025-10-01 15:11:45.643483,1334,615,51,46,3.82,Instituto Potosino,TikTok,@institutopotosino
+b186f348e70b4a3d8ab0196c015bd64f,2025-11-01 15:11:45.643483,1331,542,50,30,3.76,Instituto Potosino,TikTok,@institutopotosino
+b186f348e70b4a3d8ab0196c015bd64f,2025-12-01 15:11:45.643483,1343,390,28,23,2.08,Instituto Potosino,TikTok,@institutopotosino
+b186f348e70b4a3d8ab0196c015bd64f,2026-01-01 15:11:45.643483,1351,255,44,32,3.26,Instituto Potosino,TikTok,@institutopotosino
+2c4c91cc61224e8e838cf9c93fc924ac,2025-02-01 15:11:45.643483,9243,1730,352,230,3.81,Instituto Queretano San Javier,Facebook,@institutosanjavier
+2c4c91cc61224e8e838cf9c93fc924ac,2025-03-01 15:11:45.643483,9511,2151,78,60,0.82,Instituto Queretano San Javier,Facebook,@institutosanjavier
+2c4c91cc61224e8e838cf9c93fc924ac,2025-04-01 15:11:45.643483,9964,2871,375,249,3.76,Instituto Queretano San Javier,Facebook,@institutosanjavier
+2c4c91cc61224e8e838cf9c93fc924ac,2025-05-01 15:11:45.643483,10398,2829,84,57,0.81,Instituto Queretano San Javier,Facebook,@institutosanjavier
+2c4c91cc61224e8e838cf9c93fc924ac,2025-06-01 15:11:45.643483,10472,1901,332,211,3.17,Instituto Queretano San Javier,Facebook,@institutosanjavier
+2c4c91cc61224e8e838cf9c93fc924ac,2025-07-01 15:11:45.643483,10557,1445,273,242,2.59,Instituto Queretano San Javier,Facebook,@institutosanjavier
+2c4c91cc61224e8e838cf9c93fc924ac,2025-08-01 15:11:45.643483,10529,2803,313,235,2.97,Instituto Queretano San Javier,Facebook,@institutosanjavier
+2c4c91cc61224e8e838cf9c93fc924ac,2025-09-01 15:11:45.643483,10481,2414,177,153,1.69,Instituto Queretano San Javier,Facebook,@institutosanjavier
+2c4c91cc61224e8e838cf9c93fc924ac,2025-10-01 15:11:45.643483,10392,2005,411,264,3.95,Instituto Queretano San Javier,Facebook,@institutosanjavier
+2c4c91cc61224e8e838cf9c93fc924ac,2025-11-01 15:11:45.643483,10867,3529,131,109,1.21,Instituto Queretano San Javier,Facebook,@institutosanjavier
+2c4c91cc61224e8e838cf9c93fc924ac,2025-12-01 15:11:45.643483,10788,3826,323,282,2.99,Instituto Queretano San Javier,Facebook,@institutosanjavier
+2c4c91cc61224e8e838cf9c93fc924ac,2026-01-01 15:11:45.643483,11130,2481,86,73,0.77,Instituto Queretano San Javier,Facebook,@institutosanjavier
+449fb210b0684e6ea09dbcab5c9202fc,2025-02-01 15:11:45.643483,6585,2688,165,113,2.51,Instituto Queretano San Javier,Instagram,@institutosanjavier
+449fb210b0684e6ea09dbcab5c9202fc,2025-03-01 15:11:45.643483,6913,2214,74,47,1.07,Instituto Queretano San Javier,Instagram,@institutosanjavier
+449fb210b0684e6ea09dbcab5c9202fc,2025-04-01 15:11:45.643483,7244,1294,269,176,3.71,Instituto Queretano San Javier,Instagram,@institutosanjavier
+449fb210b0684e6ea09dbcab5c9202fc,2025-05-01 15:11:45.643483,7397,1630,170,130,2.3,Instituto Queretano San Javier,Instagram,@institutosanjavier
+449fb210b0684e6ea09dbcab5c9202fc,2025-06-01 15:11:45.643483,7586,3767,169,135,2.23,Instituto Queretano San Javier,Instagram,@institutosanjavier
+449fb210b0684e6ea09dbcab5c9202fc,2025-07-01 15:11:45.643483,7668,3134,181,152,2.36,Instituto Queretano San Javier,Instagram,@institutosanjavier
+449fb210b0684e6ea09dbcab5c9202fc,2025-08-01 15:11:45.643483,7794,1434,256,200,3.28,Instituto Queretano San Javier,Instagram,@institutosanjavier
+449fb210b0684e6ea09dbcab5c9202fc,2025-09-01 15:11:45.643483,7881,1166,80,65,1.02,Instituto Queretano San Javier,Instagram,@institutosanjavier
+449fb210b0684e6ea09dbcab5c9202fc,2025-10-01 15:11:45.643483,7912,795,87,73,1.1,Instituto Queretano San Javier,Instagram,@institutosanjavier
+449fb210b0684e6ea09dbcab5c9202fc,2025-11-01 15:11:45.643483,8285,4064,249,169,3.01,Instituto Queretano San Javier,Instagram,@institutosanjavier
+449fb210b0684e6ea09dbcab5c9202fc,2025-12-01 15:11:45.643483,8275,2466,96,75,1.16,Instituto Queretano San Javier,Instagram,@institutosanjavier
+449fb210b0684e6ea09dbcab5c9202fc,2026-01-01 15:11:45.643483,8447,2594,288,232,3.41,Instituto Queretano San Javier,Instagram,@institutosanjavier
+740adf5f6b254a528fdb3b190a87d427,2025-02-01 15:11:45.643483,4696,669,151,128,3.22,Instituto Sahuayense,Facebook,@institutosahuayense
+740adf5f6b254a528fdb3b190a87d427,2025-03-01 15:11:45.643483,4668,2151,144,124,3.08,Instituto Sahuayense,Facebook,@institutosahuayense
+740adf5f6b254a528fdb3b190a87d427,2025-04-01 15:11:45.643483,4780,1622,164,99,3.43,Instituto Sahuayense,Facebook,@institutosahuayense
+740adf5f6b254a528fdb3b190a87d427,2025-05-01 15:11:45.643483,4772,2191,138,117,2.89,Instituto Sahuayense,Facebook,@institutosahuayense
+740adf5f6b254a528fdb3b190a87d427,2025-06-01 15:11:45.643483,4774,550,99,81,2.07,Instituto Sahuayense,Facebook,@institutosahuayense
+740adf5f6b254a528fdb3b190a87d427,2025-07-01 15:11:45.643483,4744,767,146,111,3.08,Instituto Sahuayense,Facebook,@institutosahuayense
+740adf5f6b254a528fdb3b190a87d427,2025-08-01 15:11:45.643483,4828,784,153,97,3.17,Instituto Sahuayense,Facebook,@institutosahuayense
+740adf5f6b254a528fdb3b190a87d427,2025-09-01 15:11:45.643483,4813,2159,151,128,3.14,Instituto Sahuayense,Facebook,@institutosahuayense
+740adf5f6b254a528fdb3b190a87d427,2025-10-01 15:11:45.643483,5018,2042,26,21,0.52,Instituto Sahuayense,Facebook,@institutosahuayense
+740adf5f6b254a528fdb3b190a87d427,2025-11-01 15:11:45.643483,5087,1586,97,59,1.91,Instituto Sahuayense,Facebook,@institutosahuayense
+740adf5f6b254a528fdb3b190a87d427,2025-12-01 15:11:45.643483,5275,1984,137,108,2.6,Instituto Sahuayense,Facebook,@institutosahuayense
+740adf5f6b254a528fdb3b190a87d427,2026-01-01 15:11:45.643483,5454,2209,44,28,0.81,Instituto Sahuayense,Facebook,@institutosahuayense
+0b477321019d40e2aacfa0f846761ec1,2025-02-01 15:11:45.643483,4001,472,138,84,3.45,Instituto Sahuayense,Instagram,@institutosahuayense
+0b477321019d40e2aacfa0f846761ec1,2025-03-01 15:11:45.643483,4176,552,100,66,2.39,Instituto Sahuayense,Instagram,@institutosahuayense
+0b477321019d40e2aacfa0f846761ec1,2025-04-01 15:11:45.643483,4155,1768,74,65,1.78,Instituto Sahuayense,Instagram,@institutosahuayense
+0b477321019d40e2aacfa0f846761ec1,2025-05-01 15:11:45.643483,4273,1603,103,64,2.41,Instituto Sahuayense,Instagram,@institutosahuayense
+0b477321019d40e2aacfa0f846761ec1,2025-06-01 15:11:45.643483,4313,1775,167,135,3.87,Instituto Sahuayense,Instagram,@institutosahuayense
+0b477321019d40e2aacfa0f846761ec1,2025-07-01 15:11:45.643483,4414,685,172,152,3.9,Instituto Sahuayense,Instagram,@institutosahuayense
+0b477321019d40e2aacfa0f846761ec1,2025-08-01 15:11:45.643483,4499,735,140,105,3.11,Instituto Sahuayense,Instagram,@institutosahuayense
+0b477321019d40e2aacfa0f846761ec1,2025-09-01 15:11:45.643483,4706,2328,98,73,2.08,Instituto Sahuayense,Instagram,@institutosahuayense
+0b477321019d40e2aacfa0f846761ec1,2025-10-01 15:11:45.643483,4687,1965,125,102,2.67,Instituto Sahuayense,Instagram,@institutosahuayense
+0b477321019d40e2aacfa0f846761ec1,2025-11-01 15:11:45.643483,4712,958,177,151,3.76,Instituto Sahuayense,Instagram,@institutosahuayense
+0b477321019d40e2aacfa0f846761ec1,2025-12-01 15:11:45.643483,4785,1161,83,62,1.73,Instituto Sahuayense,Instagram,@institutosahuayense
+0b477321019d40e2aacfa0f846761ec1,2026-01-01 15:11:45.643483,4827,740,115,77,2.38,Instituto Sahuayense,Instagram,@institutosahuayense
+facca5ef328d482384261ae35e511f3e,2025-02-01 15:11:45.643483,8734,3887,190,125,2.18,Universidad Marista SLP,Facebook,@umaristaSLP
+facca5ef328d482384261ae35e511f3e,2025-03-01 15:11:45.643483,9154,3364,365,244,3.99,Universidad Marista SLP,Facebook,@umaristaSLP
+facca5ef328d482384261ae35e511f3e,2025-04-01 15:11:45.643483,9592,2784,353,283,3.68,Universidad Marista SLP,Facebook,@umaristaSLP
+facca5ef328d482384261ae35e511f3e,2025-05-01 15:11:45.643483,9824,2133,241,196,2.45,Universidad Marista SLP,Facebook,@umaristaSLP
+facca5ef328d482384261ae35e511f3e,2025-06-01 15:11:45.643483,9987,1277,284,229,2.84,Universidad Marista SLP,Facebook,@umaristaSLP
+facca5ef328d482384261ae35e511f3e,2025-07-01 15:11:45.643483,10317,3882,75,67,0.73,Universidad Marista SLP,Facebook,@umaristaSLP
+facca5ef328d482384261ae35e511f3e,2025-08-01 15:11:45.643483,10312,1218,175,121,1.7,Universidad Marista SLP,Facebook,@umaristaSLP
+facca5ef328d482384261ae35e511f3e,2025-09-01 15:11:45.643483,10403,3887,247,199,2.37,Universidad Marista SLP,Facebook,@umaristaSLP
+facca5ef328d482384261ae35e511f3e,2025-10-01 15:11:45.643483,10878,3518,350,235,3.22,Universidad Marista SLP,Facebook,@umaristaSLP
+facca5ef328d482384261ae35e511f3e,2025-11-01 15:11:45.643483,11143,4085,193,158,1.73,Universidad Marista SLP,Facebook,@umaristaSLP
+facca5ef328d482384261ae35e511f3e,2025-12-01 15:11:45.643483,11070,1574,152,115,1.37,Universidad Marista SLP,Facebook,@umaristaSLP
+facca5ef328d482384261ae35e511f3e,2026-01-01 15:11:45.643483,11491,5005,177,106,1.54,Universidad Marista SLP,Facebook,@umaristaSLP
+dea7c36170a04d0481fec66d910089ec,2025-02-01 15:11:45.643483,7204,789,259,209,3.6,Universidad Marista SLP,Instagram,@umaslp
+dea7c36170a04d0481fec66d910089ec,2025-03-01 15:11:45.643483,7548,2055,256,198,3.39,Universidad Marista SLP,Instagram,@umaslp
+dea7c36170a04d0481fec66d910089ec,2025-04-01 15:11:45.643483,7754,2457,51,40,0.66,Universidad Marista SLP,Instagram,@umaslp
+dea7c36170a04d0481fec66d910089ec,2025-05-01 15:11:45.643483,7862,2110,267,181,3.4,Universidad Marista SLP,Instagram,@umaslp
+dea7c36170a04d0481fec66d910089ec,2025-06-01 15:11:45.643483,7985,2199,81,54,1.01,Universidad Marista SLP,Instagram,@umaslp
+dea7c36170a04d0481fec66d910089ec,2025-07-01 15:11:45.643483,8264,1623,121,103,1.46,Universidad Marista SLP,Instagram,@umaslp
+dea7c36170a04d0481fec66d910089ec,2025-08-01 15:11:45.643483,8183,3213,246,199,3.01,Universidad Marista SLP,Instagram,@umaslp
+dea7c36170a04d0481fec66d910089ec,2025-09-01 15:11:45.643483,8212,3999,273,202,3.32,Universidad Marista SLP,Instagram,@umaslp
+dea7c36170a04d0481fec66d910089ec,2025-10-01 15:11:45.643483,8355,1727,194,162,2.32,Universidad Marista SLP,Instagram,@umaslp
+dea7c36170a04d0481fec66d910089ec,2025-11-01 15:11:45.643483,8532,2116,276,208,3.23,Universidad Marista SLP,Instagram,@umaslp
+dea7c36170a04d0481fec66d910089ec,2025-12-01 15:11:45.643483,8930,3540,184,118,2.06,Universidad Marista SLP,Instagram,@umaslp
+dea7c36170a04d0481fec66d910089ec,2026-01-01 15:11:45.643483,9021,1869,281,169,3.11,Universidad Marista SLP,Instagram,@umaslp
+ea5917a85a04460d894fc507b2a89a1e,2025-02-01 15:11:45.643483,5558,1119,179,140,3.22,Universidad Marista de México,Facebook,@umaristamx
+ea5917a85a04460d894fc507b2a89a1e,2025-03-01 15:11:45.643483,5772,1778,50,35,0.87,Universidad Marista de México,Facebook,@umaristamx
+ea5917a85a04460d894fc507b2a89a1e,2025-04-01 15:11:45.643483,5879,1398,136,89,2.31,Universidad Marista de México,Facebook,@umaristamx
+ea5917a85a04460d894fc507b2a89a1e,2025-05-01 15:11:45.643483,5947,2261,133,81,2.24,Universidad Marista de México,Facebook,@umaristamx
+ea5917a85a04460d894fc507b2a89a1e,2025-06-01 15:11:45.643483,6203,688,244,182,3.93,Universidad Marista de México,Facebook,@umaristamx
+ea5917a85a04460d894fc507b2a89a1e,2025-07-01 15:11:45.643483,6288,1365,86,74,1.37,Universidad Marista de México,Facebook,@umaristamx
+ea5917a85a04460d894fc507b2a89a1e,2025-08-01 15:11:45.643483,6536,2122,104,75,1.59,Universidad Marista de México,Facebook,@umaristamx
+ea5917a85a04460d894fc507b2a89a1e,2025-09-01 15:11:45.643483,6587,2960,40,35,0.61,Universidad Marista de México,Facebook,@umaristamx
+ea5917a85a04460d894fc507b2a89a1e,2025-10-01 15:11:45.643483,6909,1620,192,172,2.78,Universidad Marista de México,Facebook,@umaristamx
+ea5917a85a04460d894fc507b2a89a1e,2025-11-01 15:11:45.643483,7100,1866,57,45,0.8,Universidad Marista de México,Facebook,@umaristamx
+ea5917a85a04460d894fc507b2a89a1e,2025-12-01 15:11:45.643483,7257,2278,126,95,1.74,Universidad Marista de México,Facebook,@umaristamx
+ea5917a85a04460d894fc507b2a89a1e,2026-01-01 15:11:45.643483,7230,1322,263,174,3.64,Universidad Marista de México,Facebook,@umaristamx
+d58eefcebdce4d28add2d0a3643ac545,2025-02-01 15:11:45.643483,5789,2065,34,24,0.59,Universidad Marista de México,Instagram,@umaristamx
+d58eefcebdce4d28add2d0a3643ac545,2025-03-01 15:11:45.643483,5946,2952,149,102,2.51,Universidad Marista de México,Instagram,@umaristamx
+d58eefcebdce4d28add2d0a3643ac545,2025-04-01 15:11:45.643483,6139,2457,229,149,3.73,Universidad Marista de México,Instagram,@umaristamx
+d58eefcebdce4d28add2d0a3643ac545,2025-05-01 15:11:45.643483,6157,630,161,103,2.61,Universidad Marista de México,Instagram,@umaristamx
+d58eefcebdce4d28add2d0a3643ac545,2025-06-01 15:11:45.643483,6134,2693,162,141,2.64,Universidad Marista de México,Instagram,@umaristamx
+d58eefcebdce4d28add2d0a3643ac545,2025-07-01 15:11:45.643483,6373,2507,243,165,3.81,Universidad Marista de México,Instagram,@umaristamx
+d58eefcebdce4d28add2d0a3643ac545,2025-08-01 15:11:45.643483,6432,1070,222,176,3.45,Universidad Marista de México,Instagram,@umaristamx
+d58eefcebdce4d28add2d0a3643ac545,2025-09-01 15:11:45.643483,6648,1406,228,182,3.43,Universidad Marista de México,Instagram,@umaristamx
+d58eefcebdce4d28add2d0a3643ac545,2025-10-01 15:11:45.643483,6793,2867,100,75,1.47,Universidad Marista de México,Instagram,@umaristamx
+d58eefcebdce4d28add2d0a3643ac545,2025-11-01 15:11:45.643483,6839,2336,176,146,2.57,Universidad Marista de México,Instagram,@umaristamx
+d58eefcebdce4d28add2d0a3643ac545,2025-12-01 15:11:45.643483,6951,1231,47,29,0.68,Universidad Marista de México,Instagram,@umaristamx
+d58eefcebdce4d28add2d0a3643ac545,2026-01-01 15:11:45.643483,7083,857,280,183,3.95,Universidad Marista de México,Instagram,@umaristamx
+c29cb9ab47b546859b1825c825c153e5,2025-02-01 15:11:45.643483,7180,1557,136,106,1.89,Universidad Marista de México,TikTok,@umaristamx
+c29cb9ab47b546859b1825c825c153e5,2025-03-01 15:11:45.643483,7389,804,186,154,2.52,Universidad Marista de México,TikTok,@umaristamx
+c29cb9ab47b546859b1825c825c153e5,2025-04-01 15:11:45.643483,7439,3360,296,220,3.98,Universidad Marista de México,TikTok,@umaristamx
+c29cb9ab47b546859b1825c825c153e5,2025-05-01 15:11:45.643483,7796,1173,244,156,3.13,Universidad Marista de México,TikTok,@umaristamx
+c29cb9ab47b546859b1825c825c153e5,2025-06-01 15:11:45.643483,8148,2666,277,219,3.4,Universidad Marista de México,TikTok,@umaristamx
+c29cb9ab47b546859b1825c825c153e5,2025-07-01 15:11:45.643483,8379,2977,225,175,2.69,Universidad Marista de México,TikTok,@umaristamx
+c29cb9ab47b546859b1825c825c153e5,2025-08-01 15:11:45.643483,8716,2415,238,173,2.73,Universidad Marista de México,TikTok,@umaristamx
+c29cb9ab47b546859b1825c825c153e5,2025-09-01 15:11:45.643483,9093,3327,293,244,3.22,Universidad Marista de México,TikTok,@umaristamx
+c29cb9ab47b546859b1825c825c153e5,2025-10-01 15:11:45.643483,9050,1862,159,141,1.76,Universidad Marista de México,TikTok,@umaristamx
+c29cb9ab47b546859b1825c825c153e5,2025-11-01 15:11:45.643483,9493,4635,377,273,3.97,Universidad Marista de México,TikTok,@umaristamx
+c29cb9ab47b546859b1825c825c153e5,2025-12-01 15:11:45.643483,9443,3367,289,227,3.06,Universidad Marista de México,TikTok,@umaristamx
+c29cb9ab47b546859b1825c825c153e5,2026-01-01 15:11:45.643483,9553,3317,290,223,3.04,Universidad Marista de México,TikTok,@umaristamx
+92fdd242bdd146d986b88931b18753cb,2025-02-01 15:11:45.643483,7368,2346,225,174,3.05,Universidad Marista de Querétaro,Facebook,@umaq.oficial
+92fdd242bdd146d986b88931b18753cb,2025-03-01 15:11:45.643483,7518,2835,283,223,3.76,Universidad Marista de Querétaro,Facebook,@umaq.oficial
+92fdd242bdd146d986b88931b18753cb,2025-04-01 15:11:45.643483,7795,1994,93,66,1.19,Universidad Marista de Querétaro,Facebook,@umaq.oficial
+92fdd242bdd146d986b88931b18753cb,2025-05-01 15:11:45.643483,7879,1877,205,139,2.6,Universidad Marista de Querétaro,Facebook,@umaq.oficial
+92fdd242bdd146d986b88931b18753cb,2025-06-01 15:11:45.643483,8141,3168,93,71,1.14,Universidad Marista de Querétaro,Facebook,@umaq.oficial
+92fdd242bdd146d986b88931b18753cb,2025-07-01 15:11:45.643483,8401,4053,218,177,2.59,Universidad Marista de Querétaro,Facebook,@umaq.oficial
+92fdd242bdd146d986b88931b18753cb,2025-08-01 15:11:45.643483,8680,3994,54,36,0.62,Universidad Marista de Querétaro,Facebook,@umaq.oficial
+92fdd242bdd146d986b88931b18753cb,2025-09-01 15:11:45.643483,8887,4010,278,247,3.13,Universidad Marista de Querétaro,Facebook,@umaq.oficial
+92fdd242bdd146d986b88931b18753cb,2025-10-01 15:11:45.643483,9081,2728,215,163,2.37,Universidad Marista de Querétaro,Facebook,@umaq.oficial
+92fdd242bdd146d986b88931b18753cb,2025-11-01 15:11:45.643483,9409,3127,90,63,0.96,Universidad Marista de Querétaro,Facebook,@umaq.oficial
+92fdd242bdd146d986b88931b18753cb,2025-12-01 15:11:45.643483,9690,1319,140,116,1.44,Universidad Marista de Querétaro,Facebook,@umaq.oficial
+92fdd242bdd146d986b88931b18753cb,2026-01-01 15:11:45.643483,9755,2389,276,167,2.83,Universidad Marista de Querétaro,Facebook,@umaq.oficial
+7dc0ae1929a344e3ba6949df85f49d2b,2025-02-01 15:11:45.643483,1459,253,28,23,1.92,Universidad Marista de Querétaro,Instagram,@umaq.oficial
+7dc0ae1929a344e3ba6949df85f49d2b,2025-03-01 15:11:45.643483,1469,356,23,18,1.57,Universidad Marista de Querétaro,Instagram,@umaq.oficial
+7dc0ae1929a344e3ba6949df85f49d2b,2025-04-01 15:11:45.643483,1522,648,47,37,3.09,Universidad Marista de Querétaro,Instagram,@umaq.oficial
+7dc0ae1929a344e3ba6949df85f49d2b,2025-05-01 15:11:45.643483,1564,698,29,18,1.85,Universidad Marista de Querétaro,Instagram,@umaq.oficial
+7dc0ae1929a344e3ba6949df85f49d2b,2025-06-01 15:11:45.643483,1640,246,45,32,2.74,Universidad Marista de Querétaro,Instagram,@umaq.oficial
+7dc0ae1929a344e3ba6949df85f49d2b,2025-07-01 15:11:45.643483,1684,693,10,7,0.59,Universidad Marista de Querétaro,Instagram,@umaq.oficial
+7dc0ae1929a344e3ba6949df85f49d2b,2025-08-01 15:11:45.643483,1732,708,49,44,2.83,Universidad Marista de Querétaro,Instagram,@umaq.oficial
+7dc0ae1929a344e3ba6949df85f49d2b,2025-09-01 15:11:45.643483,1775,421,56,45,3.15,Universidad Marista de Querétaro,Instagram,@umaq.oficial
+7dc0ae1929a344e3ba6949df85f49d2b,2025-10-01 15:11:45.643483,1795,821,48,30,2.67,Universidad Marista de Querétaro,Instagram,@umaq.oficial
+7dc0ae1929a344e3ba6949df85f49d2b,2025-11-01 15:11:45.643483,1853,488,29,20,1.57,Universidad Marista de Querétaro,Instagram,@umaq.oficial
+7dc0ae1929a344e3ba6949df85f49d2b,2025-12-01 15:11:45.643483,1913,656,35,23,1.83,Universidad Marista de Querétaro,Instagram,@umaq.oficial
+7dc0ae1929a344e3ba6949df85f49d2b,2026-01-01 15:11:45.643483,1991,348,25,19,1.26,Universidad Marista de Querétaro,Instagram,@umaq.oficial

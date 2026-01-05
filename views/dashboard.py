@@ -16,179 +16,354 @@ from utils import (
     COLEGIOS_MARISTAS,
 )
 from utils.data_manager import load_configs
-from components import COLOR_MAP
-from utils.analytics import calculate_growth_metrics
+from components import COLOR_MAP, inject_custom_css
+from utils.analytics import calculate_growth_metrics, calculate_health_score, apply_moving_average
 
 
-def render():
-    st.title("Tablero Principal")
+def render(df=None):
+    # Inyectar estilos globales desde components
+    inject_custom_css()
 
-    # 0. Leer filtro global de institución
-    selected_institution = st.session_state.get(
-        "global_institution_filter", "Todas las Instituciones"
-    )
+    st.title("Dashboard Global")
 
-    # 1. CARGA DE DATOS
-    cuentas, metricas = load_data()
+    # Micro-interacción: status mientras procesamos/normalizamos el DataFrame
+    with st.status("Buscando datos en la nube..."):
+        # quick check (df already validated above)
+        pass
 
-    # Validación de carga básica
-    if cuentas.empty or metricas.empty:
-        st.info("👋 ¡Bienvenido! Aún no hay datos cargados para analizar.")
-        st.markdown("Ve a la pestaña **Carga de Datos** para subir tu primer reporte.")
-        st.stop()
+    with st.status("Procesando históricos..."):
+        # Si recibimos un DataFrame filtrado desde el entrypoint, úsalo.
+        if df is None or (hasattr(df, "empty") and df.empty):
+            st.info("No hay datos para los filtros seleccionados. Ajusta los filtros o intenta otro periodo.")
+            return
 
-    # 2. FUSIÓN DE DATOS (EL PASO QUE FALTABA) 🔗
-    # Unimos métricas con cuentas para obtener la columna 'entidad'
-    df = pd.merge(metricas, cuentas, on="id_cuenta", how="left")
-    # Si existe 'entidad_x', renombrar a 'entidad'
-    if "entidad_x" in df.columns:
-        df = df.rename(columns={"entidad_x": "entidad"})
-    elif "entidad_y" in df.columns:
-        df = df.rename(columns={"entidad_y": "entidad"})
-    # Si existe 'plataforma_x', renombrar a 'plataforma'
-    if "plataforma_x" in df.columns:
-        df = df.rename(columns={"plataforma_x": "plataforma"})
-    elif "plataforma_y" in df.columns:
-        df = df.rename(columns={"plataforma_y": "plataforma"})
+        # Trabajaremos con dos vistas internas:
+        # - df_full: todo el histórico recibido (p. ej. filtrado por entidad si aplica)
+        # - df_m_month: datos limitados al mes seleccionado (usado para KPIs y ranking)
+        df_full = df.copy()
 
-    # 2.5 Filtrado por institución si aplica
-    if selected_institution != "Todas las Instituciones":
-        df = df[df["entidad"] == selected_institution]
-        cuentas = cuentas[cuentas["entidad"] == selected_institution]
-        st.info(f"🔒 Vista filtrada para: {selected_institution}")
-        if df.empty:
-            st.warning(
-                f"No hay datos para la institución seleccionada: {selected_institution}"
-            )
-            st.stop()
+        # Asegurar tipos antes de cualquier cálculo
+        if "fecha" in df_full.columns:
+            df_full["fecha"] = pd.to_datetime(df_full["fecha"], errors="coerce")
 
-    # 3. VALIDACIÓN DE INTEGRIDAD (Ahora sí pasará) ✅
-    required_cols = ["fecha", "entidad", "engagement_rate"]
-    missing = [c for c in required_cols if c not in df.columns]
+        # Aplicar suavizado (promedio móvil 3M) sobre seguidores e interacciones
+        try:
+            df_full = apply_moving_average(df_full, col="seguidores")
+            if "interacciones" in df_full.columns:
+                df_full = apply_moving_average(df_full, col="interacciones")
+        except Exception as e:
+            logging.warning(f"No se pudo aplicar moving average: {e}")
 
-    if missing:
-        st.error(
-            f"⚠️ Error de Datos: Faltan columnas críticas en el archivo fusionado: {missing}"
+        # Normalizar nombres de columnas resultantes de merges: muchas vistas esperan
+        # columnas como 'plataforma' o 'entidad' sin sufijos. Si el DataFrame tiene
+        # versiones con sufijos (_x/_y), preferirlas. Si ninguna existe, rellenar
+        # con un valor por defecto para evitar KeyError en agrupaciones.
+        for logical in ("plataforma", "entidad", "usuario_red"):
+            if logical in df_full.columns:
+                continue
+            for suff in (f"{logical}_y", f"{logical}_x", f"{logical}"):
+                if suff in df_full.columns:
+                    ser = df_full.loc[:, suff]
+                    if isinstance(ser, pd.DataFrame):
+                        ser = ser.iloc[:, 0]
+                    df_full[logical] = ser
+                    break
+            else:
+                df_full[logical] = "Unknown"
+
+        # Asegurar que las columnas numéricas estén en formato correcto para evitar errores
+        for _col in ("seguidores", "interacciones"):
+            if _col in df_full.columns:
+                df_full[_col] = pd.to_numeric(df_full[_col], errors="coerce").fillna(0)
+
+        # Determinar periodo (mes) a partir del histórico para etiquetas/títulos
+        meses = sorted(df_full["fecha"].dropna().dt.strftime("%Y-%m").unique(), reverse=True)  # type: ignore
+        mes = meses[0] if meses else None
+
+        if not mes:
+            st.info("No hay meses válidos en los datos.")
+            return
+
+        # DataFrame reducido al mes seleccionado (para KPIs y ranking). NO se usa
+        # para calcular la salud ni las series históricas.
+        df_m_month = df_full[df_full["fecha"].dt.strftime("%Y-%m") == mes].copy()  # type: ignore
+
+    # Botón de descarga del reporte HTML usando utils.generar_reporte_html
+    try:
+        report_html = generar_reporte_html(df_m_month, f"Reporte {mes}")
+        st.download_button(
+            "Descargar Reporte HTML",
+            report_html,
+            file_name=f"Reporte_{mes}.html",
+            mime="text/html",
         )
-        st.write("Columnas disponibles:", df.columns.tolist())
-        st.stop()
+    except Exception as e:
+        logging.warning(f"No se pudo generar el reporte HTML: {e}")
+        st.info("No se pudo generar el reporte HTML para descarga. Puedes intentar de nuevo más tarde.")
 
-    # --- CONSTRUCTOR DE VISTAS ---
-    st.markdown("### Constructor de Vistas: Elige tus gráficas favoritas")
-    opciones_graficas = {
-        "Torta de Seguidores": "torta",
-        "Línea de Crecimiento": "linea",
-        "Barras de Interacciones": "barras",
-        "Área de Engagement": "area",
-        "Comparativa Histórica": "historico",
-    }
-    seleccionadas = st.multiselect(
-        "Selecciona hasta 3 gráficas para mostrar:",
-        list(opciones_graficas.keys()),
-        default=["Torta de Seguidores"],
-        max_selections=3,
+    # --- Resumen Ejecutivo ---
+    st.subheader("Resumen Ejecutivo")
+
+    # KPIs principales (migradas desde legacy)
+    # Evitar duplicados por merges erróneos: desduplicar por `id_cuenta` cuando exista.
+    try:
+        if "id_cuenta" in df_m_month.columns:
+            seg_series = df_m_month.drop_duplicates(subset=["id_cuenta"])['seguidores']
+            int_series = df_m_month.drop_duplicates(subset=["id_cuenta"])['interacciones']
+        else:
+            # Fallback: desduplicar por entidad+plataforma+fecha
+            seg_series = df_m_month.drop_duplicates(subset=["entidad", "plataforma", "fecha"])['seguidores']
+            int_series = df_m_month.drop_duplicates(subset=["entidad", "plataforma", "fecha"])['interacciones']
+        tot_seg = int(seg_series.sum())
+        tot_int = int(int_series.sum())
+    except Exception:
+        tot_seg = int(df_m_month['seguidores'].sum()) if 'seguidores' in df_m_month.columns else 0
+        tot_int = int(df_m_month['interacciones'].sum()) if 'interacciones' in df_m_month.columns else 0
+    er_global = (tot_int / tot_seg * 100.0) if tot_seg > 0 else 0.0
+
+    # Mes anterior para MoM
+    meses_disponibles = sorted(df_full["fecha"].dropna().dt.strftime("%Y-%m").unique(), reverse=True)  # type: ignore
+    mes_anterior = meses_disponibles[1] if len(meses_disponibles) > 1 else None
+
+    yoy_seg = None
+    if mes_anterior:
+        df_prev = df_full[df_full["fecha"].dt.strftime("%Y-%m") == mes_anterior]  # type: ignore
+        # usar desduplicación consistente para comparar
+        if "id_cuenta" in df_prev.columns:
+            seg_prev = df_prev.drop_duplicates(subset=["id_cuenta"])['seguidores'].sum()
+            int_prev = df_prev.drop_duplicates(subset=["id_cuenta"])['interacciones'].sum()
+        else:
+            seg_prev = df_prev.drop_duplicates(subset=["entidad", "plataforma", "fecha"])['seguidores'].sum()
+            int_prev = df_prev.drop_duplicates(subset=["entidad", "plataforma", "fecha"])['interacciones'].sum()
+        er_prev = (int_prev / seg_prev * 100.0) if seg_prev > 0 else 0.0
+        delta_seg = ((tot_seg - seg_prev) / seg_prev * 100.0) if seg_prev > 0 else 0.0
+        delta_int = ((tot_int - int_prev) / int_prev * 100.0) if int_prev > 0 else 0.0
+        delta_er = er_global - er_prev
+        # Detector de anomalías: alerta si el delta de seguidores es > +/-20%
+        try:
+            if abs(delta_seg) > 20:
+                st.warning(
+                    "⚠️ Se detectó un salto inusual en los datos. Verifica la consistencia de las capturas manuales."
+                )
+        except Exception:
+            # Si delta_seg no está definido o hay error, no hacer nada
+            pass
+        # YoY: comparar mismo mes año anterior
+        try:
+            mes_dt = pd.to_datetime(mes + "-01")
+            prev_year_dt = mes_dt - pd.DateOffset(years=1)
+            prev_year_str = prev_year_dt.strftime("%Y-%m")
+            df_prev_year = df[df["fecha"].dt.strftime("%Y-%m") == prev_year_str]
+            seg_prev_year = df_prev_year["seguidores"].sum() if not df_prev_year.empty else 0
+            if seg_prev_year > 0:
+                yoy_seg = (tot_seg - seg_prev_year) / seg_prev_year * 100.0
+            else:
+                yoy_seg = None
+        except Exception:
+            yoy_seg = None
+    else:
+        delta_seg = 0.0
+        delta_int = 0.0
+        delta_er = 0.0
+
+    # Health score (calculate before rendering KPIs) — usar el histórico completo
+    health_score = calculate_health_score(df_full)
+
+    k1, k2, k3, k4 = st.columns(4)
+    # Mostrar MoM y YoY juntos cuando estén disponibles
+    if mes_anterior:
+        if yoy_seg is not None:
+            delta_display = f"{delta_seg:+.1f}% (YoY {yoy_seg:+.1f}%)"
+        else:
+            delta_display = f"{delta_seg:+.1f}%"
+    else:
+        delta_display = "-"
+
+    k1.metric(
+        "Seguidores",
+        f"{tot_seg:,.0f}",
+        delta=delta_display,
+    )
+    k2.metric(
+        "Interacciones",
+        f"{tot_int:,.0f}",
+        delta=f"{delta_int:+.1f}%" if mes_anterior else "-",
+    )
+    k3.metric(
+        "Engagement",
+        f"{er_global:.2f}%",
+        delta=f"{delta_er:+.2f} pp" if mes_anterior else "-",
+    )
+    # Salud Digital: mostrar número y color
+    score_label = f"{health_score:.0f}"
+    if health_score > 80:
+        color = "#2ecc71"  # green
+    elif health_score > 60:
+        color = "#f1c40f"  # yellow
+    else:
+        color = "#e74c3c"  # red
+    # Badge Pro: tarjeta con borde dinámico y tooltip explicativo
+    tooltip = (
+        "Este score promedia tu Engagement (50%), Crecimiento Anual (30%) y Consistencia (20%)."
+    )
+    k4.markdown(
+        f"<div title='{tooltip}' style='padding:8px;border-radius:8px;border:2px solid {color};background:#ffffff;text-align:center;'>"
+        f"<div style='font-size:11px;color:#666;margin-bottom:6px;'>Salud Digital</div>"
+        f"<div style='font-size:22px;font-weight:800;color:{color};'>{score_label}</div>"
+        f"<div style='font-size:11px;color:#444;margin-top:6px;'>Score (0-100)</div>"
+        f"</div>",
+        unsafe_allow_html=True,
     )
 
-    # KPIs rápidos
-    st.markdown("### Resumen Ejecutivo")
-    col1, col2, col3 = st.columns(3)
-    col1.metric("Total Seguidores", f"{df['seguidores'].sum():,.0f}")
-    col2.metric("Total Interacciones", f"{df['interacciones'].sum():,.0f}")
+    st.markdown("---")
 
-    # Renderizar gráficas seleccionadas
-    for graf in seleccionadas:
-        tipo = opciones_graficas[graf]
-        if tipo == "torta":
-            fig = px.pie(
-                df,
-                values="seguidores",
-                names="entidad",
-                title="Distribución de Seguidores por Colegio",
-            )
-            st.plotly_chart(fig, use_container_width=True)
-        elif tipo == "linea":
-            if "fecha" in df.columns:
-                df_mes = df.copy()
-                df_mes["Mes"] = (
-                    pd.to_datetime(df_mes["fecha"]).dt.to_period("M").astype(str)
+    # --- Análisis Detallado ---
+    st.subheader("Análisis Detallado")
+
+    # --- Gráficos principales (area y barras) respetando COLOR_MAP ---
+    # Usar pestañas para evitar scroll infinito y mejorar la jerarquía de información
+    tab_evo, tab_rank = st.tabs(["Evolución", "Ranking"])
+
+    with tab_evo:
+        # Área: evolución de seguidores por plataforma (usar df_full para mostrar tendencia completa)
+        df_evo = (
+            df_full.groupby(["fecha", "plataforma"])["seguidores"].sum().reset_index()
+        )
+        fig_area = px.area(
+            df_evo,
+            x="fecha",
+            y="seguidores",
+            color="plataforma",
+            color_discrete_map=COLOR_MAP,
+            title="Tendencia de Seguidores por Plataforma",
+        )
+        fig_area.update_layout(autosize=True)
+
+        # Añadir línea de tendencia suavizada por plataforma
+        try:
+            if "seguidores_ma3" in df_full.columns:
+                df_trend = (
+                    df_full.groupby(["fecha", "plataforma"])["seguidores_ma3"].sum().reset_index()
                 )
-                resumen = (
-                    df_mes.groupby("Mes")
-                    .agg({"seguidores": "sum", "interacciones": "sum"})
-                    .reset_index()
+                import plotly.graph_objects as go
+
+                for plat in df_trend["plataforma"].unique():
+                    dfp = df_trend[df_trend["plataforma"] == plat].sort_values("fecha")
+                    fig_area.add_trace(
+                        go.Scatter(
+                            x=dfp["fecha"],
+                            y=dfp["seguidores_ma3"],
+                            mode="lines",
+                            name=f"{plat} - Tendencia Suavizada",
+                            line=dict(width=2, dash="dash"),
+                            hoverinfo="skip",
+                        )
+                    )
+        except Exception as e:
+            logging.warning(f"No se pudo agregar línea de tendencia: {e}")
+
+        st.plotly_chart(
+            fig_area,
+            width="stretch",
+            config={"displayModeBar": False, "responsive": True},
+        )
+
+        # Línea adicional: interacciones con tendencia suavizada
+        try:
+            if "interacciones" in df_full.columns:
+                df_int = (
+                    df_full.groupby(["fecha", "plataforma"])["interacciones"].sum().reset_index()
                 )
-                fig = px.line(
-                    resumen,
-                    x="Mes",
-                    y=["seguidores", "interacciones"],
-                    markers=True,
-                    title="Crecimiento Mensual",
-                )
-                st.plotly_chart(fig, use_container_width=True)
-        elif tipo == "barras":
-            if "entidad" in df.columns and "interacciones" in df.columns:
-                resumen = (
-                    df.groupby("entidad").agg({"interacciones": "sum"}).reset_index()
-                )
-                fig = px.bar(
-                    resumen,
-                    x="entidad",
+                fig_int = px.line(
+                    df_int,
+                    x="fecha",
                     y="interacciones",
-                    title="Interacciones por Colegio",
+                    color="plataforma",
+                    color_discrete_map=COLOR_MAP,
+                    title="Evolución de Interacciones (Real vs Tendencia)",
                 )
-                st.plotly_chart(fig, use_container_width=True)
-        elif tipo == "area":
-            if "fecha" in df.columns and "engagement_rate" in df.columns:
-                df_mes = df.copy()
-                df_mes["Mes"] = (
-                    pd.to_datetime(df_mes["fecha"]).dt.to_period("M").astype(str)
-                )
-                resumen = (
-                    df_mes.groupby("Mes").agg({"engagement_rate": "mean"}).reset_index()
-                )
-                fig = px.area(
-                    resumen,
-                    x="Mes",
-                    y="engagement_rate",
-                    title="Engagement Rate Mensual",
-                )
-                st.plotly_chart(fig, use_container_width=True)
-        elif tipo == "historico":
-            if "fecha" in df.columns and "seguidores" in df.columns:
-                df_hist = df.copy()
-                df_hist["Mes"] = (
-                    pd.to_datetime(df_hist["fecha"]).dt.to_period("M").astype(str)
-                )
-                fig = px.box(
-                    df_hist,
-                    x="Mes",
-                    y="seguidores",
-                    title="Distribución Histórica de Seguidores",
-                )
-                st.plotly_chart(fig, use_container_width=True)
+                if "interacciones_ma3" in df_full.columns:
+                    df_int_tr = (
+                        df_full.groupby(["fecha", "plataforma"])["interacciones_ma3"].sum().reset_index()
+                    )
+                    import plotly.graph_objects as go
 
-    # --- Tablas de datos retractiles al final ---
-    with st.expander("🔍 Ver datos de cuentas"):
-        st.dataframe(cuentas, use_container_width=True)
+                    for plat in df_int_tr["plataforma"].unique():
+                        dfp = df_int_tr[df_int_tr["plataforma"] == plat].sort_values("fecha")
+                        fig_int.add_trace(
+                            go.Scatter(
+                                x=dfp["fecha"],
+                                y=dfp["interacciones_ma3"],
+                                mode="lines",
+                                name=f"{plat} - Tendencia Suavizada",
+                                line=dict(width=2, dash="dash"),
+                                hoverinfo="skip",
+                            )
+                        )
+                fig_int.update_layout(autosize=True)
+                st.plotly_chart(
+                    fig_int,
+                    width="stretch",
+                    config={"displayModeBar": False, "responsive": True},
+                )
+        except Exception as e:
+            logging.warning(f"No se pudo generar la tendencia de interacciones: {e}")
 
-    with st.expander("🔍 Ver datos de métricas"):
-        st.dataframe(metricas, use_container_width=True)
+    with st.status("¡Listo!"):
+        pass
 
-    # --- Tabla de resumen mensual retractil ---
-    if "fecha" in df.columns:
-        df_mes = df.copy()
-        df_mes["Mes"] = pd.to_datetime(df_mes["fecha"]).dt.to_period("M").astype(str)
-        resumen_mensual = (
-            df_mes.groupby("Mes")
-            .agg(
-                {"seguidores": "sum", "interacciones": "sum", "engagement_rate": "mean"}
-            )
-            .reset_index()
+    with tab_rank:
+        # Barras: ranking por institución para el mes seleccionado
+        resumen = (
+            df_m_month.groupby(["entidad", "plataforma"])["seguidores"].sum().reset_index()
+        )
+        # Ordenar para mostrar mejores arriba
+        resumen = resumen.sort_values("seguidores", ascending=False)
+        fig_bar = px.bar(
+            resumen,
+            x="seguidores",
+            y="entidad",
+            color="plataforma",
+            orientation="h",
+            color_discrete_map=COLOR_MAP,
+            title=f"Ranking de Seguidores ({mes})",
+            barmode="group",
+        )
+        fig_bar.update_traces(textposition="outside")
+        fig_bar.update_layout(autosize=True)
+        st.plotly_chart(
+            fig_bar,
+            width="stretch",
+            config={"displayModeBar": False, "responsive": True},
         )
 
-        with st.expander("📊 Resumen Mensual de Datos"):
-            st.dataframe(resumen_mensual, use_container_width=True)
+    # --- Evolución de la Salud Digital (últimos 6 meses) ---
+    try:
+        # Obtener meses únicos ordenados (ascendente) y tomar los últimos 6 — usar el histórico completo
+        df_full_copy = df_full.copy()
+        df_full_copy["Mes"] = pd.to_datetime(df_full_copy["fecha"]).dt.to_period("M").dt.to_timestamp()
+        months = sorted(df_full_copy["Mes"].dropna().unique())
+        recent_months = months[-6:]
 
-    # --- Tabla de datos detallados retractil ---
-    with st.expander("📋 Datos Detallados"):
-        st.dataframe(df, use_container_width=True)
+        health_points = []
+        labels = []
+        for m in recent_months:
+            # construir dataframe hasta ese mes para permitir cálculo histórico
+            df_up_to = df_full_copy[df_full_copy["Mes"] <= m]
+            score_m = calculate_health_score(df_up_to)
+            labels.append(m.strftime("%Y-%m"))
+            health_points.append(score_m)
+
+        if labels and health_points:
+            fig_health = px.line(x=labels, y=health_points, markers=True, labels={"x": "Mes", "y": "Salud"}, title="Evolución de la Salud Digital (últimos 6 meses)")
+            fig_health.update_traces(line=dict(color="#2b6cb0"))
+            fig_health.update_layout(autosize=True, yaxis=dict(range=[0,100]))
+            st.plotly_chart(fig_health, width="stretch", config={"displayModeBar": False, "responsive": True})
+    except Exception as e:
+        logging.warning(f"No se pudo generar la serie histórica de salud: {e}")
+
+    # Vista de datos plegable
+    with st.expander("Ver datos fuente"):
+        st.dataframe(
+            df_full.sort_values(["entidad", "plataforma"]), width="stretch"
+        )

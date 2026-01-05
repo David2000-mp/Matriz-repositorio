@@ -8,8 +8,11 @@ from pathlib import Path
 import re
 
 
-def render():
-    """Renderiza la vista de historial de versiones y roadmap."""
+def render(df=None):
+    """Renderiza la vista de historial de versiones y roadmap.
+
+    Firma compatible para aceptar un `df` aunque no se utilice.
+    """
     st.title("📋 DOCUMENTACIÓN DEL PROYECTO")
     st.caption("Historial de versiones, roadmap de desarrollo y progreso actual")
 
@@ -157,7 +160,7 @@ def render_changelog():
             data=changelog_content,
             file_name="CHAMPILYTICS_Changelog.md",
             mime="text/markdown",
-            use_container_width=True,
+            width="stretch",
         )
 
     with col_download_2:
@@ -168,7 +171,7 @@ def render_changelog():
             data=plain_text,
             file_name="CHAMPILYTICS_Changelog.txt",
             mime="text/plain",
-            use_container_width=True,
+            width="stretch",
         )
 
     # Footer informativo

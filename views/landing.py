@@ -10,19 +10,19 @@ from utils import load_data, simular, save_batch, reset_db
 from utils.helpers import get_banner_css
 
 
-def render():
+def render(df=None):
     """
     Renderiza la página de inicio con banner hero y navegación rápida.
+
+    Acepta un parámetro `df` por compatibilidad con el enrutador.
     """
 
     # Hero Banner Minimalista Full-Screen
-    banner_css = get_banner_css(
-        "banner_landing.jpg"  # Buscará en images/
-    )
+    banner_css = get_banner_css("banner_landing.jpg")
 
-    # Si no hay banner local, usar gradiente
+    # Si no hay banner local, usar gradiente suave institucional
     if not banner_css:
-        banner_css = "background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);"
+        banner_css = "background: linear-gradient(135deg, #eaf2ff 0%, #d9e7ff 100%);"
 
     # Calcular total de seguidores actuales
     cuentas, metricas = load_data()
@@ -33,32 +33,48 @@ def render():
     if not metricas.empty and not cuentas.empty:
         try:
             df = pd.merge(metricas, cuentas, on="id_cuenta", how="left")
+            # Normalizar columnas para evitar KeyError (entidad/plataforma/usuario_red)
+            for logical in ("entidad", "plataforma", "usuario_red"):
+                if logical in df.columns:
+                    continue
+                for suff in (f"{logical}_y", f"{logical}_x", f"{logical}"):
+                    if suff in df.columns:
+                        ser = df.loc[:, suff]
+                        if isinstance(ser, pd.DataFrame):
+                            ser = ser.squeeze()  # Convertir DataFrame de una columna a Series
+                        df[logical] = ser
+                        break
+                else:
+                    df[logical] = "Unknown"
+
             if "entidad" in df.columns and not df["entidad"].isna().all():
                 # Obtener la fecha más reciente
-                ultima_fecha = df["fecha"].max()
-                df_actual = df[df["fecha"] == ultima_fecha]
-                total_seguidores = int(df_actual["seguidores"].sum())
-                datos_validos = True
-                logging.info(f"Landing - Seguidores totales: {total_seguidores:,}")
+                if "fecha" in df.columns:
+                    df["fecha"] = pd.to_datetime(df["fecha"], errors="coerce")
+                    ultima_fecha = df["fecha"].max()
+                    df_actual = df[df["fecha"] == ultima_fecha]
+                    total_seguidores = int(df_actual["seguidores"].sum())
+                    datos_validos = True
+                    logging.info(f"Landing - Seguidores totales: {total_seguidores:,}")
         except Exception as e:
             logging.warning(f"Error calculando seguidores en landing: {e}")
 
-    # Renderizar hero banner
+    # Renderizar hero banner (estilo minimalista, color institucional)
     st.markdown(
         f'''
         <div class="hero-banner" style="{banner_css}">
             <div class="hero-content" style="max-width: 900px;">
-                <h1 style="font-size: 7rem; margin-bottom: 30px; letter-spacing: 10px; text-shadow: 2px 2px 20px rgba(0,0,0,0.4); font-weight: 900;">
+                <h1 style="font-size: 4rem; margin-bottom: 8px; letter-spacing: 4px; color: #003696; font-weight: 700; text-shadow: none;">
                     CHAMPILYTICS
                 </h1>
-                <p style="font-size: 1.2rem; margin-bottom: 20px; opacity: 0.9; text-shadow: 1px 1px 10px rgba(0,0,0,0.3); letter-spacing: 4px; font-weight: 300;">
+                <p style="font-size: 1rem; margin-bottom: 18px; color: #003696; opacity: 0.9; letter-spacing: 2px; font-weight: 400;">
                     INTELIGENCIA DIGITAL MARISTA
                 </p>
-                <div class="followers-counter">
-                    {total_seguidores:,}
+                <div class="followers-counter" style="font-size:2rem; margin-bottom:6px; color:#042a5a; font-weight:700;">
+                    {f'{total_seguidores:,}' if total_seguidores > 0 else ''}
                 </div>
-                <div class="followers-label" style="margin-bottom: 60px;">
-                    Seguidores Totales Red Marista
+                <div class="followers-label" style="margin-bottom: 40px; color:#042a5a;">
+                    {('Seguidores Totales Red Marista' if total_seguidores > 0 else 'Bienvenido a tu Inteligencia Digital')}
                 </div>
             </div>
         </div>
@@ -66,65 +82,37 @@ def render():
         unsafe_allow_html=True,
     )
 
-    # Sección de navegación rápida
-    st.markdown(
-        "<div style='margin-top: -80px; position: relative; z-index: 10; max-width: 900px; margin-left: auto; margin-right: auto;'>",
-        unsafe_allow_html=True,
-    )
-    st.markdown(
-        """
-        <div style="background: rgba(255,255,255,0.98); backdrop-filter: blur(10px); border-radius: 0; padding: 50px 60px; box-shadow: 0 4px 30px rgba(0,0,0,0.1);">
-            <h2 style="text-align: center; margin-bottom: 40px; color: #003696; font-size: 1.1rem; font-weight: 400; letter-spacing: 3px; text-transform: uppercase;">Navegar</h2>
-        </div>
-    """,
-        unsafe_allow_html=True,
-    )
+    # Accesos rápidos: filas limpias de 4 columnas con iconos
+    st.markdown("<div style='max-width:900px; margin-left:auto; margin-right:auto; margin-top:-30px;'>", unsafe_allow_html=True)
+    cols = st.columns(4)
+    labels_and_pages = [
+        ("📊 Dashboard", "Dashboard Global"),
+        ("📝 Captura", "Captura"),
+        ("📈 Comparativas", "Comparativas"),
+        ("⚙️ Configuración", "Configuración"),
+    ]
 
-    st.markdown("<div style='margin-top: -30px;'>", unsafe_allow_html=True)
-    col1, col2, col3, col4 = st.columns(4)
+    for col, (label, page) in zip(cols, labels_and_pages):
+        with col:
+            if st.button(label, key=f"btn_{page}"):
+                st.session_state["page_selection"] = page
+                st.rerun()
 
-    with col1:
-        if st.button("Dashboard", key="btn_dash", use_container_width=True):
-            st.session_state.page = "dashboard"
-            st.rerun()
-
-    with col2:
-        if st.button("Captura", key="btn_cap", use_container_width=True):
-            st.session_state.page = "captura"
-            st.rerun()
-
-    with col3:
-        if st.button("Análisis", key="btn_ana", use_container_width=True):
-            st.session_state.page = "analisis"
-            st.rerun()
-
-    with col4:
-        if st.button("Configuración", key="btn_cfg", use_container_width=True):
-            st.session_state.page = "config"
-            st.rerun()
-
-    st.markdown("</div></div>", unsafe_allow_html=True)
+    st.markdown("</div>", unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
 
     # Verificar estado de los datos y mostrar alerta si hay problemas
     if not datos_validos:
-        st.markdown('<div class="css-card">', unsafe_allow_html=True)
-        st.warning("⚠️ **Configuración Inicial Requerida**", icon="⚠️")
-        st.info(
-            "Parece que es la primera vez que usas CHAMPILYTICS o los datos necesitan ser regenerados."
-        )
+        st.warning("⚠️ Configuración Inicial Requerida", icon="⚠️")
+        st.info("Parece que es la primera vez que usas CHAMPILYTICS o los datos necesitan ser regenerados.")
 
         st.markdown("### 🚀 Inicio Rápido")
         col1, col2 = st.columns(2)
 
         with col1:
             st.markdown("**Opción 1: Empezar desde Cero**")
-            if st.button(
-                "🗑️ Resetear + Generar Datos Demo",
-                use_container_width=True,
-                type="primary",
-            ):
+            if st.button("🗑️ Resetear + Generar Datos Demo"):
                 progress = st.progress(0)
                 status = st.empty()
 
@@ -136,7 +124,20 @@ def render():
                 progress.progress(66)
                 from utils.data_manager import COLEGIOS_MARISTAS
 
-                save_batch(simular(n=100, colegios_maristas=COLEGIOS_MARISTAS))
+                resultados = simular(n=100, colegios_maristas=COLEGIOS_MARISTAS)
+                # simular() puede devolver (datos, metas). Aceptar ambas formas.
+                try:
+                    if isinstance(resultados, (list, tuple)) and len(resultados) >= 1:
+                        datos_sim = resultados[0]
+                        metas_sim = resultados[1] if len(resultados) > 1 else []
+                    else:
+                        datos_sim = resultados
+                        metas_sim = []
+                except Exception:
+                    datos_sim = resultados
+                    metas_sim = []
+
+                save_batch(datos_sim)  # type: ignore
 
                 progress.progress(100)
                 status.text("✅ ¡Completado!")
@@ -145,10 +146,8 @@ def render():
 
         with col2:
             st.markdown("**Opción 2: Solo Limpiar**")
-            if st.button("🧹 Solo Resetear BD", use_container_width=True):
+            if st.button("🧹 Solo Resetear BD"):
                 with st.spinner("Limpiando..."):
                     reset_db()
                 st.success("Base de datos limpiada")
                 st.rerun()
-
-        st.markdown("</div>", unsafe_allow_html=True)
