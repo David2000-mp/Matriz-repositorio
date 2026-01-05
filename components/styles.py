@@ -34,258 +34,84 @@ COLOR_MAP = {
 
 def inject_custom_css():
     """Inyecta el CSS previo simple (pre-mejoras)."""
-    st.markdown(
-        """
+    new_css = r"""
         <style>
         @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap');
         :root {
-            --primary-color: #003696;
-            --primary-hover: #002a75;
-            --bg-color: #F0F4FF;
-            --card-bg: #E6EEFF;
-            --sidebar-bg: #003696;
+            --primary-color: #002855;
+            --primary-hover: #001f3a;
+            --accent-color: #FFB81C;
+            --bg-color: #F4F6F9;
+            --card-bg: #FFFFFF;
+            --sidebar-bg: #002855;
             --sidebar-text: #ffffff;
-            --button-primary: #003696;
-            --button-secondary: #E6EEFF;
+            --button-primary: #002855;
+            --button-secondary: #FFF4E0;
         }
-        .stApp {
-            font-family: 'Montserrat', sans-serif !important;
-            background-color: var(--bg-color);
-        }
-        [data-testid="stSidebar"] {
-            background-color: var(--sidebar-bg) !important;
-        }
-        [data-testid="stSidebar"] * {
-            color: var(--sidebar-text) !important;
-        }
-        div[data-testid="stVerticalBlock"] > div[style*="background-color"] {
-            background-color: var(--card-bg) !important;
-            border-radius: 12px;
-            padding: 1.5rem;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
-            border: 1px solid #B3C6FF;
-        }
-        .stButton button {
-            background-color: var(--button-primary) !important;
-            color: white !important;
-            border-radius: 8px !important;
-            border: none !important;
-            padding: 0.5rem 1.2rem !important;
-            font-weight: 600 !important;
-            text-transform: none !important;
-            box-shadow: 0 2px 5px rgba(0,54,150,0.2);
-            transition: all 0.3s ease !important;
-        }
-        .stButton button:hover {
-            background-color: var(--primary-hover) !important;
-            transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(0,54,150,0.3);
-        }
-        button[kind="secondary"] {
-            background-color: var(--button-secondary) !important;
-            border: 1px solid var(--primary-color) !important;
-            color: var(--primary-color) !important;
-        }
-        [data-testid="stMetric"] {
-            background-color: var(--card-bg);
-            padding: 15px;
-            border-radius: 10px;
-            border: 1px solid #B3C6FF;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
-            text-align: center; 
-        }
-        [data-testid="stMetricLabel"] {
-            font-size: 0.9rem !important;
-            color: #6c757d !important;
-            font-weight: 500;
-        }
-        [data-testid="stMetricValue"] {
-            font-size: 1.8rem !important;
-            color: var(--primary-color) !important;
-            font-weight: 700;
-        }
-        /* Asegurar texto negro en todos los contenedores principales */
-        .element-container, .stMarkdown, .stText {
-            color: #212529 !important;
-        }
-        /* Headers y títulos - texto oscuro */
-        .stApp h1, .stApp h2, .stApp h3, .stApp h4, .stApp h5, .stApp h6 {
-            color: #212529 !important;
-        }
-        /* Párrafos y texto general - solo aplicar donde no haya override específico */
-        .stApp p {
-            color: #212529 !important;
-        }
-        /* Excepciones para sidebar que debe mantener texto blanco */
-        [data-testid="stSidebar"] h1,
-        [data-testid="stSidebar"] h2,
-        [data-testid="stSidebar"] h3,
-        [data-testid="stSidebar"] p,
-        [data-testid="stSidebar"] span,
-        [data-testid="stSidebar"] div,
-        [data-testid="stSidebar"] label {
-            color: white !important;
-        }
-        /* Cajas de información, advertencia, etc. - texto negro */
-        .stAlert {
-            background-color: white !important;
-        }
-        .stAlert p, .stAlert div, .stAlert span {
-            color: black !important;
-        }
-        /* Info boxes específicos */
-        [data-testid="stAlert"] {
-            background-color: white !important;
-        }
-        [data-testid="stAlert"] p,
-        [data-testid="stAlert"] div,
-        [data-testid="stAlert"] span {
-            color: black !important;
-        }
-        /* Success, warning, error, info messages */
-        .element-container .stAlert {
-            color: black !important;
-        }
-        /* Tablas - fondo blanco, texto negro */
-        .stDataFrame, [data-testid="stDataFrame"] {
-            background-color: white !important;
-        }
-        .stDataFrame th, .stDataFrame td {
-            color: black !important;
-            background-color: white !important;
-        }
-        /* Labels de formularios */
-        label {
-            color: black !important;
-        }
-        [data-testid="stSidebar"] label {
-            color: white !important;
-        }
-        /* Selectbox - texto negro sobre fondo blanco */
-        [data-baseweb="select"] {
-            color: black !important;
-            background-color: white !important;
-        }
-        [data-baseweb="select"]:hover {
-            border-color: var(--primary-color) !important;
-        }
-        [data-baseweb="select"] > div {
-            color: black !important;
-            background-color: white !important;
-        }
-        [data-baseweb="select"] input {
-            color: black !important;
-        }
-        /* Opciones del dropdown */
-        [data-baseweb="menu"] {
-            background-color: white !important;
-        }
-        [data-baseweb="menu"] li {
-            color: black !important;
-            background-color: white !important;
-        }
-        [data-baseweb="menu"] li:hover {
-            background-color: #f0f0f0 !important;
-        }
-        /* Text input, number input, date input */
-        .stTextInput input, .stNumberInput input, .stDateInput input {
-            color: black !important;
-            background-color: white !important;
-        }
-        .stTextInput input::placeholder {
-            color: #666 !important;
-        }
-        /* Text area */
-        .stTextArea textarea {
-            color: black !important;
-            background-color: white !important;
-        }
-        .stTextArea textarea::placeholder {
-            color: #666 !important;
-        }
-        /* Multiselect */
-        [data-baseweb="tag"] {
-            color: black !important;
-            background-color: #e6eeff !important;
-        }
-        /* Radio buttons y checkboxes */
-        .stRadio label, .stCheckbox label {
-            color: black !important;
-        }
-        /* Slider */
-        .stSlider [data-baseweb="slider"] {
-            color: black !important;
-        }
-        /* Tabs - texto negro */
-        .stTabs [data-baseweb="tab-list"] button {
-            color: black !important;
-        }
-        .stTabs [data-baseweb="tab-list"] button[aria-selected="true"] {
-            color: var(--primary-color) !important;
-        }
-        /* Expanders */
-        .streamlit-expanderHeader {
-            color: black !important;
-            background-color: white !important;
-        }
-        .streamlit-expanderContent {
-            background-color: white !important;
-        }
-        .streamlit-expanderContent p,
-        .streamlit-expanderContent div {
-            color: black !important;
-        }
-        /* File uploader */
-        .stFileUploader label,
-        .stFileUploader section {
-            color: black !important;
-        }
-        /* Download button */
-        .stDownloadButton button {
-            color: white !important;
-            background-color: var(--primary-color) !important;
-        }
-        /* Caption text */
-        .caption, [data-testid="stCaptionContainer"] {
-            color: #6c757d !important;
-        }
+        .stApp { font-family: 'Montserrat', sans-serif !important; background-color: var(--bg-color); }
+        [data-testid="stSidebar"] { background-color: var(--sidebar-bg) !important; }
+        [data-testid="stSidebar"] * { color: var(--sidebar-text) !important; }
+
+        /* Card layout for KPIs */
+        .kpi-cards { display:flex; gap:16px; flex-wrap:wrap; margin-bottom:12px; }
+        .kpi-card { background:var(--card-bg) !important; border-radius:12px; padding:14px; flex:1 1 220px; box-shadow:0 4px 6px rgba(0,0,0,0.05); border:1px solid rgba(0,0,0,0.04); border-left:4px solid var(--accent-color); }
+        .kpi-card .kpi-title { color:var(--primary-color); font-weight:700; font-size:0.95rem; }
+        .kpi-card .kpi-value { color:var(--primary-color); font-weight:800; font-size:1.8rem; }
+        .kpi-card .kpi-delta { color:var(--accent-color); font-weight:700; }
+        .kpi-card .kpi-subtitle { color:#666666; font-size:0.85rem; margin-top:6px; }
+
+        .stButton button { background-color:var(--button-primary) !important; color:white !important; border-radius:8px !important; border:none !important; padding:0.5rem 1.2rem !important; font-weight:600 !important; text-transform:none !important; box-shadow:0 2px 5px rgba(0,40,85,0.12); transition:all 0.18s ease !important; }
+        .stButton button:hover { background-color:var(--primary-hover) !important; transform:translateY(-2px); box-shadow:0 6px 14px rgba(0,40,85,0.18); }
+        button[kind="secondary"] { background-color:var(--button-secondary) !important; border:1px solid var(--primary-color) !important; color:var(--primary-color) !important; }
+
+        [data-testid="stMetric"] { background-color:var(--card-bg); padding:12px; border-radius:10px; border:1px solid rgba(0,0,0,0.05); box-shadow:0 2px 6px rgba(0,0,0,0.04); text-align:center; }
+        [data-testid="stMetricValue"] { font-size:1.8rem !important; color:var(--primary-color) !important; font-weight:700; }
+
+        /* Ensure readable text */
+        .element-container, .stMarkdown, .stText { color:#212529 !important; }
+        
+            /* Textareas: asegurar fondo blanco y buen contraste */
+            textarea, .stTextArea textarea, .stTextarea textarea, textarea[role="textbox"] {
+                background-color: var(--card-bg) !important;
+                color: var(--primary-color) !important;
+                border: 1px solid rgba(0,0,0,0.08) !important;
+                border-radius: 8px !important;
+                padding: 8px !important;
+            }
+
+            /* Forzar tipografía negra en controles y bloques generados por Streamlit (clases `st-*`) */
+            [class*="st-"] , [class^="st-"] , [class*="css-"] {
+                color: #000000 !important;
+            }
+            [class*="st-"] input, [class*="st-"] label, [class*="st-"] span, [class*="st-"] div {
+                color: #000000 !important;
+            }
+            /* Preservar colores de banner, badges y botones */
+            .banner * { color: white !important; }
+            .badge { color: white !important; }
+
+        /* Responsive table with hover */
+        .responsive-table { width:100%; overflow-x:auto; border-radius:8px; }
+        .responsive-table table { width:100%; border-collapse:collapse; min-width:600px; }
+        .responsive-table th, .responsive-table td { padding:10px 12px; text-align:left; border-bottom:1px solid rgba(0,0,0,0.06); }
+        .responsive-table tr:hover { background-color: rgba(0,40,85,0.03); }
+        .responsive-table thead th { background:linear-gradient(180deg, rgba(0,40,85,0.05), rgba(0,40,85,0.02)); color:var(--primary-color); font-weight:700; }
+
+        /* Badges */
+        .badge { display:inline-block; padding:4px 8px; border-radius:999px; color:white; font-weight:700; font-size:0.75rem; }
+        .badge--danger { background:#D62828; }
+        .badge--success { background:#2E8B57; }
+        .badge--amber { background:var(--accent-color); color:#002855; }
+
+        /* Minor fade in */
+        .kpi-card { animation: fadeInUp 600ms ease both; opacity:0; }
+        @keyframes fadeInUp { from { transform:translateY(8px); opacity:0; } to { transform:translateY(0); opacity:1; } }
+        [data-testid="stMetric"], .stPlotlyChart, .js-plotly-plot { animation: fadeInUp 650ms ease both; opacity:0; }
+        .element-container { animation: fadeInUp 500ms ease both; opacity:0; }
+
         </style>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    # Animación fade-in para tarjetas KPI y micro-interacciones
-    FADE_IN_CSS = """
-    .kpi-card {
-      animation: fadeInUp 600ms ease both;
-      opacity: 0;
-    }
-
-    @keyframes fadeInUp {
-      from { transform: translateY(8px); opacity: 0; }
-      to   { transform: translateY(0); opacity: 1; }
-    }
-
-    .kpi-card .stCard { transition: transform 160ms ease, box-shadow 160ms ease; }
-    .kpi-card:hover { transform: translateY(-4px); box-shadow: 0 6px 18px rgba(0,0,0,0.08); }
-        /* Aplicar fade-in a métricas nativas de Streamlit para compatibilidad */
-        [data-testid="stMetric"] {
-            animation: fadeInUp 600ms ease both;
-            opacity: 0;
-        }
-
-        /* Fade-in para contenedores de gráficos (Plotly/Altair) */
-        .stPlotlyChart, .js-plotly-plot, [data-testid="stPlotlyChart"] {
-            animation: fadeInUp 650ms ease both;
-            opacity: 0;
-        }
-        .element-container {
-            animation: fadeInUp 500ms ease both;
-            opacity: 0;
-        }
     """
     try:
-        st.markdown(f"<style>{FADE_IN_CSS}</style>", unsafe_allow_html=True)
+        st.markdown(new_css, unsafe_allow_html=True)
     except Exception:
-        # No crítico; continuar si no se puede inyectar CSS
         pass

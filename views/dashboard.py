@@ -261,18 +261,38 @@ def render(df=None):
             if row.get('anomalia_interacciones', False):
                 anomalies_list.append(f"Anomalía en interacciones de {row['plataforma']}")
 
-    file_name = f"Reporte_{school_name.replace(' ', '_')}_{period}.pdf"
-    pdf_data = generate_pdf_report(school_name, period, kpis, anomalies_list, health_score)
+    # Preparar nombre de archivo seguro
+    safe_school = str(school_name).replace(' ', '_').replace('/', '_')
+    safe_period = str(period).replace(' ', '_')
+    file_name = f"Reporte_{safe_school}_{safe_period}.pdf"
 
     col1, col2 = st.columns([3, 1])
     with col2:
-        st.download_button(
-            "📥 Descargar Reporte PDF",
-            data=pdf_data,
-            file_name=file_name,
-            mime='application/pdf',
-            help="Genera y descarga un reporte PDF ejecutivo con los datos actuales"
-        )
+        try:
+            pdf_data = generate_pdf_report(school_name, period, kpis, anomalies_list, health_score)
+        except Exception as e:
+            logging.warning(f"No se pudo generar el PDF: {e}")
+            pdf_data = None
+
+        if pdf_data:
+            clicked = st.download_button(
+                "📥 Descargar Reporte PDF",
+                data=pdf_data,
+                file_name=file_name,
+                mime='application/pdf',
+                help="Genera y descarga un reporte PDF ejecutivo con los datos actuales"
+            )
+            if clicked:
+                try:
+                    # st.toast es reciente; intentar y fallback a st.success
+                    if hasattr(st, 'toast'):
+                        st.toast('PDF generado correctamente')
+                    else:
+                        st.success('PDF generado correctamente')
+                except Exception:
+                    st.success('PDF generado correctamente')
+        else:
+            st.info('No se pudo generar el PDF en este momento.')
 
     st.markdown("---")
 
