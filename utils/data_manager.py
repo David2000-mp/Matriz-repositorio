@@ -226,7 +226,6 @@ def validate_and_fill_columns(
 # ===========================
 
 
-@st.cache_data(ttl=60 * 60)
 def load_data() -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
     Carga datos desde Google Sheets con normalización estricta.
@@ -253,7 +252,22 @@ def load_data() -> Tuple[pd.DataFrame, pd.DataFrame]:
                     cuentas["id_cuenta"] = cuentas["id_cuenta"].astype(str).str.strip().str.lower()
         except Exception as e:
             logger.error(f"Error hoja 'cuentas': {e}")
-            st.warning(f"Error leyendo hoja 'cuentas': {e}")
+            try:
+                st.warning(f"Error leyendo hoja 'cuentas': {e}")
+            except Exception:
+                pass
+            try:
+                st.error(f"Error leyendo hoja 'cuentas': {e}")
+            except Exception:
+                pass
+            try:
+                logger.warning(f"Error leyendo hoja 'cuentas': {e}")
+            except Exception:
+                pass
+            # Si hay un error de cuota (429), forzar fallback completo a CSV
+            code = getattr(getattr(e, "response", None), "status_code", None)
+            if code == 429 or "429" in str(e) or "quota" in str(e).lower():
+                raise
 
         # Leer HOJA: metricas
         try:
@@ -269,7 +283,22 @@ def load_data() -> Tuple[pd.DataFrame, pd.DataFrame]:
                     metricas["fecha"] = pd.to_datetime(metricas["fecha"], errors="coerce")
         except Exception as e:
             logger.error(f"Error hoja 'metricas': {e}")
-            st.warning(f"Error leyendo hoja 'metricas': {e}")
+            try:
+                st.warning(f"Error leyendo hoja 'metricas': {e}")
+            except Exception:
+                pass
+            try:
+                st.error(f"Error leyendo hoja 'metricas': {e}")
+            except Exception:
+                pass
+            try:
+                logger.warning(f"Error leyendo hoja 'metricas': {e}")
+            except Exception:
+                pass
+            # Si hay un error de cuota (429), forzar fallback completo a CSV
+            code = getattr(getattr(e, "response", None), "status_code", None)
+            if code == 429 or "429" in str(e) or "quota" in str(e).lower():
+                raise
 
         # Filtro de consistencia
         if not cuentas.empty and not metricas.empty:
@@ -277,16 +306,48 @@ def load_data() -> Tuple[pd.DataFrame, pd.DataFrame]:
 
     except Exception as e:
         origin = "local"
-        logger.info(f"Fallo conexión cloud, usando locales: {e}")
+        # Registrar y notificar fallback a CSV. Detectar errores de cuota (429)
+        try:
+            code = getattr(getattr(e, "response", None), "status_code", None)
+            if code == 429 or "429" in str(e) or "quota" in str(e).lower():
+                logger.warning(f"Error 429 detectado en conexión cloud: {e}")
+                try:
+                    st.error(f"429 Quota exceeded: {e}")
+                except Exception:
+                    pass
+            else:
+                logger.warning(f"Fallo conexión cloud, usando locales: {e}")
+                try:
+                    st.warning(f"Fallo conexión cloud, usando locales: {e}")
+                except Exception:
+                    pass
+        except Exception:
+            # Ensure we always log the exception at least
+            try:
+                logger.info(f"Fallo conexión cloud, usando locales: {e}")
+            except Exception:
+                pass
         init_files()
         try:
             if CUENTAS_CSV.exists():
-                cuentas = pd.read_csv(CUENTAS_CSV, dtype=str, encoding="utf-8-sig")
+                try:
+                    cuentas = pd.read_csv(CUENTAS_CSV, dtype=str, encoding="utf-8-sig")
+                except Exception:
+                    try:
+                        cuentas = pd.read_csv(CUENTAS_CSV, dtype=str, encoding="utf-8")
+                    except Exception:
+                        cuentas = pd.DataFrame(columns=COLS_CUENTAS)
                 cuentas.columns = cuentas.columns.str.strip().str.lower()
                 cuentas = validate_and_fill_columns(cuentas, COLS_CUENTAS)
 
             if METRICAS_CSV.exists():
-                metricas = pd.read_csv(METRICAS_CSV, encoding="utf-8-sig")
+                try:
+                    metricas = pd.read_csv(METRICAS_CSV, encoding="utf-8-sig")
+                except Exception:
+                    try:
+                        metricas = pd.read_csv(METRICAS_CSV, encoding="utf-8")
+                    except Exception:
+                        metricas = pd.DataFrame(columns=COLS_METRICAS)
                 metricas.columns = metricas.columns.str.strip().str.lower()
                 metricas = validate_and_fill_columns(metricas, COLS_METRICAS)
                 if "id_cuenta" in metricas.columns:

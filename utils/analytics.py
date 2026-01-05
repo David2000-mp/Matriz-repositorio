@@ -293,3 +293,67 @@ def apply_moving_average(df: pd.DataFrame, col: str) -> pd.DataFrame:
             df_out[ma_col] = df_out[col].rolling(window=3, min_periods=1).mean()
 
     return df_out
+
+
+def detect_anomalies(df: pd.DataFrame, threshold: float = 0.20) -> pd.DataFrame:
+    """
+    Detecta anomalías en métricas comparando contra el promedio móvil o mes anterior.
+
+    Para cada registro mensual, calcula la variación porcentual contra:
+    1. Promedio Móvil de 3 meses (si disponible)
+    2. Mes anterior (como fallback)
+
+    Marca como anomalía si la variación absoluta > threshold (ej. 20%).
+
+    Args:
+        df: DataFrame con columnas 'fecha', 'seguidores', 'interacciones', etc.
+        threshold: Umbral de variación porcentual (0.20 = 20%)
+
+    Returns:
+        DataFrame con columnas adicionales 'anomalia_seguidores', 'anomalia_interacciones'
+    """
+    if df is None or df.empty:
+        return df
+
+    df_out = df.copy()
+    df_out["fecha"] = pd.to_datetime(df_out["fecha"], errors="coerce")
+    df_out = df_out.dropna(subset=["fecha"]).sort_values("fecha")
+
+    # Aplicar MA si no existe
+    if "seguidores_ma3" not in df_out.columns:
+        df_out = apply_moving_average(df_out, "seguidores")
+    if "interacciones_ma3" not in df_out.columns and "interacciones" in df_out.columns:
+        df_out = apply_moving_average(df_out, "interacciones")
+
+    # Función para detectar anomalía en una columna
+    def _detect_anomaly(series, ma_series, prev_series):
+        anomalies = pd.Series(False, index=series.index)
+        for i in range(len(series)):
+            current = series.iloc[i]
+            # Preferir MA si disponible
+            if not pd.isna(ma_series.iloc[i]) and ma_series.iloc[i] != 0:
+                baseline = ma_series.iloc[i]
+            elif i > 0 and not pd.isna(prev_series.iloc[i-1]):
+                baseline = prev_series.iloc[i-1]
+            else:
+                continue  # No baseline available
+
+            if baseline != 0:
+                variation = abs((current - baseline) / baseline)
+                if variation > threshold:
+                    anomalies.iloc[i] = True
+        return anomalies
+
+    # Detectar para seguidores
+    if "seguidores" in df_out.columns:
+        prev_seguidores = df_out["seguidores"].shift(1)
+        ma_seguidores = df_out.get("seguidores_ma3", pd.Series(dtype=float))
+        df_out["anomalia_seguidores"] = _detect_anomaly(df_out["seguidores"], ma_seguidores, prev_seguidores)
+
+    # Detectar para interacciones
+    if "interacciones" in df_out.columns:
+        prev_interacciones = df_out["interacciones"].shift(1)
+        ma_interacciones = df_out.get("interacciones_ma3", pd.Series(dtype=float))
+        df_out["anomalia_interacciones"] = _detect_anomaly(df_out["interacciones"], ma_interacciones, prev_interacciones)
+
+    return df_out

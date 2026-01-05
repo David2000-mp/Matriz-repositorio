@@ -132,6 +132,14 @@ def main():
             meses = sorted(metricas["fecha"].dt.strftime("%Y-%m").unique(), reverse=True)  # type: ignore
             mes_sel = st.selectbox("Periodo", meses, key="filtro_mes")
 
+        # Botón de Reset Filtros
+        if st.button("Reset Filtros", help="Limpia los filtros y devuelve a 'Todos los Colegios'"):
+            if "filtro_entidad" in st.session_state:
+                del st.session_state["filtro_entidad"]
+            if "filtro_mes" in st.session_state:
+                del st.session_state["filtro_mes"]
+            st.rerun()
+
         st.divider()
         st.caption("v2.1.0 • Maristas")
 

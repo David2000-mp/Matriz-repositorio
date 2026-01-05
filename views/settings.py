@@ -54,7 +54,7 @@ def render(df=None):
         registros_estimados = total_cuentas * meses
 
         if st.button(
-            "🚀 Generar Datos de Prueba", width="stretch", type="primary"
+            "🚀 Generar Datos de Prueba", use_container_width=True, type="primary"
         ):
             with st.spinner(
                 f"⏳ Creando {meses} meses de historia para {total_cuentas} cuentas..."
@@ -120,7 +120,7 @@ def render(df=None):
             )
         with col_reset2:
             if st.button(
-                "Resetear Base de Datos", type="secondary", width="stretch"
+                "Resetear Base de Datos", type="secondary", use_container_width=True
             ):
                 reset_db()
                 st.cache_data.clear()
@@ -303,7 +303,7 @@ def render(df=None):
                 inc_analisis = st.checkbox("Análisis (Texto Automático)", value=True)
 
                 # Botón Generar
-                if st.button("Generar PDF", type="primary", width="stretch"):
+                if st.button("Generar PDF", type="primary", use_container_width=True):
                     with st.status("Generando PDF..."):
                         # Filtrar datos por la entidad seleccionada
                         df_filtrado = df_completo[
@@ -364,7 +364,7 @@ def render(df=None):
                 if cols_existentes:
                     st.dataframe(
                         df_vista[cols_existentes].head(10),
-                        width="stretch",
+                        use_container_width=True,
                         hide_index=True,
                     )
                 else:

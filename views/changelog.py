@@ -160,7 +160,7 @@ def render_changelog():
             data=changelog_content,
             file_name="CHAMPILYTICS_Changelog.md",
             mime="text/markdown",
-            width="stretch",
+            use_container_width=True,
         )
 
     with col_download_2:
@@ -171,7 +171,7 @@ def render_changelog():
             data=plain_text,
             file_name="CHAMPILYTICS_Changelog.txt",
             mime="text/plain",
-            width="stretch",
+            use_container_width=True,
         )
 
     # Footer informativo

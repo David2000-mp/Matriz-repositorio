@@ -125,7 +125,7 @@ def render(df=None):
                 )
 
             submitted = st.form_submit_button(
-                "💾 Guardar Datos", width="stretch", type="primary"
+                "💾 Guardar Datos", use_container_width=True, type="primary"
             )
 
             if submitted:

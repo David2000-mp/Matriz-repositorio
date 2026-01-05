@@ -17,7 +17,8 @@ from utils import (
 )
 from utils.data_manager import load_configs
 from components import COLOR_MAP, inject_custom_css
-from utils.analytics import calculate_growth_metrics, calculate_health_score, apply_moving_average
+from utils.analytics import calculate_growth_metrics, calculate_health_score, apply_moving_average, detect_anomalies
+from utils.reports import generate_pdf_report
 
 
 def render(df=None):
@@ -53,6 +54,12 @@ def render(df=None):
                 df_full = apply_moving_average(df_full, col="interacciones")
         except Exception as e:
             logging.warning(f"No se pudo aplicar moving average: {e}")
+
+        # Detectar anomalías
+        try:
+            df_full = detect_anomalies(df_full, threshold=0.20)
+        except Exception as e:
+            logging.warning(f"No se pudo detectar anomalías: {e}")
 
         # Normalizar nombres de columnas resultantes de merges: muchas vistas esperan
         # columnas como 'plataforma' o 'entidad' sin sufijos. Si el DataFrame tiene
@@ -100,6 +107,18 @@ def render(df=None):
     except Exception as e:
         logging.warning(f"No se pudo generar el reporte HTML: {e}")
         st.info("No se pudo generar el reporte HTML para descarga. Puedes intentar de nuevo más tarde.")
+
+    # Verificar anomalías en el mes actual
+    anomalias_mes = df_m_month[
+        (df_m_month.get("anomalia_seguidores", False)) | 
+        (df_m_month.get("anomalia_interacciones", False))
+    ]
+    plataformas_anomalas = anomalias_mes["plataforma"].unique() if not anomalias_mes.empty else []
+
+    # Alerta ejecutiva si hay anomalías
+    if len(plataformas_anomalas) > 0:
+        plataformas_str = ", ".join(plataformas_anomalas)
+        st.warning(f"⚠️ Nota: Se detectó un comportamiento inusual en {plataformas_str} durante este periodo.")
 
     # --- Resumen Ejecutivo ---
     st.subheader("Resumen Ejecutivo")
@@ -169,6 +188,10 @@ def render(df=None):
     # Health score (calculate before rendering KPIs) — usar el histórico completo
     health_score = calculate_health_score(df_full)
 
+    # Verificar si hay anomalías en el mes actual para badges
+    anomalia_seguidores = df_m_month.get("anomalia_seguidores", pd.Series(False)).any()
+    anomalia_interacciones = df_m_month.get("anomalia_interacciones", pd.Series(False)).any()
+
     k1, k2, k3, k4 = st.columns(4)
     # Mostrar MoM y YoY juntos cuando estén disponibles
     if mes_anterior:
@@ -179,16 +202,23 @@ def render(df=None):
     else:
         delta_display = "-"
 
-    k1.metric(
-        "Seguidores",
-        f"{tot_seg:,.0f}",
-        delta=delta_display,
-    )
-    k2.metric(
-        "Interacciones",
-        f"{tot_int:,.0f}",
-        delta=f"{delta_int:+.1f}%" if mes_anterior else "-",
-    )
+    with k1:
+        st.metric(
+            "Seguidores",
+            f"{tot_seg:,.0f}",
+            delta=delta_display,
+        )
+        if anomalia_seguidores:
+            st.markdown("⚠️ **Anomalía detectada**", help="Variación >20% vs promedio móvil o mes anterior")
+
+    with k2:
+        st.metric(
+            "Interacciones",
+            f"{tot_int:,.0f}",
+            delta=f"{delta_int:+.1f}%" if mes_anterior else "-",
+        )
+        if anomalia_interacciones:
+            st.markdown("⚠️ **Anomalía detectada**", help="Variación >20% vs promedio móvil o mes anterior")
     k3.metric(
         "Engagement",
         f"{er_global:.2f}%",
@@ -214,6 +244,35 @@ def render(df=None):
         f"</div>",
         unsafe_allow_html=True,
     )
+
+    # Botón de descarga PDF
+    school_name = st.session_state.get('filtro_entidad', 'Todos')
+    period = st.session_state.get('filtro_mes', mes)
+    kpis = {
+        'seguidores': {'valor': tot_seg, 'delta': delta_display},
+        'interacciones': {'valor': tot_int, 'delta': f"{delta_int:+.1f}%" if mes_anterior else "-"},
+        'engagement': {'valor': f"{er_global:.2f}%", 'delta': f"{delta_er:+.2f} pp" if mes_anterior else "-"}
+    }
+    anomalies_list = []
+    if not anomalias_mes.empty:
+        for _, row in anomalias_mes.iterrows():
+            if row.get('anomalia_seguidores', False):
+                anomalies_list.append(f"Anomalía en seguidores de {row['plataforma']}")
+            if row.get('anomalia_interacciones', False):
+                anomalies_list.append(f"Anomalía en interacciones de {row['plataforma']}")
+
+    file_name = f"Reporte_{school_name.replace(' ', '_')}_{period}.pdf"
+    pdf_data = generate_pdf_report(school_name, period, kpis, anomalies_list, health_score)
+
+    col1, col2 = st.columns([3, 1])
+    with col2:
+        st.download_button(
+            "📥 Descargar Reporte PDF",
+            data=pdf_data,
+            file_name=file_name,
+            mime='application/pdf',
+            help="Genera y descarga un reporte PDF ejecutivo con los datos actuales"
+        )
 
     st.markdown("---")
 
@@ -264,7 +323,7 @@ def render(df=None):
 
         st.plotly_chart(
             fig_area,
-            width="stretch",
+            use_container_width=True,
             config={"displayModeBar": False, "responsive": True},
         )
 
@@ -303,7 +362,7 @@ def render(df=None):
                 fig_int.update_layout(autosize=True)
                 st.plotly_chart(
                     fig_int,
-                    width="stretch",
+                    use_container_width=True,
                     config={"displayModeBar": False, "responsive": True},
                 )
         except Exception as e:
@@ -333,7 +392,7 @@ def render(df=None):
         fig_bar.update_layout(autosize=True)
         st.plotly_chart(
             fig_bar,
-            width="stretch",
+            use_container_width=True,
             config={"displayModeBar": False, "responsive": True},
         )
 
@@ -358,12 +417,12 @@ def render(df=None):
             fig_health = px.line(x=labels, y=health_points, markers=True, labels={"x": "Mes", "y": "Salud"}, title="Evolución de la Salud Digital (últimos 6 meses)")
             fig_health.update_traces(line=dict(color="#2b6cb0"))
             fig_health.update_layout(autosize=True, yaxis=dict(range=[0,100]))
-            st.plotly_chart(fig_health, width="stretch", config={"displayModeBar": False, "responsive": True})
+            st.plotly_chart(fig_health, use_container_width=True, config={"displayModeBar": False, "responsive": True})
     except Exception as e:
         logging.warning(f"No se pudo generar la serie histórica de salud: {e}")
 
     # Vista de datos plegable
     with st.expander("Ver datos fuente"):
         st.dataframe(
-            df_full.sort_values(["entidad", "plataforma"]), width="stretch"
+            df_full.sort_values(["entidad", "plataforma"]), use_container_width=True
         )
