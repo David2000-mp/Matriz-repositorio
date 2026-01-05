@@ -82,14 +82,12 @@ def get_banner_css(image_filename: str, height: str = "200px") -> str:
     img_b64 = load_image(image_filename)
     if img_b64:
         return f"""
-        <div style="
-            background-image: url(data:image/png;base64,{img_b64});
-            background-size: cover;
-            background-position: center;
-            height: {height};
-            border-radius: 10px;
-            margin-bottom: 20px;
-        "></div>
+        background-image: url(data:image/png;base64,{img_b64});
+        background-size: cover;
+        background-position: center;
+        height: {height};
+        border-radius: 10px;
+        margin-bottom: 20px;
         """
     return ""
 

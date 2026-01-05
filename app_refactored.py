@@ -8,6 +8,7 @@ from utils import load_data
 from utils.data_manager import COLEGIOS_MARISTAS
 from components import inject_custom_css
 from views import landing, dashboard, analytics, data_entry, settings, changelog
+from utils.helpers import load_image
 
 
 def main():
@@ -31,6 +32,11 @@ def main():
 
     # Sidebar: El ÚNICO lugar para filtrar
     with st.sidebar:
+        # Logo Marista
+        logo_b64 = load_image("logo_maristas.png")
+        if logo_b64:
+            st.markdown(f'<img src="data:image/png;base64,{logo_b64}" style="width:100px; height:auto; margin-bottom:10px;">', unsafe_allow_html=True)
+        
         st.title("CHAMPILYTICS")
 
         page_key = "page_selection"
