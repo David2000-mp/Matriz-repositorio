@@ -67,8 +67,38 @@ def inject_custom_css():
         [data-testid="stMetric"] { background-color:var(--card-bg); padding:12px; border-radius:10px; border:1px solid rgba(0,0,0,0.05); box-shadow:0 2px 6px rgba(0,0,0,0.04); text-align:center; }
         [data-testid="stMetricValue"] { font-size:1.8rem !important; color:var(--primary-color) !important; font-weight:700; }
 
-        /* Ensure readable text */
-        .element-container, .stMarkdown, .stText { color:#212529 !important; }
+        /* Logo en Sidebar: más grande, centrado, con padding */
+        .logo-marista {
+            width: 120px !important;
+            height: auto !important;
+            display: block !important;
+            margin: 20px auto 10px auto !important;
+            border-radius: 8px !important;
+        }
+
+        /* Banner en Landing: overlay para texto legible */
+        .hero-banner {
+            position: relative;
+            height: 500px !important;  /* Hacer la imagen más grande */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .hero-banner::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.4);
+            z-index: 1;
+        }
+        .hero-banner .hero-content {
+            position: relative;
+            z-index: 2;
+            color: white !important;
+        }
         
             /* Textareas: asegurar fondo blanco y buen contraste */
             textarea, .stTextArea textarea, .stTextarea textarea, textarea[role="textbox"] {

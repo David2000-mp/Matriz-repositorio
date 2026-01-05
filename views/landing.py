@@ -64,16 +64,16 @@ def render(df=None):
         f'''
         <div class="hero-banner" style="{banner_css}">
             <div class="hero-content" style="max-width: 900px;">
-                <h1 style="font-size: 4rem; margin-bottom: 8px; letter-spacing: 4px; color: #003696; font-weight: 700; text-shadow: none;">
+                <h1 style="font-size: 4rem; margin-bottom: 8px; letter-spacing: 4px; color: white; font-weight: 700; text-shadow: none;">
                     CHAMPILYTICS
                 </h1>
-                <p style="font-size: 1rem; margin-bottom: 18px; color: #003696; opacity: 0.9; letter-spacing: 2px; font-weight: 400;">
+                <p style="font-size: 1rem; margin-bottom: 18px; color: white; opacity: 0.9; letter-spacing: 2px; font-weight: 400;">
                     INTELIGENCIA DIGITAL MARISTA
                 </p>
-                <div class="followers-counter" style="font-size:2rem; margin-bottom:6px; color:#042a5a; font-weight:700;">
+                <div class="followers-counter" style="font-size:2rem; margin-bottom:6px; color:white; font-weight:700;">
                     {f'{total_seguidores:,}' if total_seguidores > 0 else ''}
                 </div>
-                <div class="followers-label" style="margin-bottom: 40px; color:#042a5a;">
+                <div class="followers-label" style="margin-bottom: 40px; color:white;">
                     {('Seguidores Totales Red Marista' if total_seguidores > 0 else 'Bienvenido a tu Inteligencia Digital')}
                 </div>
             </div>

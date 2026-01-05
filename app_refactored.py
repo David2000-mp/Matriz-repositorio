@@ -35,7 +35,7 @@ def main():
         # Logo Marista
         logo_b64 = load_image("logo_maristas.png")
         if logo_b64:
-            st.markdown(f'<img src="data:image/png;base64,{logo_b64}" style="width:100px; height:auto; margin-bottom:10px;">', unsafe_allow_html=True)
+            st.markdown(f'<img src="data:image/png;base64,{logo_b64}" class="logo-marista" alt="Logo Marista">', unsafe_allow_html=True)
         
         st.title("CHAMPILYTICS")
 
