@@ -18,11 +18,11 @@ def render(df=None):
     """
 
     # Hero Banner Minimalista Full-Screen
-    banner_css = get_banner_css("banner_landing.jpg")
+    banner_css = get_banner_css("banner_landing.jpg", height="100vh")
 
     # Si no hay banner local, usar gradiente suave institucional
     if not banner_css:
-        banner_css = "background: linear-gradient(135deg, #eaf2ff 0%, #d9e7ff 100%);"
+        banner_css = "background: linear-gradient(135deg, #eaf2ff 0%, #d9e7ff 100%); height: 100vh;"
 
     # Calcular total de seguidores actuales
     cuentas, metricas = load_data()
@@ -63,7 +63,7 @@ def render(df=None):
     st.markdown(
         f'''
         <div class="hero-banner" style="{banner_css}">
-            <div class="hero-content" style="max-width: 900px;">
+            <div class="hero-content" style="max-width: 900px; position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%); text-align: center;">
                 <h1 style="font-size: 4rem; margin-bottom: 8px; letter-spacing: 4px; color: white; font-weight: 700; text-shadow: none;">
                     CHAMPILYTICS
                 </h1>
