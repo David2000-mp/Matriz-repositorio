@@ -62,7 +62,7 @@ def inject_custom_css():
 
         .stButton button { background-color:var(--button-primary) !important; color:white !important; border-radius:8px !important; border:none !important; padding:0.5rem 1.2rem !important; font-weight:600 !important; text-transform:none !important; box-shadow:0 2px 5px rgba(0,40,85,0.12); transition:all 0.18s ease !important; }
         .stButton button:hover { background-color:var(--primary-hover) !important; transform:translateY(-2px); box-shadow:0 6px 14px rgba(0,40,85,0.18); }
-        button[kind="secondary"] { background-color:var(--button-secondary) !important; border:1px solid var(--primary-color) !important; color:var(--primary-color) !important; }
+        button[kind="secondary"] { background-color:var(--button-secondary) !important; border:1px solid var(--primary-color) !important; color: black !important; }
 
         [data-testid="stMetric"] { background-color:var(--card-bg); padding:12px; border-radius:10px; border:1px solid rgba(0,0,0,0.05); box-shadow:0 2px 6px rgba(0,0,0,0.04); text-align:center; }
         [data-testid="stMetricValue"] { font-size:1.8rem !important; color:var(--primary-color) !important; font-weight:700; }
@@ -98,6 +98,13 @@ def inject_custom_css():
             position: relative;
             z-index: 2;
             color: white !important;
+        }
+        .hero-banner .hero-content * {
+            color: white !important;
+        }
+        .hero-banner .hero-content svg {
+            stroke: white !important;
+            fill: white !important;
         }
         
             /* Textareas: asegurar fondo blanco y buen contraste */
