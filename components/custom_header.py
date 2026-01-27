@@ -212,6 +212,16 @@ def render_custom_header():
         .viewerBadge_container__r5tak {
             display: none !important;
         }
+        
+        /* Ocultar títulos duplicados generados por st.title() o st.header() */
+        div[data-testid="stHeadingWithActionElements"] h1#champileaks {
+            display: none !important;
+        }
+        
+        /* Ocultar cualquier h1 que contenga "CHAMPILEAKS" */
+        h1:not(.custom-header-title) {
+            display: none !important;
+        }
         </style>
     """, unsafe_allow_html=True)
     
