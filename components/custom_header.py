@@ -101,15 +101,23 @@ def render_custom_header():
             color: #FFFFFF !important;
         }
         
-        /* Ocultar texto del icono Material (keyboard_double_arrow) */
+        /* Ocultar completamente el texto del icono Material */
         button[data-testid="stExpandSidebarButton"] span[data-testid="stIconMaterial"] {
             font-size: 0 !important;
+            text-indent: -9999px !important;
+            overflow: hidden !important;
+            display: inline-block !important;
+            width: 24px !important;
+            height: 24px !important;
         }
         
-        /* Asegurar que el icono se renderice usando la fuente Material Icons */
-        button[data-testid="stExpandSidebarButton"] span[data-testid="stIconMaterial"]::before {
-            font-size: 24px !important;
-            font-family: 'Material Icons' !important;
+        /* Reemplazar con símbolo de flecha personalizado */
+        button[data-testid="stExpandSidebarButton"] span[data-testid="stIconMaterial"]::after {
+            content: "☰" !important;
+            font-size: 20px !important;
+            text-indent: 0 !important;
+            display: block !important;
+            color: #FFFFFF !important;
         }
         
         /* Ajustar padding del contenido principal */
