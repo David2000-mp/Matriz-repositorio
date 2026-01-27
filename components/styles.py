@@ -257,6 +257,17 @@ def inject_custom_css():
             transition: all 0.2s ease !important;
             cursor: pointer !important;
         }
+        
+        /* Forzar texto blanco en todos los elementos del botón primary */
+        .stButton button *,
+        button[kind="primary"] *,
+        [data-testid="stBaseButton-primary"] *,
+        .stButton button p,
+        button[kind="primary"] p,
+        .stButton button span,
+        button[kind="primary"] span {
+            color: var(--button-text) !important;
+        }
 
         .stButton button:hover,
         button[kind="primary"]:hover {
@@ -285,8 +296,23 @@ def inject_custom_css():
             transition: all 0.2s ease !important;
         }
         
+        /* Texto azul en botones secondary */
+        button[kind="secondary"] *,
+        [data-testid="stBaseButton-secondary"] *,
+        button[kind="secondary"] p,
+        button[kind="secondary"] span {
+            color: var(--primary-color) !important;
+        }
+        
         button[kind="secondary"]:hover {
             background-color: var(--primary-color) !important;
+            color: var(--button-text) !important;
+        }
+        
+        /* Texto blanco en hover de secondary */
+        button[kind="secondary"]:hover *,
+        button[kind="secondary"]:hover p,
+        button[kind="secondary"]:hover span {
             color: var(--button-text) !important;
         }
 

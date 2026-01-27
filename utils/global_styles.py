@@ -339,11 +339,27 @@ def get_global_institutional_css() -> str:
         font-weight: 500 !important;
     }}
     
+    /* Forzar texto blanco en elementos hijos del botón sidebar */
+    section[data-testid="stSidebar"] .stButton > button *,
+    section[data-testid="stSidebar"] .stButton > button p,
+    section[data-testid="stSidebar"] .stButton > button span,
+    section[data-testid="stSidebar"] .stButton > button div {{
+        color: {TEXT_ON_DARK} !important;
+    }}
+    
     section[data-testid="stSidebar"] .stButton > button:hover {{
         background-color: {ACCENT_YELLOW} !important;
         color: {PRIMARY_BLUE_DARK} !important;
         border: none !important;
         border: 1px solid {ACCENT_YELLOW} !important;
+    }}
+    
+    /* Texto oscuro en hover del sidebar */
+    section[data-testid="stSidebar"] .stButton > button:hover *,
+    section[data-testid="stSidebar"] .stButton > button:hover p,
+    section[data-testid="stSidebar"] .stButton > button:hover span,
+    section[data-testid="stSidebar"] .stButton > button:hover div {{
+        color: {PRIMARY_BLUE_DARK} !important;
     }}
     
     /* === CARDS Y CONTENEDORES === */
@@ -495,12 +511,28 @@ def get_global_institutional_css() -> str:
         box-shadow: 0 2px 8px rgba(0, 54, 150, 0.15) !important;
     }}
     
+    /* Forzar texto blanco en todos los elementos dentro del botón */
+    .stButton > button *,
+    .stButton > button p,
+    .stButton > button span,
+    .stButton > button div {{
+        color: {TEXT_ON_DARK} !important;
+    }}
+    
     .stButton > button:hover {{
         background-color: {ACCENT_YELLOW} !important;
         color: {PRIMARY_BLUE_DARK} !important;
         border-color: {ACCENT_YELLOW} !important;
         transform: translateY(-2px) !important;
         box-shadow: 0 4px 12px rgba(255, 184, 28, 0.3) !important;
+    }}
+    
+    /* Texto oscuro legible en hover amarillo */
+    .stButton > button:hover *,
+    .stButton > button:hover p,
+    .stButton > button:hover span,
+    .stButton > button:hover div {{
+        color: {PRIMARY_BLUE_DARK} !important;
     }}
     
     .stButton > button:active {{

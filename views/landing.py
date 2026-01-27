@@ -254,11 +254,31 @@ def render(df=None):
             text-transform: uppercase;
         }}
         
+        /* Forzar texto blanco en todos los niveles del botón */
+        .stButton > button *,
+        .stButton > button p,
+        .stButton > button span,
+        .stButton > button div,
+        .stButton > button div[data-testid="stMarkdownContainer"],
+        .stButton > button div[data-testid="stMarkdownContainer"] p {{
+            color: {TEXT_ON_DARK} !important;
+        }}
+        
         .stButton > button:hover {{
             background: {card_hover_bg} !important;
             transform: translateY(-3px) scale(1.02) !important;
             box-shadow: 0 10px 30px rgba(255, 184, 28, 0.4) !important;
             border: 2px solid {ACCENT_YELLOW} !important;
+            color: {PRIMARY_BLUE_DARK} !important;
+        }}
+        
+        /* Texto oscuro legible en estado hover */
+        .stButton > button:hover *,
+        .stButton > button:hover p,
+        .stButton > button:hover span,
+        .stButton > button:hover div,
+        .stButton > button:hover div[data-testid="stMarkdownContainer"],
+        .stButton > button:hover div[data-testid="stMarkdownContainer"] p {{
             color: {PRIMARY_BLUE_DARK} !important;
         }}
         
