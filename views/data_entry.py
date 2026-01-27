@@ -1,0 +1,551 @@
+"""
+Vista de Captura Manual de Datos para CHAMPILEAKS.
+Formulario para ingreso manual de métricas.
+"""
+
+import streamlit as st
+import pandas as pd
+from datetime import date
+import logging
+from utils.data_provider import data_provider
+from utils.helpers import generate_social_url
+from utils.data_manager import (
+    save_comment,
+    load_usernames_editados,
+    save_username_editado,
+    save_batch,
+    invalidate_caches,
+)
+from utils.catalog import COLEGIOS_MARISTAS, PLATAFORMAS_REQUERIDAS
+from utils.data_saver import get_id
+from utils.analytics import calculate_likes_promedio, estimate_reach
+
+
+def check_registro_existente(entidad: str, plataforma: str, fecha: date) -> bool:
+    """
+    Verifica si ya existe un registro para [Institución + Plataforma + Período (mes)].
+    
+    Args:
+        entidad: Nombre de la institución
+        plataforma: Nombre de la plataforma social
+        fecha: Fecha del registro (se busca por mes)
+    
+    Returns:
+        bool: True si existe registro en ese período, False en caso contrario
+    """
+    try:
+        # Obtener datos sin caché para información fresca
+        _, df_metricas = data_provider.get_data(force_reload=True)
+        
+        if df_metricas.empty:
+            return False
+        
+        # Convertir fecha a timestamp para comparación
+        fecha_ts = pd.to_datetime(fecha)
+        periodo_busqueda = fecha_ts.to_period("M")  # Obtener periodo (mes)
+        
+        # Filtrar por institución y plataforma
+        mask = (
+            (df_metricas["entidad"] == entidad) & 
+            (df_metricas["plataforma"] == plataforma)
+        )
+        
+        if not mask.any():
+            return False
+        
+        # Verificar si hay registro en el mismo mes
+        df_filtrado = df_metricas[mask]
+        df_filtrado["periodo"] = pd.to_datetime(df_filtrado["fecha"]).dt.to_period("M")
+        
+        existe_en_periodo = (df_filtrado["periodo"] == periodo_busqueda).any()
+        return existe_en_periodo
+        
+    except Exception as e:
+        logging.error(f"Error verificando registro existente: {e}")
+        return False
+
+
+def render(df=None):
+    """
+    Renderiza la vista de captura de datos con pestañas para Captura Manual, Carga Masiva y Captura Anual.
+    """
+    # Configurar el sidebar
+    st.sidebar.title("Opciones de Captura")
+    opcion = st.sidebar.radio(
+        "Selecciona una opción:", ["Captura Manual", "Carga Masiva", "Captura Anual"]
+    )
+
+    st.title("📝 Captura de Datos")
+    st.caption("Registro de Métricas por Cuenta")
+    st.markdown("---")
+
+    # Persistencia: conservar institución y fecha seleccionadas entre envíos
+    if "capture_entidad_default" not in st.session_state:
+        st.session_state["capture_entidad_default"] = list(COLEGIOS_MARISTAS.keys())[0]
+    if "capture_fecha_default" not in st.session_state:
+        st.session_state["capture_fecha_default"] = date.today()
+    if "capture_plataforma_default" not in st.session_state:
+        st.session_state["capture_plataforma_default"] = PLATAFORMAS_REQUERIDAS[0]
+
+    if opcion == "Captura Manual":
+        st.subheader("Registro Individual")
+        st.info(
+            "💡 **Instrucciones**: Selecciona la institución y plataforma, ingresa las métricas del período y guarda."
+        )
+
+        # Contenedor de captura (usar formulario específico más abajo)
+        with st.container():
+            st.markdown("### Información de la Cuenta")
+
+            col1, col2 = st.columns(2)
+
+            with col1:
+                instituciones = list(COLEGIOS_MARISTAS.keys())
+                entidad_default = st.session_state.get("capture_entidad_default", instituciones[0])
+                entidad_index = instituciones.index(entidad_default) if entidad_default in instituciones else 0
+                entidad = st.selectbox(
+                    "Institución Marista",
+                    instituciones,
+                    index=entidad_index,
+                    key="selector_institucion",
+                    help="Selecciona la institución educativa",
+                )
+
+            with col2:
+                if entidad:
+                    plataformas_disponibles = PLATAFORMAS_REQUERIDAS
+                    plataforma_default = st.session_state.get("capture_plataforma_default", plataformas_disponibles[0])
+                    plataforma_index = plataformas_disponibles.index(plataforma_default) if plataforma_default in plataformas_disponibles else 0
+                    plataforma = st.selectbox(
+                        "Plataforma Social",
+                        plataformas_disponibles,
+                        index=plataforma_index,
+                        key="selector_plataforma",
+                        help="Selecciona la red social",
+                    )
+                else:
+                    plataforma = None
+
+            # INDICADOR DINÁMICO: Mostrar si ya existe registro para este período
+            if entidad and plataforma:
+                fecha_temp = st.session_state.get("capture_fecha_default", date.today())
+                existe_registro = check_registro_existente(entidad, plataforma, fecha_temp)
+                
+                if existe_registro:
+                    st.success(
+                        f"✅ **Dato registrado con éxito** para {entidad} - {plataforma} en {fecha_temp.strftime('%B %Y')}",
+                        icon="✅"
+                    )
+                else:
+                    st.info(
+                        f"📝 Nuevo registro para {entidad} - {plataforma}",
+                        icon="ℹ️"
+                    )
+            else:
+                plataforma = None
+
+            # DINÁMICO: Link se actualiza INMEDIATAMENTE con cada cambio de plataforma
+            # Nota: usuario/URL se coloca en Opciones Avanzadas para simplificar la UI
+            url_actual = ""
+            if entidad and plataforma:
+                url_actual = COLEGIOS_MARISTAS.get(entidad, {}).get(plataforma, "")
+
+            usuario_red = ""  # valor por defecto; sobrescrito en el expander avanzado
+
+            st.divider()
+            # Agrupar toda la entrada manual en un formulario seguro
+            with st.form("manual_entry_form", clear_on_submit=True):
+                st.markdown("### Métricas del Período (Entrada Invertida)")
+                st.info("💡 **Nueva lógica:** Ingresa Seguidores + Engagement Rate → Likes se calcula automáticamente", icon="ℹ️")
+
+                # Identificadores: Fecha (principal), Entidad y Plataforma como contexto
+                id_col1, id_col2, id_col3 = st.columns([2, 3, 3])
+                with id_col1:
+                    fecha_captura = st.date_input(
+                        "📅 Fecha del Reporte",
+                        value=date.today(),
+                        key="input_fecha",
+                        help="Fecha del período reportado (YYYY-MM-DD)",
+                    )
+
+                with id_col2:
+                    st.markdown("**Institución**")
+                    st.markdown(entidad if entidad else "— Selecciona institución —")
+
+                with id_col3:
+                    st.markdown("**Plataforma**")
+                    st.markdown(plataforma if plataforma else "— Selecciona plataforma —")
+
+                # ========================================================================
+                # INPUTS PRINCIPALES (Obligatorios)
+                # ========================================================================
+                col1, col2 = st.columns(2)
+
+                with col1:
+                    seguidores = st.number_input(
+                        "👥 Seguidores Totales *",
+                        min_value=0,
+                        value=0,
+                        step=10,
+                        key="input_seguidores",
+                        help="Número total de seguidores al final del período",
+                    )
+
+                with col2:
+                    engagement_rate = st.number_input(
+                        "📊 Engagement Rate (%) *",
+                        min_value=0.0,
+                        max_value=100.0,
+                        value=0.0,
+                        step=0.01,
+                        format="%.2f",
+                        key="input_engagement",
+                        help="Porcentaje de engagement (interacciones / seguidores × 100)",
+                    )
+
+                # ========================================================================
+                # CÁLCULO EN TIEMPO REAL - Likes Promedio Inferido
+                # ========================================================================
+                st.divider()
+                
+                if seguidores > 0 and engagement_rate > 0:
+                    likes_promedio_calculado = calculate_likes_promedio(engagement_rate, seguidores)
+                    
+                    # Mostrar en un box destacado
+                    col_likes1, col_likes2 = st.columns([2, 1])
+                    
+                    with col_likes1:
+                        st.success(
+                            f"✅ **Likes Promedio Calculado:** {likes_promedio_calculado:.2f}",
+                            icon="✔️"
+                        )
+                        st.caption(
+                            f"Fórmula: Seguidores × (Engagement Rate / 100) = {seguidores} × ({engagement_rate}/100) = {likes_promedio_calculado:.2f}"
+                        )
+                    
+                    with col_likes2:
+                        st.metric(
+                            "Likes",
+                            f"{likes_promedio_calculado:.0f}",
+                            delta=f"{engagement_rate:.1f}%",
+                        )
+                else:
+                    st.warning("⚠️ Ingresa Seguidores y Engagement Rate para ver el cálculo", icon="⚠️")
+                    likes_promedio_calculado = 0.0
+
+                st.divider()
+
+                # ========================================================================
+                # Opciones Avanzadas: URL, Alcance, Interacciones, Comentarios
+                # (La fecha ya se captura en el encabezado principal)
+                # ========================================================================
+                with st.expander("Opciones Avanzadas"):
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        manual_key = f"usuario_red_manual_{plataforma}" if plataforma else "usuario_red_manual"
+                        usuario_red = st.text_input(
+                            "Usuario o URL de la red",
+                            value=(url_actual if url_actual else ""),
+                            key=manual_key,
+                            help="Ingresa la URL o el usuario si aún no está en el catálogo. Se reutilizará para el siguiente envío.",
+                        )
+
+                    with col2:
+                        fecha_captura = st.date_input(
+                            "📅 Fecha del Reporte",
+                            value=st.session_state.get("capture_fecha_default", date.today()),
+                            key="fecha_captura_selector",
+                            help="Fecha del período reportado",
+                        )
+
+                    col3, col4 = st.columns(2)
+                    with col3:
+                        alcance = st.number_input(
+                            "🌐 Alcance Total (Opcional)",
+                            min_value=0,
+                            value=0,
+                            step=10,
+                            key="input_alcance",
+                            help="Número de personas únicas que vieron el contenido",
+                        )
+
+                    with col4:
+                        interacciones = st.number_input(
+                            "💬 Interacciones Totales (Opcional)",
+                            min_value=0,
+                            value=int(likes_promedio_calculado) if likes_promedio_calculado > 0 else 0,
+                            step=1,
+                            key="input_interacciones",
+                            help="Suma de likes, comentarios, shares, etc.",
+                        )
+
+                comentarios = st.text_area(
+                    "💭 Comentarios Contextuales",
+                    help="Agrega cualquier información adicional relevante para este registro.",
+                    key="capture_comments_input",
+                )
+                st.divider()
+
+                submitted = st.form_submit_button("💾 Guardar Datos")
+
+                if submitted:
+                    # Validación de datos (cliente)
+                    if seguidores == 0:
+                        st.error("❌ Error: El número de seguidores no puede ser 0")
+                    elif engagement_rate == 0:
+                        st.error("❌ Error: El Engagement Rate no puede ser 0")
+                    elif not entidad or not plataforma:
+                        st.error("❌ Error: Debes seleccionar una institución y plataforma")
+                    else:
+                        try:
+                            # Preparar datos para guardar
+                            cuentas_cache, _ = data_provider.get_data()
+
+                            # Usar usuario_red (URL literal o vacío) para generar ID consistente
+                            id_cuenta = get_id(
+                                entidad,
+                                plataforma,
+                                usuario_red if usuario_red and usuario_red.strip() else "",
+                                df_cuentas_cache=cuentas_cache,
+                            )
+
+                            # Redondear engagement para guardado
+                            engagement_rate_guardado = round(float(engagement_rate), 2)
+
+                            # Likes promedio ya calculado en tiempo real
+                            likes_promedio_guardado = calculate_likes_promedio(engagement_rate_guardado, seguidores)
+
+                            # Calcular alcance usando estimator si el usuario no proporcionó un valor explícito
+                            alcance_final = int(alcance) if ('alcance' in locals() and alcance > 0) else int(
+                                estimate_reach(plataforma, seguidores, engagement_rate_guardado)
+                            )
+
+                            # Construir registro
+                            nuevo_registro = {
+                                "id_cuenta": id_cuenta,
+                                "entidad": entidad,
+                                "plataforma": plataforma,
+                                "usuario_red": usuario_red,
+                                "fecha": pd.to_datetime(fecha_captura).strftime("%Y-%m-%d"),
+                                "seguidores": int(seguidores),
+                                "alcance": alcance_final,
+                                "interacciones": int(interacciones) if interacciones > 0 else int(likes_promedio_guardado),
+                                "likes_promedio": round(likes_promedio_guardado, 2),
+                                "engagement_rate": engagement_rate_guardado,
+                            }
+
+                            df_nuevo = pd.DataFrame([nuevo_registro])
+
+                            with st.status("Guardando entrada..."):
+                                success = save_batch(df_nuevo)
+
+                                # Guardar comentarios contextuales si existen (no bloquear)
+                                try:
+                                    if comentarios and comentarios.strip():
+                                        mes_formato = pd.to_datetime(fecha_captura).strftime("%Y-%m")
+                                        save_comment(entidad, mes_formato, comentarios.strip())
+                                except Exception:
+                                    pass
+
+                            # Feedback
+                            if success:
+                                st.success(f"✅ ¡Registro guardado exitosamente! Alcance estimado: {alcance_final}")
+                                try:
+                                    st.balloons()
+                                except Exception:
+                                    pass
+
+                                # Invalida cachés centralmente
+                                try:
+                                    invalidate_caches()
+                                except Exception as e:
+                                    logging.warning(f"No se pudo invalidar cachés centralmente: {e}")
+
+                                # No escribir directamente en st.session_state para claves de widgets
+                                # El formulario se limpia automáticamente por clear_on_submit=True
+
+                            else:
+                                st.error("❌ Error al guardar el registro. Intenta nuevamente.")
+
+                        except Exception as e:
+                            st.error(f"⚠️ Error al guardar el registro: {e}")
+                            logging.error(f"Error al guardar registro: {e}", exc_info=True)
+
+    elif opcion == "Carga Masiva":
+        st.subheader("Carga Masiva de Datos")
+        st.info("Esta funcionalidad está en desarrollo.")
+
+    elif opcion == "Captura Anual":
+        st.subheader("📅 Captura Anual de Datos")
+        st.info("Captura datos mensuales completos para una institución durante todo un año.")
+
+        # Selector de institución y año
+        col1, col2 = st.columns(2)
+        with col1:
+            entidad_anual = st.selectbox(
+                "Institución Marista",
+                list(COLEGIOS_MARISTAS.keys()),
+                key="entidad_anual",
+                help="Selecciona la institución para la captura anual",
+            )
+
+        with col2:
+            año_captura = st.selectbox(
+                "Año",
+                list(range(2024, 2027)),
+                index=1,  # 2025 por defecto
+                key="año_anual",
+                help="Selecciona el año para la captura",
+            )
+
+        if entidad_anual:
+            st.markdown("---")
+            st.markdown(f"### 📊 Captura Anual {año_captura} - {entidad_anual}")
+
+            # Obtener plataformas disponibles para esta institución
+            plataformas_disponibles = list(COLEGIOS_MARISTAS[entidad_anual].keys())
+
+            # Crear formulario para cada mes y plataforma
+            with st.form("captura_anual_form", clear_on_submit=False):
+                st.markdown("#### 📝 Ingreso de Datos Mensuales")
+
+                # Crear una tabla de entrada para todos los meses
+                meses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+                        "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
+
+                # Crear columnas para organizar mejor
+                col_plat, col_data = st.columns([1, 4])
+
+                with col_plat:
+                    st.markdown("**Plataformas**")
+                    for plataforma in plataformas_disponibles:
+                        st.markdown(f"**{plataforma}**")
+
+                with col_data:
+                    st.markdown("**Datos por Mes**")
+                    # Crear headers de meses
+                    cols_meses = st.columns(len(meses))
+                    for i, mes in enumerate(meses):
+                        with cols_meses[i]:
+                            st.markdown(f"**{mes[:3]}**")  # Mostrar solo primeras 3 letras
+
+                # Crear inputs para cada plataforma y mes
+                datos_anuales = {}
+                for plataforma in plataformas_disponibles:
+                    datos_anuales[plataforma] = {}
+
+                    # Crear fila para esta plataforma
+                    cols_plat_data = st.columns([1] + [1] * len(meses))
+
+                    with cols_plat_data[0]:
+                        st.markdown(f"**{plataforma}**")
+
+                    for i, mes in enumerate(meses):
+                        with cols_plat_data[i + 1]:
+                            seguidores_key = f"{plataforma}_{mes}_seguidores"
+                            datos_anuales[plataforma][mes] = st.number_input(
+                                f"Seguidores {plataforma} {mes}",
+                                min_value=0,
+                                value=0,
+                                step=10,
+                                key=seguidores_key,
+                                label_visibility="collapsed"
+                            )
+
+                st.markdown("---")
+
+                # Botón de envío
+                submitted_anual = st.form_submit_button(
+                    "💾 Guardar Datos Anuales", type="primary", use_container_width=True
+                )
+
+                if submitted_anual:
+                    # Procesar y guardar los datos
+                    registros_guardados = 0
+                    errores = []
+
+                    with st.status("Guardando datos anuales...") as status:
+                        for plataforma in plataformas_disponibles:
+                            usuario_plataforma = COLEGIOS_MARISTAS[entidad_anual][plataforma]
+
+                            for i, mes in enumerate(meses):
+                                seguidores_mes = datos_anuales[plataforma][mes]
+
+                                # Solo guardar si hay datos (seguidores > 0)
+                                if seguidores_mes > 0:
+                                    try:
+                                        # Crear fecha para este mes
+                                        fecha_mes = pd.to_datetime(f"{año_captura}-{i+1:02d}-01")
+
+                                        # Obtener datos de cache
+                                        cuentas_cache, _ = data_provider.get_data()
+
+                                        # Generar ID de cuenta
+                                        id_cuenta = get_id(
+                                            entidad_anual,
+                                            plataforma,
+                                            usuario_plataforma,
+                                            df_cuentas_cache=cuentas_cache,
+                                        )
+
+                                        # Crear registro (usando valores estimados para otras métricas)
+                                        # En una implementación completa, se pedirían todos los campos
+                                        alcance_estimado = int(seguidores_mes * 2.5)  # Estimación
+                                        interacciones_estimadas = int(alcance_estimado * 0.08)  # 8% engagement
+                                        likes_promedio = max(5, int(interacciones_estimadas / 30))  # ~30 posts/mes
+                                        engagement_rate = round((interacciones_estimadas / seguidores_mes * 100), 2)
+
+                                        registro = pd.DataFrame([{
+                                            "id_cuenta": id_cuenta,
+                                            "entidad": entidad_anual,
+                                            "plataforma": plataforma,
+                                            "usuario_red": usuario_plataforma,
+                                            "fecha": fecha_mes,
+                                            "seguidores": int(seguidores_mes),
+                                            "alcance": alcance_estimado,
+                                            "interacciones": interacciones_estimadas,
+                                            "likes_promedio": likes_promedio,
+                                            "engagement_rate": engagement_rate,
+                                        }])
+
+                                        # Guardar usando save_batch
+                                        success = save_batch(registro)
+                                        if success:
+                                            registros_guardados += 1
+                                        else:
+                                            errores.append(f"Error guardando {plataforma} - {mes}")
+
+                                    except Exception as e:
+                                        errores.append(f"Error en {plataforma} - {mes}: {str(e)}")
+                                        logging.error(f"Error guardando registro anual: {e}")
+
+                        # Mostrar resultados
+                        if registros_guardados > 0:
+                            status.update(label=f"✅ ¡Guardados {registros_guardados} registros exitosamente!")
+                            st.success(f"✅ ¡Captura anual completada! Se guardaron {registros_guardados} registros.")
+
+                            # Mostrar resumen
+                            st.info(f"📊 Resumen: {entidad_anual} - {año_captura}")
+                            resumen_data = []
+                            for plataforma in plataformas_disponibles:
+                                meses_con_datos = sum(1 for mes in meses if datos_anuales[plataforma][mes] > 0)
+                                resumen_data.append({
+                                    "Plataforma": plataforma,
+                                    "Meses con datos": meses_con_datos,
+                                    "Usuario": COLEGIOS_MARISTAS[entidad_anual][plataforma]
+                                })
+
+                            if resumen_data:
+                                st.dataframe(pd.DataFrame(resumen_data), use_container_width=True)
+
+                        else:
+                            status.update(label="❌ No se guardaron registros")
+                            st.warning("⚠️ No se encontraron datos para guardar. Asegúrate de ingresar al menos un valor de seguidores.")
+
+                        if errores:
+                            st.error("❌ Errores encontrados:")
+                            for error in errores:
+                                st.error(f"  • {error}")
+
+                        # Limpiar cache para refrescar datos
+                        st.cache_data.clear()

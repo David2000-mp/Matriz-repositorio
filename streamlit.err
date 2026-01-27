@@ -1,0 +1,67 @@
+2026-01-26 13:30:07.999 
+Warning: the config option 'server.enableCORS=false' is not compatible with
+'server.enableXsrfProtection=true'.
+As a result, 'server.enableCORS' is being overridden to 'true'.
+
+More information:
+In order to protect against CSRF attacks, we send a cookie with each request.
+To do so, we must specify allowable origins, which places a restriction on
+cross-origin resource sharing.
+
+If cross origin resource sharing is required, please disable server.enableXsrfProtection.
+            
+--- Logging error ---
+Traceback (most recent call last):
+  File "C:\Users\david\AppData\Local\Python\pythoncore-3.14-64\Lib\logging\__init__.py", line 1154, in emit
+    stream.write(msg + self.terminator)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\david\AppData\Local\Python\pythoncore-3.14-64\Lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode character '\u2713' in position 36: character maps to <undefined>
+Call stack:
+  File "C:\Users\david\AppData\Local\Python\pythoncore-3.14-64\Lib\threading.py", line 1044, in _bootstrap
+    self._bootstrap_inner()
+  File "C:\Users\david\AppData\Local\Python\pythoncore-3.14-64\Lib\threading.py", line 1082, in _bootstrap_inner
+    self._context.run(self.run)
+  File "C:\Users\david\AppData\Local\Python\pythoncore-3.14-64\Lib\threading.py", line 1024, in run
+    self._target(*self._args, **self._kwargs)
+  File "C:\Users\david\Matriz-repositorio\Matriz-repositorio-main\venv\Lib\site-packages\streamlit\runtime\scriptrunner\script_runner.py", line 379, in _run_script_thread
+    self._run_script(request.rerun_data)
+  File "C:\Users\david\Matriz-repositorio\Matriz-repositorio-main\venv\Lib\site-packages\streamlit\runtime\scriptrunner\script_runner.py", line 688, in _run_script
+    ) = exec_func_with_error_handling(code_to_exec, ctx)
+  File "C:\Users\david\Matriz-repositorio\Matriz-repositorio-main\venv\Lib\site-packages\streamlit\runtime\scriptrunner\exec_code.py", line 129, in exec_func_with_error_handling
+    result = func()
+  File "C:\Users\david\Matriz-repositorio\Matriz-repositorio-main\venv\Lib\site-packages\streamlit\runtime\scriptrunner\script_runner.py", line 672, in code_to_exec
+    exec(code, module.__dict__)  # noqa: S102
+  File "C:\Users\david\Matriz-repositorio\Matriz-repositorio-main\app_refactored.py", line 221, in <module>
+    main()
+  File "C:\Users\david\Matriz-repositorio\Matriz-repositorio-main\app_refactored.py", line 193, in main
+    landing.render()
+  File "C:\Users\david\Matriz-repositorio\Matriz-repositorio-main\views\landing.py", line 30, in render
+    cuentas, metricas = data_provider.get_data()
+  File "C:\Users\david\Matriz-repositorio\Matriz-repositorio-main\utils\data_provider.py", line 59, in get_data
+    self._data_cache = load_data()
+  File "C:\Users\david\Matriz-repositorio\Matriz-repositorio-main\venv\Lib\site-packages\streamlit\runtime\caching\cache_utils.py", line 281, in __call__
+    return self._get_or_create_cached_value(args, kwargs, spinner_message)
+  File "C:\Users\david\Matriz-repositorio\Matriz-repositorio-main\venv\Lib\site-packages\streamlit\runtime\caching\cache_utils.py", line 326, in _get_or_create_cached_value
+    return self._handle_cache_miss(cache, value_key, func_args, func_kwargs)
+  File "C:\Users\david\Matriz-repositorio\Matriz-repositorio-main\venv\Lib\site-packages\streamlit\runtime\caching\cache_utils.py", line 385, in _handle_cache_miss
+    computed_value = self._info.func(*func_args, **func_kwargs)
+  File "C:\Users\david\Matriz-repositorio\Matriz-repositorio-main\utils\data_loader.py", line 130, in load_data
+    return _load_data_impl()
+  File "C:\Users\david\Matriz-repositorio\Matriz-repositorio-main\utils\data_loader.py", line 77, in _load_data_impl
+    spreadsheet = get_sheets_connection()
+  File "C:\Users\david\Matriz-repositorio\Matriz-repositorio-main\utils\sheets_connector.py", line 263, in get_sheets_connection
+    return conectar_sheets()
+  File "C:\Users\david\Matriz-repositorio\Matriz-repositorio-main\venv\Lib\site-packages\streamlit\runtime\caching\cache_utils.py", line 281, in __call__
+    return self._get_or_create_cached_value(args, kwargs, spinner_message)
+  File "C:\Users\david\Matriz-repositorio\Matriz-repositorio-main\venv\Lib\site-packages\streamlit\runtime\caching\cache_utils.py", line 326, in _get_or_create_cached_value
+    return self._handle_cache_miss(cache, value_key, func_args, func_kwargs)
+  File "C:\Users\david\Matriz-repositorio\Matriz-repositorio-main\venv\Lib\site-packages\streamlit\runtime\caching\cache_utils.py", line 385, in _handle_cache_miss
+    computed_value = self._info.func(*func_args, **func_kwargs)
+  File "C:\Users\david\Matriz-repositorio\Matriz-repositorio-main\utils\sheets_connector.py", line 166, in conectar_sheets
+    logger.info(f"\u2713 Conexión exitosa a Google Sheets: {spreadsheet.title}")
+Message: '\u2713 Conexión exitosa a Google Sheets: BaseDatosMatriz'
+Arguments: ()
+ERROR:root:Error verificando registro existente: 'entidad'

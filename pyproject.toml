@@ -1,0 +1,83 @@
+# ========================================
+# PYTEST CONFIGURATION
+# ========================================
+# Este archivo configura pytest para tu proyecto
+
+[tool.pytest.ini_options]
+# Directorios donde pytest buscará tests
+testpaths = ["tests"]
+
+# Patrón de archivos de test
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+
+# Plugins a usar
+addopts = [
+    # Verbosidad (muestra cada test)
+    "-v",
+    
+    # Muestra print statements durante tests
+    "-s",
+    
+    # Muestra resumen al final
+    "--tb=short",
+    
+    # Cobertura de código
+    "--cov=utils",
+    "--cov=components",
+    "--cov=views",
+    "--cov=app",
+    
+    # Reporte de cobertura
+    "--cov-report=html",      # HTML en htmlcov/
+    "--cov-report=term",      # Terminal
+    "--cov-report=term-missing",  # Muestra líneas no cubiertas
+    
+    # Warnings
+    "--strict-markers",       # Error si marker no está definido
+    "-W", "ignore::DeprecationWarning",
+    
+    # Paralelización (usa -n auto para detectar CPUs)
+    # "-n", "auto",  # Descomentar para tests paralelos
+]
+
+# Markers personalizados
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests as integration tests",
+    "unit: marks tests as unit tests",
+    "smoke: marks tests as smoke tests (quick validation)",
+    "api: marks tests that call external APIs (skip in CI)",
+]
+
+# Cobertura mínima requerida (fallará si es menor)
+# [tool.coverage.report]
+# fail_under = 80
+
+# Configuración de cobertura
+[tool.coverage.run]
+source = ["utils", "components", "views"]
+omit = [
+    "*/tests/*",
+    "*/venv_local/*",
+    "*/legacy/*",
+    "*/__pycache__/*",
+    "*/site-packages/*",
+]
+
+[tool.coverage.report]
+# Excluir líneas con estos comentarios
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+    "class .*\\bProtocol\\):",
+    "@(abc\\.)?abstractmethod",
+]
+
+[tool.coverage.html]
+directory = "htmlcov"

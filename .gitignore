@@ -1,0 +1,144 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+build/
+.coverage
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+ENV/
+venv_*
+.venv
+
+# Streamlit
+.streamlit/secrets.toml
+.streamlit/
+.streamlit_cache/
+
+# Environment Variables (IMPORTANTE - CREDENCIALES)
+.env
+.env.local
+.env.*.local
+secrets.toml
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+*.sublime-project
+*.sublime-workspace
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project specific
+.cache/
+*.cache
+*.tmp
+*.log
+*.txt.log
+streamlit_debug.log
+.app_errors.log
+reporte_errores.txt
+reporte_errores_v2.txt
+verify_out.txt
+
+# HTML Coverage Reports
+htmlcov/
+.pytest_cache/
+.ruff_cache/
+coverage.xml
+
+# Generated Test Artifacts
+temp_test_files/
+temp/
+tmp/
+
+# Generated Reports
+*.pdf
+preview_report.html
+Colegio*.pdf
+*_reporte.pdf
+
+# Virtual envs (duplicates for clarity)
+venv_stable/
+venv_local/
+
+# Dev-only scripts
+tools/dev_tests/
+
+# Backup files
+*.bak
+*.backup
+*~
+
+# IDE specific
+.vscode/settings.json
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# Node/npm (if used)
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Windows
+Thumbs.db
+Desktop.ini
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+
+# Documentation with credentials (NO SUBIR)
+GUIA_IMPLEMENTACION_FASE1.md
+
+# Data files (opcional - descomenta si no quieres subir los datos)
+# data/*.csv
+# data/*.xlsx
+
+# ==========================
+# Sensitive credentials
+# ==========================
+# Google/Service account JSONs
+*service_account*.json
+*service-account*.json
+credentials.json
+# Common secrets files
+secrets.toml
+# Private keys
+*.key
+*.pem
+# any leftover secrets folders
+secrets/
+

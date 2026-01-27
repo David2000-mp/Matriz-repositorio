@@ -1,0 +1,229 @@
+name: CI - Tests y Cobertura
+
+# ========================================
+# CONFIGURACIÓN DE INTEGRACIÓN CONTINUA
+# ========================================
+# 
+# Este workflow se ejecuta automáticamente en:
+# - Cada push a main/develop
+# - Cada Pull Request
+# 
+# Funciones:
+# 1. Ejecuta todos los tests con pytest
+# 2. Genera reporte de cobertura
+# 3. FALLA si cobertura < 75% (target: 80%)
+# 4. Sube reporte de cobertura a Codecov (opcional)
+# 5. Ejecuta análisis de código con ruff
+#
+# ========================================
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+    paths:
+      - '**.py'
+      - 'requirements.txt'
+      - 'requirements-dev.txt'
+      - 'tests/**'
+      - '.github/workflows/ci.yml'
+  
+  pull_request:
+    branches:
+      - main
+      - develop
+    paths:
+      - '**.py'
+      - 'requirements.txt'
+      - 'requirements-dev.txt'
+      - 'tests/**'
+
+  # Permitir ejecución manual
+  workflow_dispatch:
+
+# Permisos necesarios
+permissions:
+  contents: read
+  pull-requests: write  # Para comentar en PRs
+
+jobs:
+  # ========================================
+  # JOB 1: TESTS Y COBERTURA
+  # ========================================
+  test:
+    name: Tests (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.11', '3.12', '3.13']
+    
+    steps:
+      # ===== CHECKOUT =====
+      - name: 📥 Checkout código
+        uses: actions/checkout@v4
+      
+      # ===== SETUP PYTHON =====
+      - name: 🐍 Configurar Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip'  # Cachear dependencias
+      
+      # ===== INSTALAR DEPENDENCIAS =====
+      - name: 📦 Instalar dependencias
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+      
+      # ===== EJECUTAR TESTS =====
+      - name: 🧪 Ejecutar tests con pytest
+        run: |
+          pytest tests/ \
+            --verbose \
+            --cov=utils \
+            --cov=views \
+            --cov=components \
+            --cov-report=term-missing \
+            --cov-report=xml \
+            --cov-report=html \
+            --cov-fail-under=75 \
+            --maxfail=5 \
+            --tb=short \
+            --strict-markers
+        env:
+          # Variables de entorno para tests
+          PYTHONPATH: ${{ github.workspace }}
+          CI: true
+      
+      # ===== VALIDAR COBERTURA MÍNIMA =====
+      - name: ✅ Validar cobertura mínima (75%)
+        run: |
+          coverage report --fail-under=75
+          echo "✅ Cobertura de tests alcanzada (mínimo 75%)"
+      
+      # ===== SUBIR ARTEFACTOS =====
+      - name: 📊 Subir reporte de cobertura HTML
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report-${{ matrix.python-version }}
+          path: htmlcov/
+          retention-days: 30
+      
+      - name: 📄 Subir reporte de cobertura XML
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-xml-${{ matrix.python-version }}
+          path: coverage.xml
+          retention-days: 30
+  
+  # ========================================
+  # JOB 2: ANÁLISIS DE CÓDIGO
+  # ========================================
+  lint:
+    name: Análisis de Código (Linting)
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 📥 Checkout código
+        uses: actions/checkout@v4
+      
+      - name: 🐍 Configurar Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: 'pip'
+      
+      - name: 📦 Instalar ruff
+        run: |
+          pip install ruff==0.8.1
+      
+      - name: 🔍 Ejecutar ruff (linting)
+        run: |
+          ruff check . --output-format=github --select=E,F,W,C,N
+        continue-on-error: true  # No fallar por warnings
+      
+      - name: 🎨 Verificar formato con ruff
+        run: |
+          ruff format --check .
+        continue-on-error: true
+  
+  # ========================================
+  # JOB 3: SECURITY SCAN (OPCIONAL)
+  # ========================================
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 📥 Checkout código
+        uses: actions/checkout@v4
+      
+      - name: 🐍 Configurar Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      
+      - name: 📦 Instalar safety
+        run: |
+          pip install safety==3.2.11
+      
+      - name: 🔒 Scan de vulnerabilidades en dependencias
+        run: |
+          pip install -r requirements.txt
+          safety check --json || true
+        continue-on-error: true
+  
+  # ========================================
+  # JOB 4: REPORTE FINAL
+  # ========================================
+  report:
+    name: Reporte Final de CI
+    needs: [test, lint, security]
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+      - name: 📝 Generar reporte
+        run: |
+          echo "========================================" 
+          echo "✅ CI WORKFLOW COMPLETADO"
+          echo "========================================"
+          echo ""
+          echo "📊 Tests: ${{ needs.test.result }}"
+          echo "🔍 Linting: ${{ needs.lint.result }}"
+          echo "🔒 Security: ${{ needs.security.result }}"
+          echo ""
+          if [ "${{ needs.test.result }}" == "failure" ]; then
+            echo "❌ TESTS FALLIDOS - Por favor revisa los errores"
+            exit 1
+          fi
+          echo "✅ Todos los checks pasaron correctamente"
+
+# ========================================
+# CONFIGURACIÓN ADICIONAL
+# ========================================
+# 
+# Para activar Codecov (opcional):
+# 1. Ir a https://codecov.io
+# 2. Conectar tu repositorio
+# 3. Agregar este step después de pytest:
+#
+#     - name: 📤 Subir a Codecov
+#       uses: codecov/codecov-action@v4
+#       with:
+#         token: ${{ secrets.CODECOV_TOKEN }}
+#         files: ./coverage.xml
+#         flags: unittests
+#         name: codecov-umbrella
+#
+# Para configurar badges en README.md:
+# [![Tests](https://github.com/USUARIO/REPO/actions/workflows/ci.yml/badge.svg)](https://github.com/USUARIO/REPO/actions/workflows/ci.yml)
+# [![Coverage](https://codecov.io/gh/USUARIO/REPO/branch/main/graph/badge.svg)](https://codecov.io/gh/USUARIO/REPO)
+#
+# ========================================
