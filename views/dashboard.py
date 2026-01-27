@@ -116,12 +116,13 @@ def render(df=None):
         )
 
     # Micro-interacción: status mientras procesamos/normalizamos el DataFrame
-    with st.status("Buscando datos en la nube..."):
-        # quick check (df already validated above)
-        pass
+    # OCULTO: Solo visible como pop-up en depuración
+    # with st.status("Buscando datos en la nube..."):
+    #     pass
+    # with st.status("Procesando históricos..."):
+    #     pass
 
-    with st.status("Procesando históricos..."):
-        # Si recibimos un DataFrame filtrado desde el entrypoint, úsalo.
+    # Si recibimos un DataFrame filtrado desde el entrypoint, úsalo.
         if df is None or (hasattr(df, "empty") and df.empty):
             st.info("No hay datos para los filtros seleccionados. Ajusta los filtros o intenta otro periodo.")
             return
@@ -716,3 +717,16 @@ def render(df=None):
             st.info(f"📄 Mostrando página de datos (total: {len(df_full):,} filas)")
 
         st.dataframe(df_paginated, width='stretch')
+    
+    # Debug merge al final como menú desplegable
+    if 'debug_merge_info' in st.session_state and st.session_state.debug_merge_info:
+        with st.expander("🔍 DEBUG MERGE - Diagnóstico de Fusión de Datos"):
+            info = st.session_state.debug_merge_info
+            st.write(f"**IDs en Métricas:** {info['ids_metricas']}")
+            st.write(f"**IDs en Cuentas:** {info['ids_cuentas']}")
+            st.write(f"**IDs que coinciden:** {info['coinciden']}")
+            st.write(f"**IDs solo en Métricas:** {info['solo_metricas']}")
+            st.write(f"**IDs solo en Cuentas:** {info['solo_cuentas']}")
+            if info['ejemplos_huerfanos']:
+                st.write(f"**Ejemplos de IDs huérfanos en Métricas:** {info['ejemplos_huerfanos']}")
+

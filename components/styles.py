@@ -1,152 +1,99 @@
 """
 Módulo de estilos CSS para CHAMPILEAKS.
-Define constantes de colores con soporte WCAG AA y función de inyección de CSS personalizado.
-Todos los colores cumplen con contraste mínimo 4.5:1 para accesibilidad.
+Define constantes de colores institucionales y función de inyección de CSS global.
 """
 
 import streamlit as st
 
 # ===========================
-# CONSTANTES DE COLOR WCAG AA
+# CONSTANTES DE COLOR INSTITUCIONALES
 # ===========================
 
-# Colores Institucionales Maristas (Contraste verificado)
-COLOR_PRIMARY = "#003696"  # Azul Marista - Contraste 10.15:1 sobre blanco ✓
-COLOR_SECONDARY = "#002566"  # Azul oscuro - Contraste 14.05:1 sobre blanco ✓
-COLOR_BG = "#F4F6F9"  # Gris muy suave para fondo
-COLOR_CARD = "#FFFFFF"  # Blanco puro para tarjetas
-COLOR_TEXT = "#1A1A1A"  # Negro casi puro - Contraste 16.1:1 sobre blanco ✓
-COLOR_TEXT_SECONDARY = "#4A5568"  # Gris oscuro - Contraste 7.54:1 sobre blanco ✓
-COLOR_CAPTION = "#5A5A5A"  # Gris medio - Contraste 6.12:1 sobre blanco ✓
+# ===========================
+# CHAMPI_THEME - Single Source of Truth para colores
+# ===========================
 
-# Colores de estado con alto contraste
-COLOR_SUCCESS = "#1E7E34"  # Verde oscuro - Contraste 5.32:1 ✓
-COLOR_WARNING = "#CC7000"  # Naranja oscuro - Contraste 4.89:1 ✓
-COLOR_DANGER = "#C82333"  # Rojo oscuro - Contraste 5.94:1 ✓
-COLOR_INFO = "#0056B3"  # Azul información - Contraste 6.47:1 ✓
-
-# Colores por plataforma (para gráficos) - Verificados para accesibilidad
-COLOR_MAP = {
-    "Facebook": "#1877F2",  # Azul Facebook - 4.51:1 ✓
-    "Instagram": "#C13584",  # Instagram fucsia oscuro - 4.57:1 ✓ (ajustado desde #E1306C)
-    "TikTok": "#000000",  # Negro - 21:1 ✓
-    "Twitter/X": "#1DA1F2",  # Azul Twitter - 3.12:1 (usar con fondo oscuro)
-    "LinkedIn": "#0A66C2",  # Azul LinkedIn - 5.51:1 ✓
-    "YouTube": "#CC0000",  # Rojo YouTube oscuro - 5.29:1 ✓ (ajustado desde #FF0000)
+CHAMPI_THEME = {
+    # Colores Institucionales Maristas
+    "primary": "#003696",      # Azul Marista
+    "secondary": "#002566",    # Azul oscuro
+    "accent": "#FFB81C",       # Amarillo acento
+    
+    # Sistema de fondos
+    "bg": "#FFFFFF",           # Fondo blanco absoluto
+    "card": "#F2F4F7",         # Cards gris claro
+    "sidebar": "#003696",      # Sidebar azul institucional
+    
+    # Sistema de texto
+    "text": "#212529",         # Texto principal negro
+    "text_secondary": "#495057",  # Texto secundario gris oscuro
+    "text_on_dark": "#FFFFFF",   # Texto sobre fondos oscuros
+    "caption": "#6C757D",      # Texto de caption/subtítulos
+    
+    # Bordes
+    "border": "#DEE2E6",       # Bordes sutiles
+    
+    # Estados
+    "success": "#0A7D35",      # Verde accesible WCAG AA
+    "danger": "#B42318",       # Rojo accesible WCAG AA
+    "warning": "#CC7000",      # Naranja WCAG AA
+    "info": "#0056B3",         # Azul información
+    
+    # Redes Sociales (Corregidos para mayor precisión)
+    "facebook": "#1877F2",
+    "instagram": "#C13584",    # Corregido de #E1306C
+    "tiktok": "#000000",
+    "twitter": "#1A8CD8",      # Corregido de #1DA1F2
+    "linkedin": "#0A66C2",
+    "youtube": "#FF0000",
 }
 
-# ===========================
-# FUNCIÓN DE INYECCIÓN CSS
-# ===========================
+# Compatibilidad con código legacy
+COLOR_PRIMARY = CHAMPI_THEME["primary"]
+COLOR_SECONDARY = CHAMPI_THEME["secondary"]
+COLOR_ACCENT = CHAMPI_THEME["accent"]
+COLOR_BG = CHAMPI_THEME["bg"]
+COLOR_CARD = CHAMPI_THEME["card"]
+COLOR_SIDEBAR = CHAMPI_THEME["sidebar"]
+COLOR_TEXT = CHAMPI_THEME["text"]
+COLOR_TEXT_SECONDARY = CHAMPI_THEME["text_secondary"]
+COLOR_TEXT_ON_DARK = CHAMPI_THEME["text_on_dark"]
+COLOR_CAPTION = CHAMPI_THEME["caption"]
+COLOR_BORDER = CHAMPI_THEME["border"]
+COLOR_SUCCESS = CHAMPI_THEME["success"]
+COLOR_DANGER = CHAMPI_THEME["danger"]
+COLOR_WARNING = CHAMPI_THEME["warning"]
+COLOR_INFO = CHAMPI_THEME["info"]
+
+# Mapa de colores por plataforma (para gráficos)
+COLOR_MAP = {
+    "Facebook": CHAMPI_THEME["facebook"],
+    "Instagram": CHAMPI_THEME["instagram"],
+    "TikTok": CHAMPI_THEME["tiktok"],
+    "Twitter/X": CHAMPI_THEME["twitter"],
+    "LinkedIn": CHAMPI_THEME["linkedin"],
+    "YouTube": CHAMPI_THEME["youtube"],
+}
 
 
 def inject_custom_css():
     """
-    Inyecta CSS accesible compatible con modo claro/oscuro.
-    Cumple con WCAG 2.1 AA (contraste mínimo 4.5:1).
-    Tamaño de fuente mínimo 16px en inputs para accesibilidad móvil.
+    Inyecta CSS global institucional para toda la aplicación CHAMPILEAKS.
+    
+    Sistema de diseño:
+    - Fondo blanco absoluto (#FFFFFF)
+    - Cards gris claro (#F2F4F7)
+    - Todo el texto negro/gris oscuro (#212529)
+    - Sidebar azul institucional con texto blanco
+    - Sin fondos negros, sombras pesadas ni glassmorphism
+    - Contraste WCAG AA en todos los elementos
     """
-    new_css = r"""
+    from utils.global_styles import get_global_institutional_css
+    
+    st.markdown(get_global_institutional_css(), unsafe_allow_html=True)
+    
+    st.markdown("""
         <style>
-        @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap');
-        
-        /* ========================================
-           VARIABLES CSS CON SOPORTE MODO OSCURO
-        ======================================== */
-        :root {
-            /* Colores institucionales */
-            --primary-color: #003696;
-            --primary-hover: #002566;
-            --accent-color: #FFB81C;
-            
-            /* Modo claro (por defecto) */
-            --bg-color: #F4F6F9;
-            --card-bg: #FFFFFF;
-            --text-color: #1A1A1A;
-            --text-secondary: #4A5568;
-            --text-caption: #5A5A5A;
-            --border-color: rgba(0, 0, 0, 0.1);
-            
-            /* Sidebar */
-            --sidebar-bg: #003696;
-            --sidebar-text: #FFFFFF;
-            
-            /* Botones */
-            --button-primary: #003696;
-            --button-primary-hover: #002566;
-            --button-secondary-bg: #FFF4E0;
-            --button-text: #FFFFFF;
-            
-            /* Estados */
-            --success-color: #1E7E34;
-            --warning-color: #CC7000;
-            --danger-color: #C82333;
-            --info-color: #0056B3;
-        }
-        
-        /* Detección automática de modo oscuro */
-        @media (prefers-color-scheme: dark) {
-            :root {
-                --bg-color: #0E1117;
-                --card-bg: #1E2228;
-                --text-color: #FAFAFA;
-                --text-secondary: #B8B8B8;
-                --text-caption: #9CA3AF;
-                --border-color: rgba(255, 255, 255, 0.1);
-            }
-        }
-        
-        /* ========================================
-           FUENTES Y TIPOGRAFÍA BASE (16px mínimo)
-        ======================================== */
-        .stApp { 
-            font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
-            background-color: var(--bg-color);
-            color: var(--text-color);
-        }
-        
-        /* Garantizar legibilidad en área principal */
-        [data-testid="stMainBlockContainer"],
-        [data-testid="block-container"],
-        .main .block-container {
-            color: var(--text-color) !important;
-        }
-        
-        /* Texto base con contraste mínimo */
-        .stMarkdown p,
-        .stMarkdown li,
-        .stMarkdown span,
-        .stMarkdown div {
-            color: var(--text-color) !important;
-            font-size: 16px !important; /* WCAG AA móvil */
-            line-height: 1.6 !important;
-        }
-        
-        /* Títulos con jerarquía visual clara */
-        .stMarkdown h1 {
-            color: var(--primary-color) !important;
-            font-weight: 700 !important;
-            font-size: 2.25rem !important;
-            line-height: 1.2 !important;
-            margin-bottom: 1rem !important;
-        }
-        
-        .stMarkdown h2 {
-            color: var(--primary-color) !important;
-            font-weight: 600 !important;
-            font-size: 1.875rem !important;
-            line-height: 1.3 !important;
-            margin-bottom: 0.875rem !important;
-        }
-        
-        .stMarkdown h3 {
-            color: var(--text-color) !important;
-            font-weight: 600 !important;
-            font-size: 1.5rem !important;
-            line-height: 1.4 !important;
-            margin-bottom: 0.75rem !important;
-        }
-        
         /* ========================================
            INPUTS Y FORMULARIOS (Accesibilidad AA)
         ======================================== */
@@ -551,11 +498,7 @@ def inject_custom_css():
         }
 
         </style>
-    """
-    try:
-        st.markdown(new_css, unsafe_allow_html=True)
-    except Exception:
-        pass
+    """, unsafe_allow_html=True)
 
 
 def aplicar_estilo_personalizado():
@@ -637,7 +580,7 @@ def aplicar_estilo_personalizado():
     # Inyectar CSS dinámico
     css = f"""
         <style>
-        @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
         
         /* ========================================
            VARIABLES CSS DINÁMICAS - TEMA {tema_seleccionado.upper()}
@@ -675,9 +618,16 @@ def aplicar_estilo_personalizado():
         .stApp,
         [data-testid="stAppViewContainer"],
         .main {{
-            font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+            font-family: 'Inter', 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif !important;
             background-color: var(--background-color) !important;
             color: var(--text-color) !important;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }}
+        
+        /* Párrafos con line-height óptimo */
+        p, .stMarkdown p {{
+            line-height: 1.6 !important;
         }}
         
         /* Contenedores principales */
@@ -811,7 +761,7 @@ def aplicar_estilo_personalizado():
             font-size: 16px !important;
             padding: 12px 16px !important;
             line-height: 1.6 !important;
-            font-family: 'Montserrat', sans-serif !important;
+            font-family: 'Inter', sans-serif !important;
         }}
         
         .stTextArea textarea:focus {{
@@ -984,12 +934,12 @@ def aplicar_estilo_personalizado():
     """
     return {
         "font": {
-            "family": "Montserrat, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
+            "family": "Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
             "size": 14,  # Tamaño mínimo legible
             "color": "#1A1A1A"  # Alto contraste
         },
         "title": {
-            "font": {"size": 18, "color": "#003696", "family": "Montserrat"},
+            "font": {"size": 18, "color": "#003696", "family": "Inter"},
             "x": 0.5,
             "xanchor": "center"
         },
@@ -1029,12 +979,12 @@ def configure_plotly_theme():
     """
     return {
         "font": {
-            "family": "Montserrat, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
+            "family": "Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
             "size": 14,  # Tamaño mínimo legible
             "color": "#1A1A1A"  # Alto contraste
         },
         "title": {
-            "font": {"size": 18, "color": "#003696", "family": "Montserrat"},
+            "font": {"size": 18, "color": "#003696", "family": "Inter"},
             "x": 0.5,
             "xanchor": "center"
         },

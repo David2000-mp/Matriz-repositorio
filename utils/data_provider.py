@@ -93,15 +93,17 @@ class DataProvider:
             cuentas["id_cuenta"] = cuentas["id_cuenta"].astype(str).str.strip()
             metricas["id_cuenta"] = metricas["id_cuenta"].astype(str).str.strip()
             
-            # DEBUG: Mostrar IDs para diagnosticar merge
+            # Guardar información de debug para mostrar al final
             ids_metricas = set(metricas["id_cuenta"].unique())
             ids_cuentas = set(cuentas["id_cuenta"].unique())
-            st.write(f"🔍 **DEBUG MERGE** - IDs en Métricas: {len(ids_metricas)}, IDs en Cuentas: {len(ids_cuentas)}")
-            st.write(f"   IDs que coinciden: {len(ids_metricas & ids_cuentas)}")
-            st.write(f"   IDs solo en Métricas: {len(ids_metricas - ids_cuentas)}")
-            st.write(f"   IDs solo en Cuentas: {len(ids_cuentas - ids_metricas)}")
-            if len(ids_metricas - ids_cuentas) > 0:
-                st.write(f"   Ejemplos de IDs huérfanos en Métricas: {list(ids_metricas - ids_cuentas)[:3]}")
+            debug_info = {
+                'ids_metricas': len(ids_metricas),
+                'ids_cuentas': len(ids_cuentas),
+                'coinciden': len(ids_metricas & ids_cuentas),
+                'solo_metricas': len(ids_metricas - ids_cuentas),
+                'solo_cuentas': len(ids_cuentas - ids_metricas),
+                'ejemplos_huerfanos': list(ids_metricas - ids_cuentas)[:3] if len(ids_metricas - ids_cuentas) > 0 else []
+            }
             
             # Fusión: métricas es la tabla principal (hechos)
             df_merged = pd.merge(metricas, cuentas, on="id_cuenta", how="left")
@@ -153,6 +155,11 @@ class DataProvider:
             cols_order = [c for c in preferred_order if c in df_merged.columns]
             cols_order += [c for c in df_merged.columns if c not in cols_order]
             df_merged = df_merged.loc[:, cols_order]
+            
+            # Almacenar info de debug en session_state para mostrar al final
+            if 'debug_merge_info' not in st.session_state:
+                st.session_state.debug_merge_info = {}
+            st.session_state.debug_merge_info = debug_info
             
             self._merged_cache = df_merged
             logger.debug(f"Datos fusionados: {len(df_merged)} registros (limpiados de NaN)")

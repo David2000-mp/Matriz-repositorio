@@ -68,28 +68,54 @@ def load_image(filename: str) -> Optional[str]:
         return None
 
 
-def get_banner_css(image_filename: str, height: str = "200px") -> str:
+def get_banner_css(image_filename: str, height: str = "clamp(400px, 60vh, 500px)", overlay_opacity: float = 0.75) -> str:
     """
-    Genera CSS para un banner con imagen de fondo.
+    Genera CSS profesional para banner hero con imagen de fondo.
+    
+    ✅ Optimizaciones implementadas:
+    - background-size: cover → Cubre 100% sin espacios vacíos
+    - Overlay blanco configurable → Contraste garantizado para texto azul
+    - Altura responsiva clamp() → Adaptable mobile (400px) a desktop (500px)
+    - border-radius: 0 → Bordes rectos profesionales para hero
+    - background-position: center 30% → Posicionamiento inteligente contenido
+    - margin-bottom: clamp() → Espaciado responsivo institucional
+    - Fallback consistente → Mismo overlay blanco sobre gradiente azul
 
     Args:
-        image_filename: Nombre del archivo de imagen
-        height: Altura del banner (CSS)
+        image_filename: Nombre del archivo de imagen (ej: 'banner_landing.jpg')
+        height: Altura responsiva CSS (default: clamp(400px, 60vh, 500px))
+        overlay_opacity: Opacidad overlay blanco 0-1 (default: 0.75 para contraste WCAG AA)
 
     Returns:
-        String con CSS para el banner
+        String CSS con overlay blanco para contraste texto azul institucional
     """
     img_b64 = load_image(image_filename)
     if img_b64:
         return f"""
-        background-image: url(data:image/png;base64,{img_b64});
+        background: 
+            linear-gradient(
+                rgba(255, 255, 255, {overlay_opacity}), 
+                rgba(255, 255, 255, {overlay_opacity})
+            ),
+            url(data:image/png;base64,{img_b64});
         background-size: cover;
-        background-position: center;
+        background-position: center 30%;
+        background-repeat: no-repeat;
         height: {height};
-        border-radius: 10px;
-        margin-bottom: 20px;
+        width: 100%;
+        border-radius: 0;
+        margin-bottom: clamp(2rem, 5vw, 4rem);
         """
-    return ""
+    # Fallback: gradiente institucional Marista con mismo overlay blanco
+    return f"""
+        background: 
+            linear-gradient(rgba(255, 255, 255, {overlay_opacity}), rgba(255, 255, 255, {overlay_opacity})),
+            linear-gradient(135deg, #003696 0%, #0052CC 100%);
+        height: {height};
+        width: 100%;
+        border-radius: 0;
+        margin-bottom: clamp(2rem, 5vw, 4rem);
+        """
 
 
 # ===========================

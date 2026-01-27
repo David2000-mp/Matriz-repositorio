@@ -68,6 +68,10 @@ def normalize_latest_by_account(df: pd.DataFrame, freq: str = "D") -> pd.DataFra
     # Busca el segundo último registro de cada grupo
     seguidores_prev_list = []
     for group_val, group_df in dfc.groupby(group_keys):
+        # Asegurar que group_val sea siempre una tupla
+        if not isinstance(group_val, tuple):
+            group_val = (group_val,)
+        
         if len(group_df) > 1:
             prev_value = group_df.iloc[-2]["seguidores"]
         else:
@@ -78,11 +82,15 @@ def normalize_latest_by_account(df: pd.DataFrame, freq: str = "D") -> pd.DataFra
     prev_dict = {k: v for k, v in seguidores_prev_list}
     
     # Aplica seguidores_prev basado en el grupo
-    latest_rows["seguidores_prev"] = latest_rows.apply(
-        lambda row: prev_dict.get(row[group_keys[0]] if len(group_keys) == 1 else 
-                                  tuple(row[k] for k in group_keys), 0),
-        axis=1
-    )
+    def get_prev_value(row):
+        # Construir la clave del mismo modo que en el groupby
+        if len(group_keys) == 1:
+            key = (row[group_keys[0]],)
+        else:
+            key = tuple(row[k] for k in group_keys)
+        return prev_dict.get(key, 0)
+    
+    latest_rows["seguidores_prev"] = latest_rows.apply(get_prev_value, axis=1)
     latest_rows["seguidores_prev"] = latest_rows["seguidores_prev"].fillna(0)
     return latest_rows
 
