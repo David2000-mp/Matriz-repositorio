@@ -107,10 +107,8 @@ def get_global_institutional_css() -> str:
         background-color: {BG_SIDEBAR} !important;
     }}
     
-    /* ELIMINAR TODOS LOS BORDES EN EL SIDEBAR */
-    section[data-testid="stSidebar"] *,
+    /* ELIMINAR TODOS LOS BORDES EN EL SIDEBAR (excepto inputs) */
     section[data-testid="stSidebar"] hr,
-    section[data-testid="stSidebar"] div,
     section[data-testid="stSidebar"] .stMarkdown hr {{
         border: none !important;
         outline: none !important;
@@ -119,23 +117,31 @@ def get_global_institutional_css() -> str:
     
     /* Tipografía sidebar - Inter con font smoothing */
     section[data-testid="stSidebar"],
-    section[data-testid="stSidebar"] * {{
-        font-family: 'Inter', 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif !important;
-    }}
-    
-    /* TODO EL TEXTO DEL SIDEBAR EN BLANCO - REGLA UNIVERSAL */
-    section[data-testid="stSidebar"] *,
     section[data-testid="stSidebar"] p,
     section[data-testid="stSidebar"] span,
     section[data-testid="stSidebar"] div,
-    section[data-testid="stSidebar"] label,
+    section[data-testid="stSidebar"] h1,
+    section[data-testid="stSidebar"] h2,
+    section[data-testid="stSidebar"] h3 {{
+        font-family: 'Inter', 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif !important;
+    }}
+    
+    /* TODO EL TEXTO DEL SIDEBAR EN BLANCO (texto general) */
+    section[data-testid="stSidebar"] p,
+    section[data-testid="stSidebar"] h1,
+    section[data-testid="stSidebar"] h2,
+    section[data-testid="stSidebar"] h3,
     section[data-testid="stSidebar"] .stMarkdown,
-    section[data-testid="stSidebar"] .stCaption,
-    section[data-testid="stSidebar"] button,
-    [data-testid="stSidebarContent"] *,
-    [data-testid="stSidebarUserContent"] * {{
+    section[data-testid="stSidebar"] .stCaption {{
         color: #FFFFFF !important;
         line-height: 1.6;
+    }}
+    
+    /* Labels de widgets en BLANCO */
+    section[data-testid="stSidebar"] .stSelectbox > label,
+    section[data-testid="stSidebar"] .stRadio > label,
+    section[data-testid="stSidebar"] label[data-testid="stWidgetLabel"] {{
+        color: #FFFFFF !important;
     }}
     
     /* Títulos sidebar - tamaños explícitos para máxima visibilidad */
@@ -166,8 +172,8 @@ def get_global_institutional_css() -> str:
     /* === SELECTBOXES EN SIDEBAR === */
     
     /* Label del selectbox en BLANCO con alta visibilidad */
-    section[data-testid="stSidebar"] .stSelectbox label,
-    section[data-testid="stSidebar"] .stSelectbox [data-testid="stWidgetLabel"] {{
+    section[data-testid="stSidebar"] .stSelectbox > label,
+    section[data-testid="stSidebar"] .stSelectbox > [data-testid="stWidgetLabel"] {{
         color: #FFFFFF !important;
         font-size: 16px !important;
         font-weight: 600 !important;
@@ -177,31 +183,32 @@ def get_global_institutional_css() -> str:
     /* Contenedor principal del selectbox - BLANCO SIN BORDES */
     section[data-testid="stSidebar"] .stSelectbox > div,
     section[data-testid="stSidebar"] .stSelectbox > div > div,
-    section[data-testid="stSidebar"] div[data-baseweb="select"] {{
+    section[data-testid="stSidebar"] .stSelectbox div[data-baseweb="select"] {{
         background-color: {BG_WHITE} !important;
         border: none !important;
         border-radius: 5px !important;
     }}
     
-    /* CRÍTICO: Forzar texto NEGRO en TODOS los elementos internos del selectbox */
+    /* CRÍTICO: Forzar texto NEGRO en TODOS los elementos del selectbox */
+    section[data-testid="stSidebar"] .stSelectbox div[data-baseweb="select"],
     section[data-testid="stSidebar"] .stSelectbox div[data-baseweb="select"] *,
     section[data-testid="stSidebar"] .stSelectbox div[data-baseweb="select"] div,
+    section[data-testid="stSidebar"] .stSelectbox div[data-baseweb="select"] div *,
     section[data-testid="stSidebar"] .stSelectbox div[data-baseweb="select"] input,
-    section[data-testid="stSidebar"] .stSelectbox div[data-baseweb="select"] span {{
+    section[data-testid="stSidebar"] .stSelectbox div[data-baseweb="select"] span,
+    section[data-testid="stSidebar"] .stSelectbox input,
+    section[data-testid="stSidebar"] .stSelectbox div[class*="st-c"],
+    section[data-testid="stSidebar"] .stSelectbox div[class*="st-d"],
+    section[data-testid="stSidebar"] div[data-baseweb="select"] div[class*="st-"],
+    section[data-testid="stSidebar"] div[data-baseweb="select"] div[value] {{
         color: {TEXT_PRIMARY} !important;
         background-color: transparent !important;
     }}
     
-    /* Input oculto del selectbox */
-    section[data-testid="stSidebar"] .stSelectbox input {{
-        color: {TEXT_PRIMARY} !important;
+    /* Fondo blanco para el input del selectbox */
+    section[data-testid="stSidebar"] .stSelectbox div[data-baseweb="select"],
+    section[data-testid="stSidebar"] div[data-baseweb="select"] {{
         background-color: {BG_WHITE} !important;
-    }}
-    
-    /* Valor seleccionado visible (clases dinámicas de Streamlit) */
-    section[data-testid="stSidebar"] .stSelectbox div[class*="st-c"],
-    section[data-testid="stSidebar"] .stSelectbox div[class*="st-d"] {{
-        color: {TEXT_PRIMARY} !important;
     }}
     
     /* Dropdown (cuando se abre el selectbox) */
