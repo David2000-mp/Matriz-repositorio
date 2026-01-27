@@ -172,19 +172,51 @@ def inject_custom_css():
                 padding: 8px !important;
             }
 
-            /* Excluir header y toolbar de los estilos globales */
-            [data-testid="stHeader"],
-            [data-testid="stToolbar"],
-            [data-testid="stToolbarActions"],
-            .stMainMenu,
-            [class*="stAppHeader"],
-            [class*="stToolbar"] {
-                background-color: transparent !important;
+            /* Texto negro en área de contenido principal */
+            [data-testid="stMainBlockContainer"] *,
+            [data-testid="block-container"] *,
+            .main .block-container *,
+            .stMarkdown p,
+            .stMarkdown li,
+            .stMarkdown span,
+            .stMarkdown div,
+            .stSelectbox label,
+            .stTextInput label,
+            .stNumberInput label,
+            .stDateInput label,
+            .stTextArea label,
+            .stFileUploader label,
+            .stMultiSelect label,
+            .stRadio label,
+            .stCheckbox label {
+                color: #212529 !important;
+            }
+            
+            /* Excluir header y toolbar de estilos */
+            [data-testid="stHeader"] *,
+            [data-testid="stToolbar"] *,
+            [data-testid="stToolbarActions"] *,
+            .stMainMenu *,
+            [class*="stAppHeader"] *,
+            [class*="stToolbar"] * {
+                color: inherit !important;
+            }
+            
+            /* Preservar colores de sidebar (fondo azul, texto blanco) */
+            [data-testid="stSidebar"] * { 
+                color: var(--sidebar-text) !important; 
             }
             
             /* Preservar colores de banner, badges y botones */
-            .banner * { color: white !important; }
+            .banner *, .hero-banner * { color: white !important; }
             .badge { color: white !important; }
+            
+            /* Botones mantienen su color definido */
+            .stButton button *, 
+            button[kind="primary"] *,
+            button[kind="secondary"] * {
+                color: inherit !important;
+            }
 
         /* Responsive table with hover */
         .responsive-table { width:100%; overflow-x:auto; border-radius:8px; }
