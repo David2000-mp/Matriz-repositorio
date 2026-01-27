@@ -296,11 +296,11 @@ def inject_custom_css():
             transition: all 0.2s ease !important;
         }
         
-        /* Texto azul en botones secondary */
-        button[kind="secondary"] *,
-        [data-testid="stBaseButton-secondary"] *,
-        button[kind="secondary"] p,
-        button[kind="secondary"] span {
+        /* Texto azul en botones secondary (EXCEPTO Download Buttons) */
+        button[kind="secondary"]:not(.stDownloadButton button):not(div[data-testid="stDownloadButton"] button) *,
+        [data-testid="stBaseButton-secondary"]:not(.stDownloadButton button):not(div[data-testid="stDownloadButton"] button) *,
+        button[kind="secondary"]:not(.stDownloadButton button):not(div[data-testid="stDownloadButton"] button) p,
+        button[kind="secondary"]:not(.stDownloadButton button):not(div[data-testid="stDownloadButton"] button) span {
             color: var(--primary-color) !important;
         }
         
@@ -318,10 +318,14 @@ def inject_custom_css():
         
         /* ========================================
            BOTONES DE DESCARGA (Download Button)
+           MÁXIMA ESPECIFICIDAD para sobrescribir secondary
         ======================================== */
         .stDownloadButton button,
         .stDownloadButton button[kind="secondary"],
-        div[data-testid="stDownloadButton"] button {
+        .stDownloadButton button[data-testid="stBaseButton-secondary"],
+        div[data-testid="stDownloadButton"] button,
+        div[data-testid="stDownloadButton"] button[kind="secondary"],
+        div.stDownloadButton button[kind="secondary"] {
             background-color: var(--primary-color) !important;
             color: var(--button-text) !important;
             border: 2px solid var(--primary-color) !important;
@@ -331,27 +335,52 @@ def inject_custom_css():
             font-size: 16px !important;
         }
         
-        /* Forzar texto blanco en botones de descarga */
+        /* Forzar texto blanco en TODOS los elementos de botones de descarga */
         .stDownloadButton button *,
         .stDownloadButton button p,
         .stDownloadButton button span,
         .stDownloadButton button div,
+        .stDownloadButton button[kind="secondary"] *,
+        .stDownloadButton button[kind="secondary"] p,
+        .stDownloadButton button[kind="secondary"] span,
+        .stDownloadButton button[kind="secondary"] div,
         div[data-testid="stDownloadButton"] button *,
-        div[data-testid="stDownloadButton"] button p {
+        div[data-testid="stDownloadButton"] button p,
+        div[data-testid="stDownloadButton"] button span,
+        div[data-testid="stDownloadButton"] button div,
+        div[data-testid="stDownloadButton"] button[kind="secondary"] *,
+        div[data-testid="stDownloadButton"] button[kind="secondary"] p,
+        div.stDownloadButton button[kind="secondary"] *,
+        div.stDownloadButton button[kind="secondary"] p {
+            color: var(--button-text) !important;
+        }
+        
+        /* Específicamente el contenedor de Markdown */
+        .stDownloadButton button div[data-testid="stMarkdownContainer"] p,
+        div[data-testid="stDownloadButton"] button div[data-testid="stMarkdownContainer"] p,
+        div.stDownloadButton button[kind="secondary"] div[data-testid="stMarkdownContainer"] p {
             color: var(--button-text) !important;
         }
         
         .stDownloadButton button:hover,
-        div[data-testid="stDownloadButton"] button:hover {
+        .stDownloadButton button[kind="secondary"]:hover,
+        div[data-testid="stDownloadButton"] button:hover,
+        div[data-testid="stDownloadButton"] button[kind="secondary"]:hover {
             background-color: var(--accent-color) !important;
             color: var(--text-color) !important;
             border-color: var(--accent-color) !important;
         }
         
-        /* Texto oscuro en hover */
+        /* Texto oscuro en hover con máxima especificidad */
         .stDownloadButton button:hover *,
         .stDownloadButton button:hover p,
-        div[data-testid="stDownloadButton"] button:hover * {
+        .stDownloadButton button:hover span,
+        .stDownloadButton button[kind="secondary"]:hover *,
+        .stDownloadButton button[kind="secondary"]:hover p,
+        div[data-testid="stDownloadButton"] button:hover *,
+        div[data-testid="stDownloadButton"] button:hover p,
+        div[data-testid="stDownloadButton"] button[kind="secondary"]:hover *,
+        div[data-testid="stDownloadButton"] button[kind="secondary"]:hover p {
             color: var(--text-color) !important;
         }
 
