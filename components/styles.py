@@ -87,10 +87,16 @@ def inject_custom_css():
     - Sidebar azul institucional con texto blanco
     - Sin fondos negros, sombras pesadas ni glassmorphism
     - Contraste WCAG AA en todos los elementos
+    - Optimización móvil responsive (tablets, móviles)
     """
     from utils.global_styles import get_global_institutional_css
+    from utils.mobile_styles import get_mobile_css
     
+    # Inyectar estilos base globales
     st.markdown(get_global_institutional_css(), unsafe_allow_html=True)
+    
+    # Inyectar estilos móviles responsive
+    st.markdown(get_mobile_css(), unsafe_allow_html=True)
     
     st.markdown("""
         <style>
