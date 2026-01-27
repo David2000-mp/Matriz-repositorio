@@ -172,13 +172,16 @@ def inject_custom_css():
                 padding: 8px !important;
             }
 
-            /* Forzar tipografía negra en controles y bloques generados por Streamlit (clases `st-*`) */
-            [class*="st-"] , [class^="st-"] , [class*="css-"] {
-                color: #000000 !important;
+            /* Excluir header y toolbar de los estilos globales */
+            [data-testid="stHeader"],
+            [data-testid="stToolbar"],
+            [data-testid="stToolbarActions"],
+            .stMainMenu,
+            [class*="stAppHeader"],
+            [class*="stToolbar"] {
+                background-color: transparent !important;
             }
-            [class*="st-"] input, [class*="st-"] label, [class*="st-"] span, [class*="st-"] div {
-                color: #000000 !important;
-            }
+            
             /* Preservar colores de banner, badges y botones */
             .banner * { color: white !important; }
             .badge { color: white !important; }
