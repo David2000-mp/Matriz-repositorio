@@ -20,10 +20,13 @@ from .styles import (
     COLOR_MAP,
 )
 
+from .custom_header import render_custom_header
+
 __all__ = [
     "inject_custom_css",
     "configure_plotly_theme",
     "aplicar_estilo_personalizado",
+    "render_custom_header",
     "COLOR_PRIMARY",
     "COLOR_SECONDARY",
     "COLOR_BG",

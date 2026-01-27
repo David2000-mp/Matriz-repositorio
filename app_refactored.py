@@ -3,7 +3,7 @@ App refactorizado para CHAMPILEAKS.
 Provee enrutamiento limpio a las vistas y asegura inyección de estilos.
 """
 import streamlit as st
-from components import inject_custom_css
+from components import inject_custom_css, render_custom_header
 from utils.helpers import load_image
 from utils.logger import set_production_mode
 
@@ -14,7 +14,26 @@ def main():
     if os.getenv("STREAMLIT_SERVER_HEADLESS", "false").lower() == "true":
         set_production_mode()
 
-    st.set_page_config(page_title="CHAMPILEAKS", layout="wide", page_icon="Ⓜ️")
+    st.set_page_config(
+        page_title="CHAMPILEAKS",
+        layout="wide",
+        page_icon="Ⓜ️",
+        initial_sidebar_state="expanded",
+        menu_items={
+            'Get Help': None,
+            'Report a bug': None,
+            'About': None
+        }
+    )
+    
+    # Renderizar header personalizado (antes de cualquier contenido)
+    try:
+        render_custom_header()
+    except Exception as e:
+        import logging
+        logging.warning(f"No se pudo renderizar header personalizado: {e}")
+    
+    # Aplicar estilos CSS globales
     try:
         inject_custom_css()
     except Exception as e:
