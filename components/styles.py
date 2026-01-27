@@ -558,7 +558,426 @@ def inject_custom_css():
         pass
 
 
-def configure_plotly_theme():
+def aplicar_estilo_personalizado():
+    """
+    Sistema de temas dinámico con selector en sidebar.
+    Permite al usuario elegir entre Tema Claro y Oscuro.
+    Unifica el diseño de todos los inputs con contraste perfecto.
+    
+    Returns:
+        str: Tema seleccionado ('Claro' o 'Oscuro')
+    """
+    import streamlit as st
+    
+    # Inicializar tema en session_state si no existe
+    if 'tema' not in st.session_state:
+        st.session_state.tema = 'Claro'
+    
+    # Selector de tema en sidebar con emoji
+    with st.sidebar:
+        st.markdown("---")
+        tema_seleccionado = st.radio(
+            "🎨 Tema de la Aplicación",
+            options=['Claro', 'Oscuro'],
+            index=0 if st.session_state.tema == 'Claro' else 1,
+            help="Cambia entre modo claro y oscuro para mejor legibilidad"
+        )
+        
+        # Actualizar session_state
+        st.session_state.tema = tema_seleccionado
+    
+    # Definir paletas de color según tema
+    if tema_seleccionado == 'Oscuro':
+        theme = {
+            # Fondos
+            'bg_primary': '#0E1117',
+            'bg_secondary': '#1E2228',
+            'bg_card': '#262730',
+            'bg_input': '#1E2228',
+            'bg_hover': '#2D3139',
+            
+            # Textos
+            'text_primary': '#FAFAFA',
+            'text_secondary': '#B8B8B8',
+            'text_caption': '#8B8B8B',
+            'text_placeholder': '#6B6B6B',
+            
+            # Bordes
+            'border_color': '#3A3F47',
+            'border_focus': '#0056B3',
+            
+            # Institucionales (mantener)
+            'primary': '#4A90E2',  # Azul más claro para oscuro
+            'accent': '#FFB81C',
+        }
+    else:  # Claro
+        theme = {
+            # Fondos
+            'bg_primary': '#FFFFFF',
+            'bg_secondary': '#F4F6F9',
+            'bg_card': '#FFFFFF',
+            'bg_input': '#FFFFFF',
+            'bg_hover': '#F0F2F6',
+            
+            # Textos
+            'text_primary': '#1A1A1A',
+            'text_secondary': '#4A5568',
+            'text_caption': '#5A5A5A',
+            'text_placeholder': '#9CA3AF',
+            
+            # Bordes
+            'border_color': '#D1D5DB',
+            'border_focus': '#003696',
+            
+            # Institucionales
+            'primary': '#003696',
+            'accent': '#FFB81C',
+        }
+    
+    # Inyectar CSS dinámico
+    css = f"""
+        <style>
+        @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap');
+        
+        /* ========================================
+           VARIABLES CSS DINÁMICAS - TEMA {tema_seleccionado.upper()}
+        ======================================== */
+        :root {{
+            /* Fondos */
+            --background-color: {theme['bg_primary']};
+            --bg-secondary: {theme['bg_secondary']};
+            --bg-card: {theme['bg_card']};
+            --input-bg: {theme['bg_input']};
+            --bg-hover: {theme['bg_hover']};
+            
+            /* Textos */
+            --text-color: {theme['text_primary']};
+            --text-secondary: {theme['text_secondary']};
+            --text-caption: {theme['text_caption']};
+            --text-placeholder: {theme['text_placeholder']};
+            
+            /* Bordes */
+            --border-color: {theme['border_color']};
+            --border-focus: {theme['border_focus']};
+            
+            /* Institucionales */
+            --primary-color: {theme['primary']};
+            --accent-color: {theme['accent']};
+            
+            /* Sidebar (siempre azul institucional) */
+            --sidebar-bg: #003696;
+            --sidebar-text: #FFFFFF;
+        }}
+        
+        /* ========================================
+           APLICACIÓN GLOBAL DE TEMA
+        ======================================== */
+        .stApp,
+        [data-testid="stAppViewContainer"],
+        .main {{
+            font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+            background-color: var(--background-color) !important;
+            color: var(--text-color) !important;
+        }}
+        
+        /* Contenedores principales */
+        [data-testid="stMainBlockContainer"],
+        [data-testid="block-container"],
+        .block-container {{
+            background-color: var(--background-color) !important;
+            color: var(--text-color) !important;
+        }}
+        
+        /* ========================================
+           INPUTS UNIFICADOS - DISEÑO CONSISTENTE
+        ======================================== */
+        
+        /* SELECTBOX / COMBOBOX */
+        .stSelectbox > div > div,
+        [data-baseweb="select"],
+        [data-baseweb="select"] > div,
+        div[role="combobox"],
+        div[data-testid="stSelectbox"] > div > div {{
+            background-color: var(--input-bg) !important;
+            color: var(--text-color) !important;
+            border: 2px solid var(--border-color) !important;
+            border-radius: 8px !important;
+            font-size: 16px !important;
+            font-weight: 500 !important;
+            padding: 10px 16px !important;
+            transition: all 0.2s ease !important;
+            min-height: 48px !important;
+        }}
+        
+        /* Hover en selectbox */
+        .stSelectbox > div > div:hover,
+        [data-baseweb="select"]:hover,
+        div[role="combobox"]:hover {{
+            border-color: var(--border-focus) !important;
+            background-color: var(--bg-hover) !important;
+            box-shadow: 0 0 0 3px rgba(0, 86, 179, 0.1) !important;
+        }}
+        
+        /* Focus en selectbox */
+        .stSelectbox > div > div:focus-within,
+        [data-baseweb="select"]:focus-within {{
+            border-color: var(--border-focus) !important;
+            outline: 2px solid var(--border-focus) !important;
+            outline-offset: 2px !important;
+            box-shadow: 0 0 0 4px rgba(0, 86, 179, 0.15) !important;
+        }}
+        
+        /* Opciones del dropdown */
+        [role="listbox"],
+        [data-baseweb="popover"] {{
+            background-color: var(--input-bg) !important;
+            border: 2px solid var(--border-color) !important;
+            border-radius: 8px !important;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15) !important;
+        }}
+        
+        [role="option"],
+        li[role="option"] {{
+            background-color: var(--input-bg) !important;
+            color: var(--text-color) !important;
+            font-size: 16px !important;
+            padding: 12px 16px !important;
+            transition: background-color 0.15s ease !important;
+        }}
+        
+        [role="option"]:hover,
+        li[role="option"]:hover {{
+            background-color: var(--bg-hover) !important;
+            color: var(--primary-color) !important;
+        }}
+        
+        /* TEXT INPUT */
+        .stTextInput input,
+        input[type="text"],
+        input[type="email"],
+        input[type="password"],
+        input[type="number"] {{
+            background-color: var(--input-bg) !important;
+            color: var(--text-color) !important;
+            border: 2px solid var(--border-color) !important;
+            border-radius: 8px !important;
+            font-size: 16px !important;
+            font-weight: 500 !important;
+            padding: 12px 16px !important;
+            transition: all 0.2s ease !important;
+            caret-color: var(--primary-color) !important;
+        }}
+        
+        .stTextInput input:hover,
+        input:hover {{
+            border-color: var(--border-focus) !important;
+            background-color: var(--bg-hover) !important;
+        }}
+        
+        .stTextInput input:focus,
+        input:focus {{
+            border-color: var(--border-focus) !important;
+            outline: 2px solid var(--border-focus) !important;
+            outline-offset: 2px !important;
+            box-shadow: 0 0 0 4px rgba(0, 86, 179, 0.15) !important;
+        }}
+        
+        /* Placeholder con contraste perfecto */
+        .stTextInput input::placeholder,
+        input::placeholder,
+        textarea::placeholder {{
+            color: var(--text-placeholder) !important;
+            opacity: 0.8 !important;
+            font-weight: 400 !important;
+        }}
+        
+        /* NUMBER INPUT */
+        .stNumberInput input {{
+            background-color: var(--input-bg) !important;
+            color: var(--text-color) !important;
+            border: 2px solid var(--border-color) !important;
+            border-radius: 8px !important;
+            font-size: 16px !important;
+            padding: 12px 16px !important;
+        }}
+        
+        /* TEXTAREA */
+        .stTextArea textarea,
+        textarea {{
+            background-color: var(--input-bg) !important;
+            color: var(--text-color) !important;
+            border: 2px solid var(--border-color) !important;
+            border-radius: 8px !important;
+            font-size: 16px !important;
+            padding: 12px 16px !important;
+            line-height: 1.6 !important;
+            font-family: 'Montserrat', sans-serif !important;
+        }}
+        
+        .stTextArea textarea:focus {{
+            border-color: var(--border-focus) !important;
+            outline: 2px solid var(--border-focus) !important;
+            outline-offset: 2px !important;
+        }}
+        
+        /* DATE INPUT */
+        .stDateInput input {{
+            background-color: var(--input-bg) !important;
+            color: var(--text-color) !important;
+            border: 2px solid var(--border-color) !important;
+            border-radius: 8px !important;
+            font-size: 16px !important;
+            padding: 12px 16px !important;
+        }}
+        
+        /* MULTISELECT */
+        .stMultiSelect > div > div {{
+            background-color: var(--input-bg) !important;
+            border: 2px solid var(--border-color) !important;
+            border-radius: 8px !important;
+        }}
+        
+        /* ========================================
+           LABELS CON CONTRASTE PERFECTO
+        ======================================== */
+        .stSelectbox label,
+        .stTextInput label,
+        .stNumberInput label,
+        .stTextArea label,
+        .stDateInput label,
+        .stMultiSelect label,
+        .stFileUploader label,
+        .stRadio label,
+        .stCheckbox label,
+        [data-testid="stWidgetLabel"] {{
+            color: var(--text-color) !important;
+            font-size: 16px !important;
+            font-weight: 600 !important;
+            margin-bottom: 8px !important;
+        }}
+        
+        /* ========================================
+           SIDEBAR INSTITUCIONAL (SIEMPRE AZUL)
+        ======================================== */
+        [data-testid="stSidebar"] {{
+            background-color: var(--sidebar-bg) !important;
+        }}
+        
+        [data-testid="stSidebar"] *,
+        [data-testid="stSidebar"] label,
+        [data-testid="stSidebar"] p {{
+            color: var(--sidebar-text) !important;
+        }}
+        
+        /* Inputs en sidebar con fondo semi-transparente */
+        [data-testid="stSidebar"] input,
+        [data-testid="stSidebar"] select,
+        [data-testid="stSidebar"] .stSelectbox > div > div {{
+            background-color: rgba(255, 255, 255, 0.15) !important;
+            border-color: rgba(255, 255, 255, 0.3) !important;
+            color: white !important;
+        }}
+        
+        /* ========================================
+           TIPOGRAFÍA CON JERARQUÍA CLARA
+        ======================================== */
+        .stMarkdown h1 {{
+            color: var(--primary-color) !important;
+            font-weight: 700 !important;
+            font-size: 2.25rem !important;
+            margin-bottom: 1rem !important;
+        }}
+        
+        .stMarkdown h2 {{
+            color: var(--primary-color) !important;
+            font-weight: 600 !important;
+            font-size: 1.875rem !important;
+            margin-bottom: 0.875rem !important;
+        }}
+        
+        .stMarkdown h3 {{
+            color: var(--text-color) !important;
+            font-weight: 600 !important;
+            font-size: 1.5rem !important;
+        }}
+        
+        .stMarkdown p,
+        .stMarkdown li,
+        .stMarkdown span {{
+            color: var(--text-color) !important;
+            font-size: 16px !important;
+            line-height: 1.6 !important;
+        }}
+        
+        /* ========================================
+           TARJETAS Y MÉTRICAS
+        ======================================== */
+        [data-testid="stMetric"] {{
+            background-color: var(--bg-card) !important;
+            border: 1px solid var(--border-color) !important;
+            padding: 16px !important;
+            border-radius: 10px !important;
+        }}
+        
+        [data-testid="stMetricValue"] {{
+            color: var(--text-color) !important;
+            font-weight: 700 !important;
+        }}
+        
+        [data-testid="stMetricLabel"] {{
+            color: var(--text-secondary) !important;
+        }}
+        
+        /* ========================================
+           BOTONES CON TEMA
+        ======================================== */
+        .stButton button,
+        button[kind="primary"] {{
+            background-color: var(--primary-color) !important;
+            color: white !important;
+            border: none !important;
+            border-radius: 8px !important;
+            padding: 12px 24px !important;
+            font-size: 16px !important;
+            font-weight: 600 !important;
+            transition: all 0.2s ease !important;
+        }}
+        
+        .stButton button:hover {{
+            transform: translateY(-2px) !important;
+            box-shadow: 0 6px 16px rgba(0, 54, 150, 0.25) !important;
+        }}
+        
+        /* ========================================
+           TABLAS ADAPTATIVAS
+        ======================================== */
+        .dataframe {{
+            background-color: var(--bg-card) !important;
+            color: var(--text-color) !important;
+        }}
+        
+        .dataframe th {{
+            background-color: var(--primary-color) !important;
+            color: white !important;
+        }}
+        
+        .dataframe td {{
+            border-color: var(--border-color) !important;
+        }}
+        
+        /* ========================================
+           INDICADOR DE TEMA ACTIVO
+        ======================================== */
+        .stRadio > label > div[data-testid="stMarkdownContainer"] p {{
+            font-weight: 600 !important;
+        }}
+        
+        </style>
+    """
+    
+    st.markdown(css, unsafe_allow_html=True)
+    
+    return tema_seleccionado
     """
     Configuración de tema Plotly accesible con fuentes legibles.
     Retorna diccionario de configuración para update_layout().
