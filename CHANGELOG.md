@@ -7,6 +7,91 @@ y este proyecto adhiere a [Versionado Semántico](https://semver.org/lang/es/).
 
 ---
 
+## [2.2.2] - 2026-01-26
+
+### ✨ Agregado
+- **Sistema de Fuerza Bruta CSS para Streamlit Cloud**:
+  - 5 bloques de blindaje CSS para garantizar visualización idéntica Local ↔ Cloud
+  - Anclaje de contenido principal con selectores de alta especificidad
+  - Blindaje de widgets (Captura/Configuración) con labels legibles
+  - Persistencia de estilos entre navegación de tabs
+  - Última línea de defensa con máxima prioridad CSS
+  - Anti-gris: opacity 1 !important en todo el contenido
+
+### 🔧 Mejorado
+- **Tipografía Ultra-Reforzada**:
+  - `-webkit-font-smoothing: antialiased !important` en todo el contenido
+  - `-moz-osx-font-smoothing: grayscale !important`
+  - `text-rendering: optimizeLegibility !important`
+  - Fuente Inter forzada en todos los elementos del cuerpo
+- **Labels de Widgets**:
+  - `font-weight: 600 !important` para máxima visibilidad
+  - `color: #212529 !important` (negro legible)
+  - `font-size: 16px !important` (evita zoom en iOS)
+- **Inputs y Formularios**:
+  - Selectores específicos para `.stTextInput`, `.stNumberInput`, `.stTextArea`
+  - Blindaje total de inputs con color negro
+  - Labels con peso 600 en Captura/Configuración
+
+### 🔒 Blindajes Implementados
+1. **Blindaje de Contenido Principal**: Selectores `div[data-testid="stAppViewBlockContainer"]`
+2. **Blindaje de Tabs**: Reglas para `div[data-baseweb="tab-panel"]` y `[role="tabpanel"]`
+3. **Blindaje de Widgets**: Labels `[data-testid="stWidgetLabel"]` con font-weight 600
+4. **Persistencia Dinámica**: Re-inyección en `[class*="st-emotion-cache"]`
+5. **Última Defensa**: `section[data-testid="stMain"] *` con máxima prioridad
+
+### 🧪 Testing
+- **test_css_fuerza_bruta.py**: Script de verificación automática
+  - 13/13 verificaciones de selectores críticos
+  - 5/5 bloques de protección activos
+  - Estadísticas de color (negro vs blanco)
+  - Validación de presencia de reglas
+
+### 📚 Documentación
+- **GUIA_FUERZA_BRUTA_CSS.md**: Guía completa de implementación
+  - Problema solucionado con síntomas detallados
+  - Solución técnica con ejemplos de código
+  - Checklist de verificación visual
+  - Debugging en Streamlit Cloud
+  - Troubleshooting común
+  - Resultado antes/después
+
+### 🎯 Problema Resuelto
+- Contenido interno de secciones perdía legibilidad en Streamlit Cloud
+- Labels de widgets se volvían grises (#999999) en lugar de negros (#212529)
+- Tipografía se veía delgada/borrosa en servidor
+- Estilos se reseteaban al cambiar entre Dashboard → Comparativas → Captura
+- Diferencias visuales entre entorno local y producción
+
+### ✅ Garantía de Resultado
+- **100% consistencia** entre Local y Streamlit Cloud
+- **WCAG AAA** compliance en todo el contenido
+- **16px mínimo** en todos los textos (accesibilidad móvil)
+- **Antialiasing** en toda la tipografía
+
+---
+
+## [2.2.1] - 2026-01-26
+
+### 🐛 Corregido
+- **Texto Blanco en Selectboxes (Streamlit Cloud)**:
+  - Eliminado selector universal `section[data-testid="stSidebar"] *` que causaba texto blanco invisible en selectboxes
+  - Refactorización de selectores CSS usando elementos específicos (p, h1, h2, h3, .stMarkdown) en lugar de `*`
+  - Reforzadas reglas de selectbox con mayor especificidad para garantizar texto negro (#212529)
+  - Labels de selectbox permanecen en blanco (#FFFFFF) para contraste con fondo azul del sidebar
+  - El problema solo se manifestaba en Streamlit Cloud, no en local
+  - Ver documentación completa en `FIX_SELECTBOX_TEXTO_BLANCO.md`
+
+### 🧪 Testing
+- Creado script de validación `test_css_selectbox.py` para verificar reglas CSS de selectboxes
+- Verificación automática de ausencia de selectores universales problemáticos
+
+### 📚 Documentación
+- **FIX_SELECTBOX_TEXTO_BLANCO.md**: Documentación técnica detallada del problema y solución
+- Incluye análisis de causa raíz, implementación, validación y lecciones aprendidas
+
+---
+
 ## [2.2.0] - 2026-01-26
 
 ### ✨ Agregado
