@@ -4,20 +4,15 @@ Combina branding Marista con UX nativa de Streamlit.
 """
 
 import streamlit as st
-from utils.helpers import load_image
 
 
 def render_custom_header():
     """
     Renderiza header personalizado con:
-    - Logo institucional
     - Título CHAMPILEAKS
     - Botón de toggle sidebar (mantiene funcionalidad nativa)
     - Oculta botones innecesarios (Share, Settings, Menu)
     """
-    
-    # Cargar logo
-    logo_b64 = load_image("logo_maristas.png")
     
     # CSS para ocultar elementos nativos pero mantener toggle sidebar
     st.markdown("""
@@ -58,14 +53,6 @@ def render_custom_header():
             right: 0;
             z-index: 999998;
             pointer-events: none;
-        }
-        
-        /* Logo institucional */
-        .custom-header-logo {
-            height: 45px;
-            width: auto;
-            filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
-            pointer-events: auto;
         }
         
         /* Título CHAMPILEAKS */
@@ -226,11 +213,8 @@ def render_custom_header():
     """, unsafe_allow_html=True)
     
     # Renderizar header personalizado
-    st.markdown(f"""
+    st.markdown("""
         <div class="custom-header-container">
-            <img src="data:image/png;base64,{logo_b64}" 
-                 class="custom-header-logo" 
-                 alt="Logo Maristas">
             <h1 class="custom-header-title">CHAMPILEAKS</h1>
         </div>
     """, unsafe_allow_html=True)
