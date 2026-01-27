@@ -166,6 +166,21 @@ def render_custom_header():
             margin: 0 !important;
         }
         
+        /* Botones secondary con tooltip */
+        div[data-testid="stTooltipHoverTarget"] button[kind="secondary"],
+        div.stTooltipHoverTarget button[kind="secondary"] {
+            background-color: #003696 !important;
+            color: #FFFFFF !important;
+        }
+        
+        /* Texto en botones con tooltip */
+        div[data-testid="stTooltipHoverTarget"] button[kind="secondary"] *,
+        div[data-testid="stTooltipHoverTarget"] button[kind="secondary"] p,
+        div.stTooltipHoverTarget button[kind="secondary"] *,
+        div.stTooltipHoverTarget button[kind="secondary"] p {
+            color: #FFFFFF !important;
+        }
+        
         /* Responsive - Mobile */
         @media (max-width: 768px) {
             .custom-header-container {

@@ -315,6 +315,45 @@ def inject_custom_css():
         button[kind="secondary"]:hover span {
             color: var(--button-text) !important;
         }
+        
+        /* ========================================
+           BOTONES DE DESCARGA (Download Button)
+        ======================================== */
+        .stDownloadButton button,
+        .stDownloadButton button[kind="secondary"],
+        div[data-testid="stDownloadButton"] button {
+            background-color: var(--primary-color) !important;
+            color: var(--button-text) !important;
+            border: 2px solid var(--primary-color) !important;
+            border-radius: 8px !important;
+            padding: 12px 24px !important;
+            font-weight: 600 !important;
+            font-size: 16px !important;
+        }
+        
+        /* Forzar texto blanco en botones de descarga */
+        .stDownloadButton button *,
+        .stDownloadButton button p,
+        .stDownloadButton button span,
+        .stDownloadButton button div,
+        div[data-testid="stDownloadButton"] button *,
+        div[data-testid="stDownloadButton"] button p {
+            color: var(--button-text) !important;
+        }
+        
+        .stDownloadButton button:hover,
+        div[data-testid="stDownloadButton"] button:hover {
+            background-color: var(--accent-color) !important;
+            color: var(--text-color) !important;
+            border-color: var(--accent-color) !important;
+        }
+        
+        /* Texto oscuro en hover */
+        .stDownloadButton button:hover *,
+        .stDownloadButton button:hover p,
+        div[data-testid="stDownloadButton"] button:hover * {
+            color: var(--text-color) !important;
+        }
 
         /* ========================================
            MÉTRICAS STREAMLIT

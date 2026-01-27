@@ -738,6 +738,26 @@ def get_global_institutional_css() -> str:
         background-color: {HOVER_BG} !important;
     }}
     
+    /* Título del expander - texto negro legible */
+    details[open] summary,
+    summary[class*="streamlit-expanderHeader"],
+    .st-emotion-cache-nwb5ao,
+    .st-emotion-cache-11fa8fd,
+    span.st-emotion-cache-nwb5ao p,
+    div.st-emotion-cache-11fa8fd p {{
+        color: {TEXT_PRIMARY} !important;
+        font-weight: 600 !important;
+        font-size: 16px !important;
+    }}
+    
+    /* Iconos de expander visibles */
+    summary span[data-testid="stIconMaterial"],
+    .st-emotion-cache-leahp2,
+    span.st-emotion-cache-leahp2 span {{
+        color: {TEXT_PRIMARY} !important;
+        visibility: visible !important;
+    }}
+    
     .streamlit-expanderContent {{
         background-color: {BG_WHITE} !important;
         border: 1px solid {BORDER_LIGHT} !important;
