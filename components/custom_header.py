@@ -131,9 +131,11 @@ def render_custom_header():
            BOTONES SECONDARY (Navegación Landing)
            ======================================== */
         
-        /* Botones secondary con diseño institucional */
+        /* Botones secondary con diseño institucional - Selectores ultra específicos */
         button[kind="secondary"],
-        button[data-testid="stBaseButton-secondary"] {
+        button[data-testid="stBaseButton-secondary"],
+        .stButton button[kind="secondary"],
+        div[data-testid="stButton"] button[kind="secondary"] {
             background-color: #003696 !important;
             color: #FFFFFF !important;
             border: 2px solid #003696 !important;
@@ -146,7 +148,9 @@ def render_custom_header():
         }
         
         button[kind="secondary"]:hover,
-        button[data-testid="stBaseButton-secondary"]:hover {
+        button[data-testid="stBaseButton-secondary"]:hover,
+        .stButton button[kind="secondary"]:hover,
+        div[data-testid="stButton"] button[kind="secondary"]:hover {
             background-color: #00235A !important;
             color: #FFFFFF !important;
             border-color: #FFB81C !important;
@@ -159,14 +163,20 @@ def render_custom_header():
             transform: translateY(-1px) !important;
         }
         
-        /* Texto dentro de botones secondary - FORZAR BLANCO */
+        /* Texto dentro de botones secondary - FORZAR BLANCO EN TODOS LOS NIVELES */
+        button[kind="secondary"] *,
+        button[data-testid="stBaseButton-secondary"] *,
+        .stButton button[kind="secondary"] *,
+        div[data-testid="stButton"] button[kind="secondary"] * {
+            color: #FFFFFF !important;
+        }
+        
+        /* Específicamente el párrafo dentro del markdown */
         button[kind="secondary"] p,
         button[data-testid="stBaseButton-secondary"] p,
-        button[kind="secondary"] span,
-        button[data-testid="stBaseButton-secondary"] span,
-        button[kind="secondary"] div,
-        button[data-testid="stBaseButton-secondary"] div {
+        button[kind="secondary"] div[data-testid="stMarkdownContainer"] p {
             color: #FFFFFF !important;
+            margin: 0 !important;
         }
         
         /* Responsive - Mobile */
