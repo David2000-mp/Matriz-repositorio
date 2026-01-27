@@ -1018,3 +1018,48 @@ def aplicar_estilo_personalizado():
             "bordercolor": "#003696"
         }
     }
+    
+    return tema_seleccionado
+
+
+def configure_plotly_theme():
+    """
+    Configuración de tema Plotly accesible con fuentes legibles.
+    Retorna diccionario de configuración para update_layout().
+    """
+    return {
+        "font": {
+            "family": "Montserrat, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
+            "size": 14,  # Tamaño mínimo legible
+            "color": "#1A1A1A"  # Alto contraste
+        },
+        "title": {
+            "font": {"size": 18, "color": "#003696", "family": "Montserrat"},
+            "x": 0.5,
+            "xanchor": "center"
+        },
+        "xaxis": {
+            "title": {"font": {"size": 14, "color": "#4A5568"}},
+            "tickfont": {"size": 12, "color": "#1A1A1A"},
+            "gridcolor": "rgba(0, 0, 0, 0.08)"
+        },
+        "yaxis": {
+            "title": {"font": {"size": 14, "color": "#4A5568"}},
+            "tickfont": {"size": 12, "color": "#1A1A1A"},
+            "gridcolor": "rgba(0, 0, 0, 0.08)"
+        },
+        "legend": {
+            "font": {"size": 13, "color": "#1A1A1A"},
+            "bgcolor": "rgba(255, 255, 255, 0.9)",
+            "bordercolor": "rgba(0, 0, 0, 0.1)",
+            "borderwidth": 1
+        },
+        "plot_bgcolor": "#FFFFFF",
+        "paper_bgcolor": "#FFFFFF",
+        "margin": {"l": 50, "r": 30, "t": 60, "b": 50},
+        "hoverlabel": {
+            "bgcolor": "#FFFFFF",
+            "font": {"size": 13, "color": "#1A1A1A"},
+            "bordercolor": "#003696"
+        }
+    }
