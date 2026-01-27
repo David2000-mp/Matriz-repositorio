@@ -101,6 +101,17 @@ def render_custom_header():
             color: #FFFFFF !important;
         }
         
+        /* Ocultar texto del icono Material (keyboard_double_arrow) */
+        button[data-testid="stExpandSidebarButton"] span[data-testid="stIconMaterial"] {
+            font-size: 0 !important;
+        }
+        
+        /* Asegurar que el icono se renderice usando la fuente Material Icons */
+        button[data-testid="stExpandSidebarButton"] span[data-testid="stIconMaterial"]::before {
+            font-size: 24px !important;
+            font-family: 'Material Icons' !important;
+        }
+        
         /* Ajustar padding del contenido principal */
         .main .block-container {
             padding-top: 5rem !important;
