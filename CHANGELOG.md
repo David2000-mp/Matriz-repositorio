@@ -7,6 +7,86 @@ y este proyecto adhiere a [Versionado Semántico](https://semver.org/lang/es/).
 
 ---
 
+## [2.2.0] - 2026-01-26
+
+### ✨ Agregado
+- **Sistema de Estilos Global**:
+  - Nuevo módulo `utils/global_styles.py` para centralizar CSS institucional
+  - Fuente Inter aplicada universalmente con antialiasing (`-webkit-font-smoothing`)
+  - Tema CHAMPI_THEME como single source of truth para colores
+- **Suite de Testing Automatizado**:
+  - `test_system_verification.py`: 5 tests críticos de lógica de negocio
+  - Verificación de métricas NO acumulativas (snapshot vs histórico)
+  - Validación de cálculos de crecimiento MoM
+  - Tests de normalización mensual y deduplicación
+  - Tests de métricas derivadas (likes_promedio, engagement_rate)
+- **Debug Mejorado**:
+  - Expander "🔍 DEBUG MERGE" movido al final del dashboard
+  - Información de fusión de datos disponible bajo demanda
+  - Almacenamiento en `st.session_state.debug_merge_info`
+- **Documentación Técnica**:
+  - `REPORTE_VERIFICACION.md`: Informe completo de validación del sistema
+  - `LANDING_REFACTORING_BEST_PRACTICES.md`: Guía de mejores prácticas UI
+  - `SISTEMA_ESTILOS_GLOBAL.md`: Documentación del sistema de estilos
+
+### 🔧 Mejorado
+- **UI/UX del Sidebar**:
+  - Fondo azul institucional (#003696) en todo el sidebar
+  - Texto blanco (#FFFFFF) para máximo contraste (WCAG AA)
+  - Labels de widgets con `font-size: 16px` y `font-weight: 600`
+  - Eliminación completa de bordes visuales (hr, divs, boxes)
+- **Landing Page**:
+  - Hero banner con imagen optimizada para nitidez (`image-rendering: crisp-edges`)
+  - Eliminado contenedor `metrics-institutional-container` para diseño más limpio
+  - Métricas mostradas directamente sin caja decorativa
+- **Dashboard**:
+  - Expanders de status ("Buscando datos...", "Procesando...") ocultados
+  - Contenedores `.element-container` con fondo transparente (sin cajas grises)
+  - Interfaz más limpia y minimalista
+- **Typography**:
+  - Sidebar: h1 (1.5rem), h2 (1.25rem), h3 (1.1rem) con peso 700
+  - Letter-spacing: 0.5px para mejor legibilidad
+  - Line-height: 1.6 (párrafos), 1.4 (títulos)
+  - Botones móviles: font-size mínimo 16px (evita zoom iOS)
+
+### 🐛 Corregido
+- **Bug Crítico en `normalize_latest_by_account`**:
+  - **Problema**: `seguidores_prev` retornaba 0 en lugar del valor anterior real
+  - **Causa**: Mismatch entre keys de diccionario (tuplas vs valores individuales)
+  - **Solución**: Normalización de todas las keys a tuplas consistentes
+  - **Impacto**: Cálculos de crecimiento ahora 100% precisos
+- **Selectbox en Sidebar**:
+  - Texto interno forzado a negro (#212529) para contraste
+  - Fondo blanco sin bordes
+  - Dropdown con hover state visible
+
+### 🚀 Refactorización
+- **Arquitectura de Estilos**:
+  - Consolidación de CSS disperso en `global_styles.py`
+  - Eliminación de duplicación entre `components/styles.py` y vistas
+  - Sistema de placeholders f-string para colores institucionales
+- **Data Provider**:
+  - Debug info ahora almacenada en session_state en vez de impresa directamente
+  - Separación de preocupaciones: cálculo vs presentación
+- **Analytics Module**:
+  - Función `normalize_latest_by_account` con manejo robusto de tuplas
+  - Soporte consistente para groupby con múltiples keys
+
+### ✅ Validación
+- **5/5 Tests Pasados**:
+  - ✅ Métricas NO acumulativas (25,800 vs 122,000 histórico)
+  - ✅ Cálculo de crecimiento (+2.79% validado)
+  - ✅ Normalización mensual (último registro por mes)
+  - ✅ Deduplicación (3 cuentas únicas de 15 registros)
+  - ✅ Métricas derivadas (likes = seguidores × engagement/100)
+- **Verificación de Producción**:
+  - Snapshots correctos (último valor por cuenta)
+  - Agregaciones sin duplicados
+  - Comparaciones MoM/YoY precisas
+  - Gráficas con datos apropiados (agregados vs snapshots)
+
+---
+
 ## [2.1.0] - 2025-12-01
 
 ### ✨ Agregado
