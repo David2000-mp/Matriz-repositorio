@@ -210,31 +210,38 @@ def generate_html_report(school_name: str,
     crecimiento = _kpiv('seguidores') or _kpiv('followers') or 'N/A'
     engagement = _kpiv('engagement_rate') or _kpiv('engagement') or 'N/A'
 
-    # CSS Marista (mejorada para tabla legible y agrupada)
+    # CSS Marista WCAG AA (contraste mínimo 4.5:1)
     css = """
         <style>
-            :root{--marista-blue:#003696; --marista-amber:#FFB81C; --alert-red:#d9534f; --alert-green:#5cb85c;}
-            body{font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial; color:#222; background:#f6f8fa; padding:16px}
-            .banner{background:var(--marista-blue); color: white; padding:18px 24px; border-radius:6px; margin-bottom:16px}
-            .banner h1{margin:0; font-size:20px}
-            .meta{color:rgba(255,255,255,0.9); font-size:13px; margin-top:6px}
-            .kpi-row{display:flex; gap:12px; margin:12px 0 18px 0}
-            .kpi-card{flex:1; background:#fff; border-radius:8px; padding:14px; box-shadow:0 4px 6px rgba(0,0,0,0.05); border-left:4px solid var(--marista-amber); color:var(--marista-blue)}
-            .kpi-title{font-size:13px; color:var(--marista-blue); margin-bottom:6px}
-            .kpi-value{font-size:22px; font-weight:700; color:var(--marista-blue)}
-            .kpi-subtitle{font-size:12px; color:#666666; margin-top:6px}
-            .kpi-amber{color:var(--marista-amber)}
-            .alerts{padding:12px; border-radius:8px; margin-bottom:16px}
-            .alert-item{padding:8px; border-radius:6px; color:white; margin-bottom:8px}
-            .details-table{width:100%; border-collapse:collapse; margin-top:12px; font-size:13px}
-            .details-table thead th{background:var(--marista-blue); color:#fff; position:sticky; top:0; z-index:2}
-            .details-table th, .details-table td{border:1px solid #eef0f2; padding:10px; text-align:left; vertical-align:middle}
-            .details-table tbody tr:nth-child(even){background:#fbfcfd}
-            .details-table tbody tr:hover{background:#f1f6fb}
+            :root{
+                --marista-blue:#003696; 
+                --marista-amber:#FFB81C; 
+                --alert-red:#C82333; 
+                --alert-green:#1E7E34;
+                --text-primary:#1A1A1A;
+                --text-secondary:#4A5568;
+            }
+            body{font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial; color:var(--text-primary); background:#f6f8fa; padding:16px; font-size:16px; line-height:1.6;}
+            .banner{background:var(--marista-blue); color: white; padding:20px 24px; border-radius:8px; margin-bottom:18px}
+            .banner h1{margin:0; font-size:22px; font-weight:700;}
+            .meta{color:rgba(255,255,255,0.95); font-size:15px; margin-top:8px}
+            .kpi-row{display:flex; gap:14px; margin:14px 0 20px 0}
+            .kpi-card{flex:1; background:#fff; border-radius:8px; padding:16px; box-shadow:0 4px 8px rgba(0,0,0,0.08); border-left:4px solid var(--marista-amber); color:var(--marista-blue)}
+            .kpi-title{font-size:15px; color:var(--marista-blue); margin-bottom:8px; font-weight:600;}
+            .kpi-value{font-size:26px; font-weight:800; color:var(--text-primary)}
+            .kpi-subtitle{font-size:14px; color:var(--text-secondary); margin-top:8px}
+            .kpi-amber{color:var(--marista-amber); font-weight:700;}
+            .alerts{padding:14px; border-radius:8px; margin-bottom:18px}
+            .alert-item{padding:10px 14px; border-radius:6px; color:white; margin-bottom:10px; font-size:15px; font-weight:600;}
+            .details-table{width:100%; border-collapse:collapse; margin-top:14px; font-size:15px}
+            .details-table thead th{background:var(--marista-blue); color:#fff; position:sticky; top:0; z-index:2; font-weight:700; padding:12px;}
+            .details-table th, .details-table td{border:1px solid #E5E7EB; padding:12px; text-align:left; vertical-align:middle}
+            .details-table tbody tr:nth-child(even){background:#FAFAFA}
+            .details-table tbody tr:hover{background:#EFF6FF}
             .details-table td.num{ text-align:right; font-variant-numeric:tabular-nums }
-            .details-card{background:#fff; padding:12px; border-radius:8px; box-shadow:0 6px 18px rgba(0,0,0,0.04)}
-            .school-title{background:#f2f6fa; padding:8px 10px; border-radius:6px; margin-top:10px; font-weight:700}
-            .summary-row{background:#f7f9fc; font-weight:700}
+            .details-card{background:#fff; padding:14px; border-radius:8px; box-shadow:0 6px 20px rgba(0,0,0,0.06)}
+            .school-title{background:#EFF6FF; padding:10px 12px; border-radius:6px; margin-top:12px; font-weight:700; color:var(--text-primary);}
+            .summary-row{background:#F3F4F6; font-weight:700}
             @media (max-width:800px){.kpi-row{flex-direction:column}}
         </style>
         """

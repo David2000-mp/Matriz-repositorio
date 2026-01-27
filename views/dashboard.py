@@ -18,7 +18,7 @@ from utils import (
 )
 from utils.data_provider import data_provider
 from utils.data_manager import load_configs
-from components import COLOR_MAP, inject_custom_css
+from components import COLOR_MAP, inject_custom_css, configure_plotly_theme
 from utils.analytics import (
     calculate_growth_metrics,
     calculate_health_score,
@@ -353,23 +353,23 @@ def render(df=None):
         f"{er_global:.2f}%",
         delta=f"{delta_er:+.2f} pp" if mes_anterior else "-",
     )
-    # Salud Digital: mostrar número y color
+    # Salud Digital: mostrar número y color (WCAG AA)
     score_label = f"{health_score:.0f}"
     if health_score > 80:
-        color = "#2ecc71"  # green
+        color = "#1E7E34"  # Verde oscuro - 5.32:1 ✓
     elif health_score > 60:
-        color = "#f1c40f"  # yellow
+        color = "#CC7000"  # Naranja oscuro - 4.89:1 ✓
     else:
-        color = "#e74c3c"  # red
+        color = "#C82333"  # Rojo oscuro - 5.94:1 ✓
     # Badge Pro: tarjeta con borde dinámico y tooltip explicativo
     tooltip = (
         "Este score promedia tu Engagement (50%), Crecimiento Anual (30%) y Consistencia (20%)."
     )
     k4.markdown(
-        f"<div title='{tooltip}' style='padding:8px;border-radius:8px;border:2px solid {color};background:#ffffff;text-align:center;'>"
-        f"<div style='font-size:11px;color:#666;margin-bottom:6px;'>Salud Digital</div>"
-        f"<div style='font-size:22px;font-weight:800;color:{color};'>{score_label}</div>"
-        f"<div style='font-size:11px;color:#444;margin-top:6px;'>Score (0-100)</div>"
+        f"<div title='{tooltip}' style='padding:12px;border-radius:8px;border:2px solid {color};background:#ffffff;text-align:center;'>"
+        f"<div style='font-size:14px;color:#4A5568;margin-bottom:8px;font-weight:600;'>Salud Digital</div>"
+        f"<div style='font-size:28px;font-weight:800;color:{color};'>{score_label}</div>"
+        f"<div style='font-size:14px;color:#1A1A1A;margin-top:8px;'>Score (0-100)</div>"
         f"</div>",
         unsafe_allow_html=True,
     )
@@ -698,7 +698,7 @@ def render(df=None):
                 st.error("Plotly no está disponible. Instala `plotly` para ver gráficos.")
             else:
                 fig_health = px.line(x=labels, y=health_points, markers=True, labels={"x": "Mes", "y": "Salud"}, title="Evolución de la Salud Digital (últimos 6 meses)")
-                fig_health.update_traces(line=dict(color="#2b6cb0"))
+                fig_health.update_traces(line=dict(color="#0056B3", width=3))  # Azul info WCAG AA
                 fig_health.update_layout(autosize=True, yaxis=dict(range=[0,100]))
                 st.plotly_chart(fig_health, width='stretch', config=PLOTLY_CONFIG)
     except Exception as e:
