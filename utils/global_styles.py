@@ -68,27 +68,104 @@ def get_global_institutional_css() -> str:
         max-width: 95% !important;
     }}
     
-    /* Tipografía base global con font smoothing */
+    /* Tipografía base global con font smoothing ULTRA-REFORZADO */
     body,
-    .stApp {{
-        -webkit-font-smoothing: antialiased;
-        -moz-osx-font-smoothing: grayscale;
+    .stApp,
+    [data-testid="stAppViewBlockContainer"],
+    div[data-testid="stVerticalBlock"] {{
+        -webkit-font-smoothing: antialiased !important;
+        -moz-osx-font-smoothing: grayscale !important;
+        text-rendering: optimizeLegibility !important;
     }}
     
-    /* Tipografía base - solo para contenido principal, NO sidebar */
-    .main body,
-    .main .stMarkdown,
+    /* ============================================
+       🔒 BLINDAJE DE CONTENIDO PRINCIPAL (FUERZA BRUTA)
+       Garantiza legibilidad idéntica en Local y Cloud
+       ============================================ */
+    
+    /* ANCLAJE DE TODO EL TEXTO EN EL CUERPO DE LA APP */
+    div[data-testid="stAppViewBlockContainer"] p,
+    div[data-testid="stAppViewBlockContainer"] span,
+    div[data-testid="stAppViewBlockContainer"] label,
+    div[data-testid="stAppViewBlockContainer"] li,
+    div[data-testid="stAppViewBlockContainer"] div,
+    [data-testid="stVerticalBlock"] p,
+    [data-testid="stVerticalBlock"] span,
+    [data-testid="stVerticalBlock"] label,
+    [data-testid="stVerticalBlock"] li,
+    section[data-testid="stMain"] p,
+    section[data-testid="stMain"] span,
+    section[data-testid="stMain"] label,
+    section[data-testid="stMain"] li,
+    .main p,
+    .main span,
+    .main label,
+    .main li,
+    .main div:not([data-testid="stSidebar"] *) {{
+        color: {TEXT_PRIMARY} !important;
+        font-family: 'Inter', 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif !important;
+        font-size: 16px !important;
+        line-height: 1.6 !important;
+        -webkit-font-smoothing: antialiased !important;
+        -moz-osx-font-smoothing: grayscale !important;
+    }}
+    
+    /* TÍTULOS DEL CONTENIDO PRINCIPAL */
+    div[data-testid="stAppViewBlockContainer"] h1,
+    div[data-testid="stAppViewBlockContainer"] h2,
+    div[data-testid="stAppViewBlockContainer"] h3,
+    div[data-testid="stAppViewBlockContainer"] h4,
+    div[data-testid="stAppViewBlockContainer"] h5,
+    div[data-testid="stAppViewBlockContainer"] h6,
+    section[data-testid="stMain"] h1,
+    section[data-testid="stMain"] h2,
+    section[data-testid="stMain"] h3,
+    section[data-testid="stMain"] h4,
+    section[data-testid="stMain"] h5,
+    section[data-testid="stMain"] h6,
     .main h1,
     .main h2,
     .main h3,
     .main h4,
     .main h5,
-    .main h6,
-    .main p,
-    .main span {{
-        font-family: 'Inter', 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
-        color: {TEXT_PRIMARY};
-        line-height: 1.6;
+    .main h6 {{
+        color: {TEXT_PRIMARY} !important;
+        font-family: 'Inter', 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif !important;
+        font-weight: 700 !important;
+        line-height: 1.4 !important;
+        -webkit-font-smoothing: antialiased !important;
+        -moz-osx-font-smoothing: grayscale !important;
+    }}
+    
+    /* MARKDOWN CONTAINERS EN TODO EL CUERPO */
+    div[data-testid="stMarkdownContainer"]:not([data-testid="stSidebar"] *) p,
+    div[data-testid="stMarkdownContainer"]:not([data-testid="stSidebar"] *) span,
+    div[data-testid="stMarkdownContainer"]:not([data-testid="stSidebar"] *) {{
+        color: {TEXT_PRIMARY} !important;
+        font-family: 'Inter', sans-serif !important;
+    }}
+    
+    /* BLINDAJE DE LABELS DE WIDGETS (Captura/Configuración) */
+    [data-testid="stWidgetLabel"]:not([data-testid="stSidebar"] *) p,
+    [data-testid="stWidgetLabel"]:not([data-testid="stSidebar"] *) span,
+    [data-testid="stWidgetLabel"]:not([data-testid="stSidebar"] *) {{
+        color: {TEXT_PRIMARY} !important;
+        font-weight: 600 !important;
+        font-size: 16px !important;
+        font-family: 'Inter', sans-serif !important;
+    }}
+    
+    /* INPUTS Y FORMULARIOS DEL CUERPO PRINCIPAL */
+    section[data-testid="stMain"] input,
+    section[data-testid="stMain"] textarea,
+    section[data-testid="stMain"] select,
+    .main input,
+    .main textarea,
+    .main select {{
+        color: {TEXT_PRIMARY} !important;
+        font-family: 'Inter', sans-serif !important;
+        font-size: 16px !important;
+        -webkit-font-smoothing: antialiased !important;
     }}
     
     /* === SIDEBAR INSTITUCIONAL === */
@@ -316,11 +393,16 @@ def get_global_institutional_css() -> str:
     
     /* === INPUTS Y FORMULARIOS === */
     
-    /* Todos los inputs con fondo blanco y borde sutil */
+    /* BLINDAJE TOTAL DE INPUTS - FUERZA BRUTA */
     .stTextInput input,
     .stSelectbox select,
     .stNumberInput input,
-    .stTextArea textarea {{
+    .stTextArea textarea,
+    .stDateInput input,
+    .stTimeInput input,
+    section[data-testid="stMain"] input,
+    section[data-testid="stMain"] textarea,
+    section[data-testid="stMain"] select {{
         background-color: {BG_WHITE} !important;
         color: {TEXT_PRIMARY} !important;
         border: 1px solid {BORDER_MEDIUM} !important;
@@ -328,6 +410,8 @@ def get_global_institutional_css() -> str:
         font-size: 16px !important;
         line-height: 1.6 !important;
         padding: 10px 12px !important;
+        font-family: 'Inter', sans-serif !important;
+        -webkit-font-smoothing: antialiased !important;
     }}
     
     .stTextInput input:focus,
@@ -338,15 +422,31 @@ def get_global_institutional_css() -> str:
         box-shadow: 0 0 0 2px rgba(0, 54, 150, 0.1) !important;
     }}
     
-    /* Labels de inputs */
+    /* LABELS DE INPUTS - MÁXIMA VISIBILIDAD */
     .stTextInput label,
     .stSelectbox label,
     .stNumberInput label,
-    .stTextArea label {{
+    .stTextArea label,
+    .stDateInput label,
+    .stTimeInput label,
+    .stFileUploader label,
+    section[data-testid="stMain"] .stTextInput [data-testid="stWidgetLabel"],
+    section[data-testid="stMain"] .stNumberInput [data-testid="stWidgetLabel"],
+    section[data-testid="stMain"] .stTextArea [data-testid="stWidgetLabel"] {{
         color: {TEXT_PRIMARY} !important;
-        font-weight: 500 !important;
-        font-size: 14px !important;
+        font-weight: 600 !important;
+        font-size: 16px !important;
         margin-bottom: 6px !important;
+        font-family: 'Inter', sans-serif !important;
+    }}
+    
+    /* FORZAR TEXTO EN LABELS (evitar grises en Cloud) */
+    .stTextInput [data-testid="stWidgetLabel"] p,
+    .stNumberInput [data-testid="stWidgetLabel"] p,
+    .stTextArea [data-testid="stWidgetLabel"] p,
+    .stSelectbox [data-testid="stWidgetLabel"] p {{
+        color: {TEXT_PRIMARY} !important;
+        font-weight: 600 !important;
     }}
     
     /* === SELECTBOXES (FIX PARA CUADROS NEGROS) === */
@@ -410,6 +510,127 @@ def get_global_institutional_css() -> str:
     .stButton > button:focus {{
         outline: 3px solid {ACCENT_YELLOW};
         outline-offset: 2px;
+    }}
+    
+    /* ============================================
+       🔒 BLINDAJE DE TABS Y NAVEGACIÓN (Comparativas, Dashboard, etc.)
+       Garantiza persistencia de estilos al cambiar de sección
+       ============================================ */
+    
+    /* CONTENIDO DE TABS - FUERZA BRUTA */
+    div[data-baseweb="tab-panel"] p,
+    div[data-baseweb="tab-panel"] span,
+    div[data-baseweb="tab-panel"] label,
+    div[data-baseweb="tab-panel"] li,
+    div[data-baseweb="tab-panel"] div:not([data-testid="stSidebar"] *),
+    [role="tabpanel"] p,
+    [role="tabpanel"] span,
+    [role="tabpanel"] label,
+    [role="tabpanel"] li {{
+        color: {TEXT_PRIMARY} !important;
+        font-family: 'Inter', sans-serif !important;
+        font-size: 16px !important;
+        line-height: 1.6 !important;
+    }}
+    
+    /* TÍTULOS DENTRO DE TABS */
+    div[data-baseweb="tab-panel"] h1,
+    div[data-baseweb="tab-panel"] h2,
+    div[data-baseweb="tab-panel"] h3,
+    div[data-baseweb="tab-panel"] h4,
+    [role="tabpanel"] h1,
+    [role="tabpanel"] h2,
+    [role="tabpanel"] h3,
+    [role="tabpanel"] h4 {{
+        color: {TEXT_PRIMARY} !important;
+        font-family: 'Inter', sans-serif !important;
+        font-weight: 700 !important;
+    }}
+    
+    /* LABELS DE TABS (pestañas en la parte superior) */
+    button[data-baseweb="tab"],
+    button[data-testid="stTab"] {{
+        color: {TEXT_PRIMARY} !important;
+        font-family: 'Inter', sans-serif !important;
+        font-size: 16px !important;
+        font-weight: 600 !important;
+    }}
+    
+    /* TAB ACTIVO */
+    button[data-baseweb="tab"][aria-selected="true"],
+    button[data-testid="stTab"][aria-selected="true"] {{
+        color: {PRIMARY_BLUE} !important;
+        border-bottom-color: {PRIMARY_BLUE} !important;
+    }}
+    
+    /* ============================================
+       🔒 BLINDAJE DE WIDGETS ESPECÍFICOS (Captura/Configuración)
+       ============================================ */
+    
+    /* TODOS LOS WIDGET LABELS EN EL CUERPO */
+    .stTextInput [data-testid="stWidgetLabel"],
+    .stNumberInput [data-testid="stWidgetLabel"],
+    .stTextArea [data-testid="stWidgetLabel"],
+    .stDateInput [data-testid="stWidgetLabel"],
+    .stTimeInput [data-testid="stWidgetLabel"],
+    .stFileUploader [data-testid="stWidgetLabel"],
+    .stColorPicker [data-testid="stWidgetLabel"] {{
+        color: {TEXT_PRIMARY} !important;
+        font-weight: 600 !important;
+        font-size: 16px !important;
+        font-family: 'Inter', sans-serif !important;
+    }}
+    
+    /* CHECKBOX LABELS */
+    .stCheckbox label,
+    .stCheckbox span {{
+        color: {TEXT_PRIMARY} !important;
+        font-size: 16px !important;
+        font-family: 'Inter', sans-serif !important;
+    }}
+    
+    /* RADIO BUTTON LABELS EN EL CUERPO */
+    section[data-testid="stMain"] .stRadio label,
+    section[data-testid="stMain"] .stRadio [data-testid="stWidgetLabel"] {{
+        color: {TEXT_PRIMARY} !important;
+        font-size: 16px !important;
+        font-weight: 600 !important;
+    }}
+    
+    /* RADIO OPTIONS */
+    section[data-testid="stMain"] .stRadio div[data-testid="stMarkdownContainer"] p {{
+        color: {TEXT_PRIMARY} !important;
+    }}
+    
+    /* ============================================
+       🔒 PERSISTENCIA - RE-INYECCIÓN EN CADA RENDER
+       ============================================ */
+    
+    /* FORZAR ESTILOS EN ELEMENTOS DINÁMICOS DE STREAMLIT */
+    [class*="st-emotion-cache"] p,
+    [class*="st-emotion-cache"] span,
+    [class*="st-emotion-cache"] label:not([data-testid="stSidebar"] *) {{
+        color: {TEXT_PRIMARY} !important;
+        font-family: 'Inter', sans-serif !important;
+    }}
+    
+    /* ASEGURAR QUE MARKDOWN SIEMPRE SEA LEGIBLE */
+    .stMarkdown:not([data-testid="stSidebar"] *) p,
+    .stMarkdown:not([data-testid="stSidebar"] *) span,
+    .stMarkdown:not([data-testid="stSidebar"] *) li {{
+        color: {TEXT_PRIMARY} !important;
+        font-size: 16px !important;
+        line-height: 1.6 !important;
+    }}
+    
+    /* EXPANDERS - CONTENIDO INTERNO */
+    .streamlit-expanderContent p,
+    .streamlit-expanderContent span,
+    .streamlit-expanderContent label,
+    details[class*="stExpander"] p,
+    details[class*="stExpander"] span {{
+        color: {TEXT_PRIMARY} !important;
+        font-family: 'Inter', sans-serif !important;
     }}
     
     /* === TABLAS === */
@@ -550,6 +771,66 @@ def get_global_institutional_css() -> str:
     div[role="listbox"],
     .stAlert {{
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08) !important;
+    }}
+    
+    /* ============================================
+       🛡️ ÚLTIMA LÍNEA DE DEFENSA - MÁXIMA PRIORIDAD
+       Se ejecuta al final para sobrescribir cualquier CSS de Streamlit Cloud
+       ============================================ */
+    
+    /* TEXTO EN TODO EL CONTENIDO PRINCIPAL (última oportunidad) */
+    section[data-testid="stMain"] *:not([data-testid="stSidebar"] *):not(button):not(input):not(select):not(textarea) {{
+        -webkit-font-smoothing: antialiased !important;
+        -moz-osx-font-smoothing: grayscale !important;
+        text-rendering: optimizeLegibility !important;
+    }}
+    
+    /* ANCLAJE FINAL DE COLOR DE TEXTO */
+    .main [data-testid="stMarkdownContainer"] p,
+    .main [data-testid="stMarkdownContainer"] span,
+    .main [data-testid="stMarkdownContainer"] li,
+    div[data-testid="stVerticalBlock"] [data-testid="stMarkdownContainer"] p,
+    div[data-testid="stVerticalBlock"] [data-testid="stMarkdownContainer"] span {{
+        color: {TEXT_PRIMARY} !important;
+    }}
+    
+    /* GARANTIZAR LABELS LEGIBLES EN STREAMLIT CLOUD */
+    section[data-testid="stMain"] label[data-testid="stWidgetLabel"] p,
+    section[data-testid="stMain"] label[data-testid="stWidgetLabel"] span,
+    div[data-testid="stVerticalBlock"] label[data-testid="stWidgetLabel"] p {{
+        color: {TEXT_PRIMARY} !important;
+        font-weight: 600 !important;
+    }}
+    
+    /* SOBRESCRIBIR CUALQUIER CLASE DE EMOTION CACHE GRIS */
+    [class*="st-emotion-cache"]:not([data-testid="stSidebar"] *) p,
+    [class*="st-emotion-cache"]:not([data-testid="stSidebar"] *) span,
+    [class*="st-emotion-cache"]:not([data-testid="stSidebar"] *) label {{
+        color: {TEXT_PRIMARY} !important;
+    }}
+    
+    /* FORZAR INTER EN TODA LA APLICACIÓN (menos sidebar) */
+    body:not([data-testid="stSidebar"] *),
+    .stApp:not([data-testid="stSidebar"] *),
+    section[data-testid="stMain"],
+    section[data-testid="stMain"] *,
+    div[data-testid="stVerticalBlock"],
+    div[data-testid="stVerticalBlock"] * {{
+        font-family: 'Inter', 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif !important;
+    }}
+    
+    /* PROTECCIÓN CONTRA RESET DE STREAMLIT CLOUD */
+    section[data-testid="stMain"] {{
+        color: {TEXT_PRIMARY} !important;
+        background-color: {BG_WHITE} !important;
+    }}
+    
+    /* ANTI-GRIS: Eliminar cualquier color gris claro en texto del cuerpo */
+    section[data-testid="stMain"] p:not([data-testid="stSidebar"] *),
+    section[data-testid="stMain"] span:not([data-testid="stSidebar"] *),
+    section[data-testid="stMain"] label:not([data-testid="stSidebar"] *) {{
+        color: {TEXT_PRIMARY} !important;
+        opacity: 1 !important;
     }}
     
     </style>
