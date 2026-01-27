@@ -127,6 +127,45 @@ def render_custom_header():
             padding-top: 5rem !important;
         }
         
+        /* ========================================
+           BOTONES SECONDARY (Navegación Landing)
+           ======================================== */
+        
+        /* Botones secondary con diseño institucional */
+        button[kind="secondary"],
+        button[data-testid="stBaseButton-secondary"] {
+            background-color: #003696 !important;
+            color: #FFFFFF !important;
+            border: 2px solid #003696 !important;
+            border-radius: 10px !important;
+            padding: 18px 16px !important;
+            font-size: 15px !important;
+            font-weight: 600 !important;
+            transition: all 0.25s ease !important;
+            box-shadow: 0 4px 12px rgba(0, 54, 150, 0.25) !important;
+        }
+        
+        button[kind="secondary"]:hover,
+        button[data-testid="stBaseButton-secondary"]:hover {
+            background-color: #FFB81C !important;
+            color: #003696 !important;
+            border-color: #FFB81C !important;
+            transform: translateY(-3px) !important;
+            box-shadow: 0 6px 20px rgba(255, 184, 28, 0.4) !important;
+        }
+        
+        button[kind="secondary"]:active,
+        button[data-testid="stBaseButton-secondary"]:active {
+            transform: translateY(-1px) !important;
+        }
+        
+        /* Texto dentro de botones secondary */
+        button[kind="secondary"] p,
+        button[data-testid="stBaseButton-secondary"] p {
+            color: inherit !important;
+            margin: 0 !important;
+        }
+        
         /* Responsive - Mobile */
         @media (max-width: 768px) {
             .custom-header-container {
