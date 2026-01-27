@@ -101,23 +101,25 @@ def render_custom_header():
             color: #FFFFFF !important;
         }
         
-        /* Ocultar completamente el texto del icono Material */
+        /* Ocultar completamente el span del icono Material */
         button[data-testid="stExpandSidebarButton"] span[data-testid="stIconMaterial"] {
-            font-size: 0 !important;
-            text-indent: -9999px !important;
-            overflow: hidden !important;
-            display: inline-block !important;
+            visibility: hidden !important;
+            position: relative !important;
             width: 24px !important;
             height: 24px !important;
+            display: inline-block !important;
         }
         
-        /* Reemplazar con símbolo de flecha personalizado */
+        /* Reemplazar con icono hamburguesa usando ::after */
         button[data-testid="stExpandSidebarButton"] span[data-testid="stIconMaterial"]::after {
             content: "☰" !important;
+            visibility: visible !important;
+            position: absolute !important;
+            top: 0 !important;
+            left: 0 !important;
             font-size: 20px !important;
-            text-indent: 0 !important;
-            display: block !important;
             color: #FFFFFF !important;
+            line-height: 24px !important;
         }
         
         /* Ajustar padding del contenido principal */
