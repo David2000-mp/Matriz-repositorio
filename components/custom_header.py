@@ -147,8 +147,8 @@ def render_custom_header():
         
         button[kind="secondary"]:hover,
         button[data-testid="stBaseButton-secondary"]:hover {
-            background-color: #FFB81C !important;
-            color: #003696 !important;
+            background-color: #00235A !important;
+            color: #FFFFFF !important;
             border-color: #FFB81C !important;
             transform: translateY(-3px) !important;
             box-shadow: 0 6px 20px rgba(255, 184, 28, 0.4) !important;
@@ -159,11 +159,14 @@ def render_custom_header():
             transform: translateY(-1px) !important;
         }
         
-        /* Texto dentro de botones secondary */
+        /* Texto dentro de botones secondary - FORZAR BLANCO */
         button[kind="secondary"] p,
-        button[data-testid="stBaseButton-secondary"] p {
-            color: inherit !important;
-            margin: 0 !important;
+        button[data-testid="stBaseButton-secondary"] p,
+        button[kind="secondary"] span,
+        button[data-testid="stBaseButton-secondary"] span,
+        button[kind="secondary"] div,
+        button[data-testid="stBaseButton-secondary"] div {
+            color: #FFFFFF !important;
         }
         
         /* Responsive - Mobile */
