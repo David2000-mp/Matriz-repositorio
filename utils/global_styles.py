@@ -203,6 +203,19 @@ def get_global_institutional_css() -> str:
         font-family: 'Inter', 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif !important;
     }}
     
+    /* === OCULTAR TEXTO DEL ICONO MATERIAL (botón colapsar) === */
+    
+    /* Ocultar el texto literal "keyboard_double_arrow_left" del botón de colapsar */
+    [data-testid="stSidebarHeader"] [data-testid="stIconMaterial"] {{
+        font-size: 0 !important;
+        line-height: 0 !important;
+        text-indent: -9999px !important;
+        overflow: hidden !important;
+        display: inline-block !important;
+        width: 24px !important;
+        height: 24px !important;
+    }}
+    
     /* TODO EL TEXTO DEL SIDEBAR EN BLANCO (texto general) */
     section[data-testid="stSidebar"] p,
     section[data-testid="stSidebar"] h1,
@@ -307,27 +320,140 @@ def get_global_institutional_css() -> str:
         color: {PRIMARY_BLUE} !important;
     }}
     
-    /* === RADIO BUTTONS EN SIDEBAR === */
+    /* === RADIO BUTTONS EN SIDEBAR - MENÚ MODERNO CON ANIMACIONES === */
     
-    /* Label del grupo de radio en BLANCO con alta visibilidad */
-    section[data-testid="stSidebar"] .stRadio label,
+    /* Ocultar label del grupo (ya se muestra "Navegación" arriba) */
     section[data-testid="stSidebar"] .stRadio [data-testid="stWidgetLabel"] {{
-        color: #FFFFFF !important;
-        font-size: 16px !important;
-        font-weight: 600 !important;
-        letter-spacing: 0.5px;
+        display: none !important;
     }}
     
-    /* Opciones individuales en BLANCO */
-    section[data-testid="stSidebar"] .stRadio > div,
-    section[data-testid="stSidebar"] .stRadio label[data-baseweb="radio"],
+    /* Contenedor de opciones con espaciado moderno */
+    section[data-testid="stSidebar"] .stRadio > div[role="radiogroup"] {{
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 8px !important;
+        padding: 0 !important;
+    }}
+    
+    /* Cada opción del menú - INVISIBLE por defecto, se activa en hover */
+    section[data-testid="stSidebar"] .stRadio label[data-baseweb="radio"] {{
+        background: transparent !important;
+        border-radius: 12px !important;
+        padding: 12px 16px !important;
+        margin: 0 !important;
+        cursor: pointer !important;
+        border: 2px solid transparent !important;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        position: relative !important;
+        overflow: hidden !important;
+        display: flex !important;
+        align-items: center !important;
+    }}
+    
+    /* Efecto de brillo deslizante (solo visible en hover) */
+    section[data-testid="stSidebar"] .stRadio label[data-baseweb="radio"]::before {{
+        content: '' !important;
+        position: absolute !important;
+        top: 0 !important;
+        left: -100% !important;
+        width: 100% !important;
+        height: 100% !important;
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.15), transparent) !important;
+        transition: left 0.5s ease !important;
+        pointer-events: none !important;
+        opacity: 0 !important;
+    }}
+    
+    /* Hover state - AQUÍ SE ACTIVA TODO: fondo, elevación, borde, scale */
+    section[data-testid="stSidebar"] .stRadio label[data-baseweb="radio"]:hover {{
+        background: rgba(255, 255, 255, 0.15) !important;
+        transform: translateX(4px) scale(1.05) !important;
+        border-left: 4px solid {ACCENT_YELLOW} !important;
+        padding-left: 12px !important;
+    }}
+    
+    /* Activar shimmer solo en hover */
+    section[data-testid="stSidebar"] .stRadio label[data-baseweb="radio"]:hover::before {{
+        left: 100% !important;
+        opacity: 1 !important;
+    }}
+    
+    /* Opción seleccionada - resaltado vibrante con gradiente */
+    section[data-testid="stSidebar"] .stRadio label[data-baseweb="radio"]:has(input:checked) {{
+        background: linear-gradient(135deg, rgba(255, 184, 28, 0.25) 0%, rgba(255, 184, 28, 0.1) 100%) !important;
+        border: 2px solid {ACCENT_YELLOW} !important;
+        box-shadow: 0 4px 12px rgba(255, 184, 28, 0.3) !important;
+        transform: translateX(0) !important;
+    }}
+    
+    /* Seleccionado + Hover: combinar efectos */
+    section[data-testid="stSidebar"] .stRadio label[data-baseweb="radio"]:has(input:checked):hover {{
+        transform: translateX(4px) scale(1.05) !important;
+    }}
+    
+    /* Ocultar el radio button nativo */
+    section[data-testid="stSidebar"] .stRadio input[type="radio"] {{
+        position: absolute !important;
+        opacity: 0 !important;
+        width: 0 !important;
+        height: 0 !important;
+    }}
+    
+    /* Círculo indicador personalizado - OCULTO */
+    section[data-testid="stSidebar"] .stRadio label[data-baseweb="radio"] > div:first-child {{
+        display: none !important;
+    }}
+    
+    /* Círculo cuando está seleccionado - ELIMINADO (no se usan círculos) */
+    
+    /* Texto de la opción con mejor tipografía */
     section[data-testid="stSidebar"] .stRadio div[data-testid="stMarkdownContainer"] {{
-        color: {TEXT_ON_DARK} !important;
+        flex: 1 !important;
     }}
     
-    /* Texto de cada opción de radio */
     section[data-testid="stSidebar"] .stRadio div[data-testid="stMarkdownContainer"] p {{
         color: {TEXT_ON_DARK} !important;
+        font-size: 15px !important;
+        font-weight: 500 !important;
+        margin: 0 !important;
+        transition: all 0.3s ease !important;
+        letter-spacing: 0.3px !important;
+    }}
+    
+    /* Texto más brillante y con sombra al seleccionar */
+    section[data-testid="stSidebar"] .stRadio label[data-baseweb="radio"]:has(input:checked) div[data-testid="stMarkdownContainer"] p {{
+        color: white !important;
+        font-weight: 600 !important;
+        text-shadow: 0 2px 8px rgba(0, 0, 0, 0.3) !important;
+    }}
+    
+    /* Animación de entrada pop para el punto interior */
+    @keyframes popIn {{
+        0% {{
+            transform: scale(0);
+            opacity: 0;
+        }}
+        50% {{
+            transform: scale(1.2);
+        }}
+        100% {{
+            transform: scale(1);
+            opacity: 1;
+        }}
+    }}
+    
+    /* Animación de pulso sutil para la opción seleccionada */
+    @keyframes gentlePulse {{
+        0%, 100% {{
+            box-shadow: 0 4px 12px rgba(255, 184, 28, 0.3);
+        }}
+        50% {{
+            box-shadow: 0 6px 16px rgba(255, 184, 28, 0.4);
+        }}
+    }}
+    
+    section[data-testid="stSidebar"] .stRadio label[data-baseweb="radio"]:has(input:checked) {{
+        animation: gentlePulse 2s ease-in-out infinite !important;
     }}
     
     /* === BOTONES EN SIDEBAR === */
