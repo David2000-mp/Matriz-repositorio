@@ -18,15 +18,26 @@ from .styles import (
     COLOR_DANGER,
     COLOR_INFO,
     COLOR_MAP,
+    PLOTLY_CONFIG,
+    PLOTLY_LAYOUT_DEFAULTS,
 )
 
 from .custom_header import render_custom_header
+
+try:
+    from .skeleton_loaders import show_kpi_skeleton, show_chart_skeleton
+except ImportError:
+    # Skeleton loaders opcional durante desarrollo
+    show_kpi_skeleton = None
+    show_chart_skeleton = None
 
 __all__ = [
     "inject_custom_css",
     "configure_plotly_theme",
     "aplicar_estilo_personalizado",
     "render_custom_header",
+    "show_kpi_skeleton",
+    "show_chart_skeleton",
     "COLOR_PRIMARY",
     "COLOR_SECONDARY",
     "COLOR_BG",
@@ -39,4 +50,6 @@ __all__ = [
     "COLOR_DANGER",
     "COLOR_INFO",
     "COLOR_MAP",
+    "PLOTLY_CONFIG",
+    "PLOTLY_LAYOUT_DEFAULTS",
 ]

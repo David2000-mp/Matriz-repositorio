@@ -369,6 +369,7 @@ def generar_reporte_html(df: pd.DataFrame, titulo: str = "Reporte de Métricas")
                 font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
                 margin: 40px;
                 background-color: #f5f5f5;
+                color: #212529;
             }}
             .header {{
                 background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -388,6 +389,9 @@ def generar_reporte_html(df: pd.DataFrame, titulo: str = "Reporte de Métricas")
                 margin-bottom: 20px;
                 box-shadow: 0 2px 4px rgba(0,0,0,0.1);
             }}
+            .stats h2, .stats h3, .stats p {{
+                color: #212529;
+            }}
             table {{
                 width: 100%;
                 border-collapse: collapse;
@@ -398,16 +402,24 @@ def generar_reporte_html(df: pd.DataFrame, titulo: str = "Reporte de Métricas")
             }}
             th {{
                 background-color: #667eea;
-                color: white;
+                color: white !important;
                 padding: 12px;
                 text-align: left;
             }}
             td {{
                 padding: 10px;
                 border-bottom: 1px solid #eee;
+                color: #212529 !important;
             }}
             tr:hover {{
                 background-color: #f8f9fa;
+            }}
+            /* Asegurar color de texto oscuro en todas las celdas */
+            .table-striped tbody tr:nth-of-type(odd) {{
+                background-color: rgba(0, 0, 0, 0.02);
+            }}
+            .table td, .table th, .table-striped td, .table-striped th {{
+                color: #212529 !important;
             }}
             .footer {{
                 margin-top: 30px;
@@ -422,7 +434,7 @@ def generar_reporte_html(df: pd.DataFrame, titulo: str = "Reporte de Métricas")
             {logo_html}
             <div>
                 <h1>📊 {titulo}</h1>
-                <p style="margin:0;">Generado el {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}</p>
+                <p style="margin:0; color:white;">Generado el {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}</p>
             </div>
         </div>
         

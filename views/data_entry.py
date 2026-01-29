@@ -19,6 +19,21 @@ from utils.data_manager import (
 from utils.catalog import COLEGIOS_MARISTAS, PLATAFORMAS_REQUERIDAS
 from utils.data_saver import get_id
 from utils.analytics import calculate_likes_promedio, estimate_reach
+from utils.validators import (
+    validate_social_url,
+    validate_followers,
+    validate_engagement,
+    validate_form,
+    get_validation_icon,
+)
+from utils.app_state import get_app_state
+from components.toast_notifications import (
+    toast_success,
+    toast_info,
+    toast_warning,
+    toast_data_saved,
+    toast_validation_error,
+)
 
 
 def check_registro_existente(entidad: str, plataforma: str, fecha: date) -> bool:
@@ -79,19 +94,21 @@ def render(df=None):
     st.caption("Registro de Métricas por Cuenta")
     st.markdown("---")
 
+    # Obtener estado global
+    state = get_app_state()
+    
     # Persistencia: conservar institución y fecha seleccionadas entre envíos
-    if "capture_entidad_default" not in st.session_state:
-        st.session_state["capture_entidad_default"] = list(COLEGIOS_MARISTAS.keys())[0]
-    if "capture_fecha_default" not in st.session_state:
-        st.session_state["capture_fecha_default"] = date.today()
-    if "capture_plataforma_default" not in st.session_state:
-        st.session_state["capture_plataforma_default"] = PLATAFORMAS_REQUERIDAS[0]
+    defaults = state.get_form_defaults()
+    if not defaults.get("capture_entidad_default"):
+        state.set_form_defaults({
+            "capture_entidad_default": list(COLEGIOS_MARISTAS.keys())[0],
+            "capture_fecha_default": date.today(),
+            "capture_plataforma_default": PLATAFORMAS_REQUERIDAS[0],
+        })
 
     if opcion == "Captura Manual":
         st.subheader("Registro Individual")
-        st.info(
-            "💡 **Instrucciones**: Selecciona la institución y plataforma, ingresa las métricas del período y guarda."
-        )
+        toast_info("Selecciona la institución y plataforma, ingresa las métricas del período y guarda.", duration=2)
 
         # Contenedor de captura (usar formulario específico más abajo)
         with st.container():
@@ -101,7 +118,8 @@ def render(df=None):
 
             with col1:
                 instituciones = list(COLEGIOS_MARISTAS.keys())
-                entidad_default = st.session_state.get("capture_entidad_default", instituciones[0])
+                defaults = state.get_form_defaults()
+                entidad_default = defaults.get("capture_entidad_default", instituciones[0])
                 entidad_index = instituciones.index(entidad_default) if entidad_default in instituciones else 0
                 entidad = st.selectbox(
                     "Institución Marista",
@@ -114,7 +132,7 @@ def render(df=None):
             with col2:
                 if entidad:
                     plataformas_disponibles = PLATAFORMAS_REQUERIDAS
-                    plataforma_default = st.session_state.get("capture_plataforma_default", plataformas_disponibles[0])
+                    plataforma_default = defaults.get("capture_plataforma_default", plataformas_disponibles[0])
                     plataforma_index = plataformas_disponibles.index(plataforma_default) if plataforma_default in plataformas_disponibles else 0
                     plataforma = st.selectbox(
                         "Plataforma Social",
@@ -128,7 +146,8 @@ def render(df=None):
 
             # INDICADOR DINÁMICO: Mostrar si ya existe registro para este período
             if entidad and plataforma:
-                fecha_temp = st.session_state.get("capture_fecha_default", date.today())
+                defaults = state.get_form_defaults()
+                fecha_temp = defaults.get("capture_fecha_default", date.today())
                 existe_registro = check_registro_existente(entidad, plataforma, fecha_temp)
                 
                 if existe_registro:
@@ -156,7 +175,7 @@ def render(df=None):
             # Agrupar toda la entrada manual en un formulario seguro
             with st.form("manual_entry_form", clear_on_submit=True):
                 st.markdown("### Métricas del Período (Entrada Invertida)")
-                st.info("💡 **Nueva lógica:** Ingresa Seguidores + Engagement Rate → Likes se calcula automáticamente", icon="ℹ️")
+                st.caption("💡 Nueva lógica: Ingresa Seguidores + Engagement Rate → Likes se calcula automáticamente")
 
                 # Identificadores: Fecha (principal), Entidad y Plataforma como contexto
                 id_col1, id_col2, id_col3 = st.columns([2, 3, 3])
@@ -190,6 +209,12 @@ def render(df=None):
                         key="input_seguidores",
                         help="Número total de seguidores al final del período",
                     )
+                    # Validación reactiva de seguidores
+                    seguidores_valid, seguidores_msg = validate_followers(seguidores)
+                    if seguidores > 0 and not seguidores_valid:
+                        st.error(f"{get_validation_icon(False)} {seguidores_msg}", icon="❌")
+                    elif seguidores > 0:
+                        st.caption(f"{get_validation_icon(True)} Seguidores válidos")
 
                 with col2:
                     engagement_rate = st.number_input(
@@ -202,6 +227,12 @@ def render(df=None):
                         key="input_engagement",
                         help="Porcentaje de engagement (interacciones / seguidores × 100)",
                     )
+                    # Validación reactiva de engagement rate
+                    engagement_valid, engagement_msg = validate_engagement(engagement_rate)
+                    if engagement_rate > 0 and not engagement_valid:
+                        st.error(f"{get_validation_icon(False)} {engagement_msg}", icon="❌")
+                    elif engagement_rate > 0:
+                        st.caption(f"{get_validation_icon(True)} Engagement válido")
 
                 # ========================================================================
                 # CÁLCULO EN TIEMPO REAL - Likes Promedio Inferido
@@ -230,7 +261,7 @@ def render(df=None):
                             delta=f"{engagement_rate:.1f}%",
                         )
                 else:
-                    st.warning("⚠️ Ingresa Seguidores y Engagement Rate para ver el cálculo", icon="⚠️")
+                    st.caption("⚠️ Ingresa Seguidores y Engagement Rate para ver el cálculo")
                     likes_promedio_calculado = 0.0
 
                 st.divider()
@@ -249,11 +280,19 @@ def render(df=None):
                             key=manual_key,
                             help="Ingresa la URL o el usuario si aún no está en el catálogo. Se reutilizará para el siguiente envío.",
                         )
+                        # Validación reactiva de URL
+                        if usuario_red and plataforma:
+                            url_valid, url_msg = validate_social_url(usuario_red, plataforma)
+                            if not url_valid:
+                                st.error(f"{get_validation_icon(False)} {url_msg}", icon="❌")
+                            else:
+                                st.caption(f"{get_validation_icon(True)} URL válida para {plataforma}")
 
                     with col2:
+                        defaults = state.get_form_defaults()
                         fecha_captura = st.date_input(
                             "📅 Fecha del Reporte",
-                            value=st.session_state.get("capture_fecha_default", date.today()),
+                            value=defaults.get("capture_fecha_default", date.today()),
                             key="fecha_captura_selector",
                             help="Fecha del período reportado",
                         )
@@ -289,13 +328,21 @@ def render(df=None):
                 submitted = st.form_submit_button("💾 Guardar Datos")
 
                 if submitted:
-                    # Validación de datos (cliente)
-                    if seguidores == 0:
-                        st.error("❌ Error: El número de seguidores no puede ser 0")
-                    elif engagement_rate == 0:
-                        st.error("❌ Error: El Engagement Rate no puede ser 0")
-                    elif not entidad or not plataforma:
-                        st.error("❌ Error: Debes seleccionar una institución y plataforma")
+                    # Validación completa del formulario
+                    form_valid, form_errors = validate_form(
+                        entidad=entidad,
+                        plataforma=plataforma,
+                        usuario_red=usuario_red,
+                        seguidores=seguidores,
+                        engagement_rate=engagement_rate,
+                        interacciones=interacciones if interacciones > 0 else None,
+                        me_gusta=None,
+                    )
+
+                    if not form_valid:
+                        st.error("❌ Errores de validación:")
+                        for error in form_errors:
+                            st.error(f"   • {error}")
                     else:
                         try:
                             # Preparar datos para guardar
@@ -349,7 +396,8 @@ def render(df=None):
 
                             # Feedback
                             if success:
-                                st.success(f"✅ ¡Registro guardado exitosamente! Alcance estimado: {alcance_final}")
+                                toast_data_saved(f"{entidad} - {plataforma}")
+                                toast_info(f"Alcance estimado: {alcance_final:,}", duration=2)
                                 try:
                                     st.balloons()
                                 except Exception:
@@ -361,8 +409,12 @@ def render(df=None):
                                 except Exception as e:
                                     logging.warning(f"No se pudo invalidar cachés centralmente: {e}")
 
-                                # No escribir directamente en st.session_state para claves de widgets
-                                # El formulario se limpia automáticamente por clear_on_submit=True
+                                # Persistir valores para siguiente captura usando AppState
+                                state.set_form_defaults({
+                                    "capture_entidad_default": entidad,
+                                    "capture_plataforma_default": plataforma,
+                                    "capture_fecha_default": fecha_captura,
+                                })
 
                             else:
                                 st.error("❌ Error al guardar el registro. Intenta nuevamente.")
@@ -373,11 +425,11 @@ def render(df=None):
 
     elif opcion == "Carga Masiva":
         st.subheader("Carga Masiva de Datos")
-        st.info("Esta funcionalidad está en desarrollo.")
+        st.info("🚧 Esta funcionalidad está en desarrollo.")
 
     elif opcion == "Captura Anual":
         st.subheader("📅 Captura Anual de Datos")
-        st.info("Captura datos mensuales completos para una institución durante todo un año.")
+        st.caption("Captura datos mensuales completos para una institución durante todo un año.")
 
         # Selector de institución y año
         col1, col2 = st.columns(2)
@@ -522,7 +574,7 @@ def render(df=None):
                         # Mostrar resultados
                         if registros_guardados > 0:
                             status.update(label=f"✅ ¡Guardados {registros_guardados} registros exitosamente!")
-                            st.success(f"✅ ¡Captura anual completada! Se guardaron {registros_guardados} registros.")
+                            toast_success(f"¡Captura anual completada! {registros_guardados} registros guardados")
 
                             # Mostrar resumen
                             st.info(f"📊 Resumen: {entidad_anual} - {año_captura}")

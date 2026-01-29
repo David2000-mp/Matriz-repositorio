@@ -380,23 +380,3 @@ def render(df=None):
             
             # Mensaje de bienvenida fuera del hero
             st.info("🚀 Bienvenido a tu Inteligencia Digital - Carga datos para comenzar", icon="ℹ️")
-
-    # Accesos rápidos institucionales: cuadrícula de navegación
-    st.markdown("<div style='max-width:950px; margin:40px auto 0; padding:0 20px;'>", unsafe_allow_html=True)
-    cols = st.columns(4)
-    labels_and_pages = [
-        ("📊 Dashboard", "Dashboard Global"),
-        ("📝 Captura", "Captura"),
-        ("📈 Comparativas", "Comparativas"),
-        ("⚙️ Configuración", "Configuración"),
-    ]
-
-    for col, (label, page) in zip(cols, labels_and_pages):
-        with col:
-            if st.button(label, key=f"btn_{page}"):
-                st.session_state["page_selection"] = page
-                st.rerun()
-
-    st.markdown("</div>", unsafe_allow_html=True)
-
-    st.markdown("<br>", unsafe_allow_html=True)

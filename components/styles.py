@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 Módulo de estilos CSS para CHAMPILEAKS.
 Define constantes de colores institucionales y función de inyección de CSS global.
@@ -1113,3 +1114,27 @@ def configure_plotly_theme():
             "bordercolor": "#003696"
         }
     }
+
+
+# ===========================
+# CONFIGURACI�N PLOTLY GLOBAL
+# ===========================
+
+# Configuraci�n optimizada para gr�ficos Plotly (rendimiento en la nube)
+PLOTLY_CONFIG = {
+    "displayModeBar": False,  # Ocultar barra de herramientas
+    "responsive": True,       # Responsive
+    "displaylogo": False,     # Ocultar logo Plotly
+    "modeBarButtonsToRemove": [
+        "pan2d", "select2d", "lasso2d", "autoScale2d", "resetScale2d",
+        "zoom2d", "zoomIn2d", "zoomOut2d", "toImage"
+    ],  # Remover botones innecesarios
+    "staticPlot": False,      # Mantener interactividad m�nima
+}
+
+PLOTLY_LAYOUT_DEFAULTS = {
+    "font": {"size": 10},      # Fuente m�s peque�a para mejor rendimiento
+    "margin": {"l": 20, "r": 20, "t": 40, "b": 20},  # M�rgenes reducidos
+    "showlegend": True,
+    "legend": {"orientation": "h", "y": -0.2},  # Leyenda horizontal abajo
+}

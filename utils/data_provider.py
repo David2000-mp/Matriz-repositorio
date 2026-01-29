@@ -14,11 +14,41 @@ Responsabilidades:
 
 import streamlit as st
 import pandas as pd
-from typing import Tuple
+from typing import Tuple, List
 from utils.logger import get_logger
 from utils.analytics import normalize_monthly_latest
 
 logger = get_logger(__name__)
+
+
+def normalize_merge_columns(df: pd.DataFrame, columns: List[str] = None) -> pd.DataFrame:
+    """
+    Normaliza columnas después de merge pandas para evitar sufijos _x/_y.
+    
+    Args:
+        df: DataFrame después de merge
+        columns: Lista de columnas a normalizar (default: entidad, plataforma, usuario_red)
+    
+    Returns:
+        DataFrame con columnas normalizadas
+    """
+    if columns is None:
+        columns = ["entidad", "plataforma", "usuario_red"]
+    
+    for logical in columns:
+        if logical in df.columns:
+            continue
+        for suff in (f"{logical}_y", f"{logical}_x", f"{logical}"):
+            if suff in df.columns:
+                ser = df.loc[:, suff]
+                if isinstance(ser, pd.DataFrame):
+                    ser = ser.squeeze()
+                df[logical] = ser
+                break
+        else:
+            df[logical] = "Unknown"
+    
+    return df
 
 
 class DataProvider:
@@ -146,6 +176,9 @@ class DataProvider:
                         lambda r: (r['interacciones'] / r['seguidores'] * 100.0) if r.get('seguidores', 0) else 0.0,
                         axis=1,
                     )
+
+            # Normalizar columnas después de merge (eliminar sufijos _x/_y)
+            df_merged = normalize_merge_columns(df_merged)
 
             # Priorizar métricas clave (seguidores, engagement) y luego secundarios
             preferred_order = [

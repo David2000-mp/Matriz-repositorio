@@ -33,7 +33,7 @@ def render_custom_header():
         
         /* Mantener SOLO el botón de toggle sidebar */
         header[data-testid="stHeader"] {
-            background: linear-gradient(135deg, #003696 0%, #00235A 100%) !important;
+            background: linear-gradient(135deg, #002366 0%, #001840 100%) !important;
             height: 70px !important;
             padding: 0 2rem !important;
             box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15) !important;

@@ -228,11 +228,9 @@ def main():
             from views import dashboard
             dashboard.render(df_filtered)
     elif selected == "Comparativas":
-        data = load_data_lazy()
-        if data:
-            df_filtered = apply_filters(data["df_global"])
-            from views import analytics
-            analytics.render(df_filtered)
+        # Sprint 2 Week 3: Nueva vista de comparación lado a lado
+        from views import comparison
+        comparison.render_comparison_view()
     elif selected == "Captura":
         data = load_data_lazy()
         if data:

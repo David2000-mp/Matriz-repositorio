@@ -56,58 +56,71 @@ def render(df=None):
         if st.button(
             "🚀 Generar Datos de Prueba", width='stretch', type="primary"
         ):
-            with st.spinner(
-                f"⏳ Creando {meses} meses de historia para {total_cuentas} cuentas..."
-            ):
-                # Generar datos
-                resultados_simulacion = simular(
-                    n=registros_estimados,
-                    colegios_maristas=COLEGIOS_MARISTAS,
-                    generar_metas=True,
-                )
+            # Progress bar con pasos
+            progress_bar = st.progress(0)
+            status = st.empty()
+            
+            status.text(f"📊 1/3: Generando {registros_estimados} registros...")
+            progress_bar.progress(33)
+            
+            # Generar datos
+            resultados_simulacion = simular(
+                n=registros_estimados,
+                colegios_maristas=COLEGIOS_MARISTAS,
+                generar_metas=True,
+            )
+            
+            status.text("📦 2/3: Procesando datos...")
+            progress_bar.progress(66)
 
-                # Desempaquetado flexible para compatibilidad con distintas firmas
-                datos = []
-                metas = []
-                try:
-                    if isinstance(resultados_simulacion, (list, tuple)):
-                        if len(resultados_simulacion) == 2:
-                            datos, metas = resultados_simulacion
-                        elif len(resultados_simulacion) == 3:
-                            # Forma: (cuentas, metricas, metas) -> tomamos metricas/metas
-                            datos = resultados_simulacion[0]
-                            metas = resultados_simulacion[2]
-                        else:
-                            # Assume it's a flat list of metric dicts
-                            datos = list(resultados_simulacion)
-                            metas = []
+            # Desempaquetado flexible para compatibilidad con distintas firmas
+            datos = []
+            metas = []
+            try:
+                if isinstance(resultados_simulacion, (list, tuple)):
+                    if len(resultados_simulacion) == 2:
+                        datos, metas = resultados_simulacion
+                    elif len(resultados_simulacion) == 3:
+                        # Forma: (cuentas, metricas, metas) -> tomamos metricas/metas
+                        datos = resultados_simulacion[0]
+                        metas = resultados_simulacion[2]
                     else:
-                        # Single-object return (e.g., list of dicts)
-                        datos = resultados_simulacion
+                        # Assume it's a flat list of metric dicts
+                        datos = list(resultados_simulacion)
                         metas = []
-                except Exception as e:
+                else:
+                    # Single-object return (e.g., list of dicts)
                     datos = resultados_simulacion
                     metas = []
+            except Exception as e:
+                datos = resultados_simulacion
+                metas = []
 
-                # Guardar métricas (batch)
-                if isinstance(datos, pd.DataFrame) and not datos.empty:
-                    save_batch(datos)  # type: ignore
-                else:
-                    st.warning("No se generaron datos para guardar")
+            # Guardar métricas (batch)
+            if isinstance(datos, pd.DataFrame) and not datos.empty:
+                status.text("💾 3/3: Guardando en base de datos...")
+                progress_bar.progress(100)
+                save_batch(datos)  # type: ignore
+            else:
+                st.warning("No se generaron datos para guardar")
 
-                # Guardar metas individuales si existen
-                # Nota: save_config no está disponible en dm, usar otro método si es necesario
-                # for meta in metas:
-                #     try:
-                #         dm.save_config(
-                #             entidad=meta["entidad"],
-                #             meta_seguidores=meta["meta_seguidores"],
-                #             meta_engagement=meta["meta_engagement"],
-                #         )
-                #     except Exception:
-                #         # No interrumpir el flujo si una meta falla
-                #         pass
+            # Guardar metas individuales si existen
+            # Nota: save_config no está disponible en dm, usar otro método si es necesario
+            # for meta in metas:
+            #     try:
+            #         dm.save_config(
+            #             entidad=meta["entidad"],
+            #             meta_seguidores=meta["meta_seguidores"],
+            #             meta_engagement=meta["meta_engagement"],
+            #         )
+            #     except Exception:
+            #         # No interrumpir el flujo si una meta falla
+            #         pass
 
+            # Limpiar progress bar
+            progress_bar.empty()
+            status.empty()
+            
             st.success(f"🎉 ¡{len(datos):,} registros generados exitosamente!")
             st.balloons()
             st.cache_data.clear()

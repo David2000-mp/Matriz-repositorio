@@ -28,26 +28,16 @@ from utils.analytics import (
     summarize_followers_growth,
 )
 from utils.reports import generate_pdf_report
+from utils.app_state import get_app_state
+from components.toast_notifications import (
+    toast_success,
+    toast_info,
+    toast_warning,
+    toast_error,
+)
 
-
-# Configuración optimizada para gráficos Plotly (rendimiento en la nube)
-PLOTLY_CONFIG = {
-    "displayModeBar": False,  # Ocultar barra de herramientas
-    "responsive": True,       # Responsive
-    "displaylogo": False,     # Ocultar logo Plotly
-    "modeBarButtonsToRemove": [
-        "pan2d", "select2d", "lasso2d", "autoScale2d", "resetScale2d",
-        "zoom2d", "zoomIn2d", "zoomOut2d", "toImage"
-    ],  # Remover botones innecesarios
-    "staticPlot": False,      # Mantener interactividad mínima
-}
-
-PLOTLY_LAYOUT_DEFAULTS = {
-    "font": {"size": 10},      # Fuente más pequeña para mejor rendimiento
-    "margin": {"l": 20, "r": 20, "t": 40, "b": 20},  # Márgenes reducidos
-    "showlegend": True,
-    "legend": {"orientation": "h", "y": -0.2},  # Leyenda horizontal abajo
-}
+# Importar configuración Plotly centralizada
+from components import PLOTLY_CONFIG, PLOTLY_LAYOUT_DEFAULTS, show_kpi_skeleton, show_chart_skeleton
 
 
 def paginate_dataframe(df, page_size=1000, page_key="page"):
@@ -94,9 +84,30 @@ def render(df=None):
 
     # Cargar datos usando data provider si no se proporcionaron
     if df is None:
-        # IMPORTANTE: Siempre forzar recarga en dashboard para ver datos frescos
-        # después de guardar desde data_entry
+        # Progress bar con pasos
+        progress_bar = st.progress(0)
+        status = st.empty()
+        
+        status.text("📥 1/4: Cargando cuentas desde Google Sheets...")
+        progress_bar.progress(25)
+        cuentas, metricas = data_provider.get_data(force_reload=True)
+        
+        status.text("🔄 2/4: Consolidando datos...")
+        progress_bar.progress(50)
+        import time
+        time.sleep(0.3)  # Breve pausa para visualización
+        
+        status.text("🧹 3/4: Normalizando columnas...")
+        progress_bar.progress(75)
         df = data_provider.get_merged_data(force_reload=True)
+        
+        status.text("✅ 4/4: Aplicando filtros...")
+        progress_bar.progress(100)
+        time.sleep(0.2)
+        
+        # Limpiar progress bar
+        progress_bar.empty()
+        status.empty()
         
         # Debug visual temporal para confirmar cantidad de registros cargados
         if df is not None:
@@ -124,7 +135,8 @@ def render(df=None):
 
     # Si recibimos un DataFrame filtrado desde el entrypoint, úsalo.
         if df is None or (hasattr(df, "empty") and df.empty):
-            st.info("No hay datos para los filtros seleccionados. Ajusta los filtros o intenta otro periodo.")
+            st.warning("⚠️ No hay datos para los filtros seleccionados.")
+            st.caption("💡 Ajusta los filtros o intenta otro periodo.")
             return
 
         # Trabajaremos con dos vistas internas:
@@ -181,7 +193,7 @@ def render(df=None):
         mes = meses[0] if meses else None
 
         if not mes:
-            st.info("No hay meses válidos en los datos.")
+            st.warning("⚠️ No hay meses válidos en los datos.")
             return
 
         # Aplicar filtro temporal según selección del usuario
@@ -229,7 +241,7 @@ def render(df=None):
         )
     except Exception as e:
         logging.warning(f"No se pudo generar el reporte HTML: {e}")
-        st.info("No se pudo generar el reporte HTML para descarga. Puedes intentar de nuevo más tarde.")
+        st.caption("📊 No se pudo generar el reporte HTML para descarga.")
 
     # Verificar anomalías en el mes actual
     anomalias_mes = df_m_month[
@@ -248,6 +260,11 @@ def render(df=None):
 
     # --- Resumen Ejecutivo ---
     st.subheader("Resumen Ejecutivo")
+
+    # Mostrar skeleton mientras se calculan métricas
+    kpi_placeholder = st.empty()
+    with kpi_placeholder.container():
+        show_kpi_skeleton(count=4)
 
     # KPIs principales con snapshot consolidado por cuenta
     followers_resume = summarize_followers_growth(df_full)
@@ -286,9 +303,7 @@ def render(df=None):
         # Detector de anomalías: alerta si el delta de seguidores es > +/-20%
         try:
             if abs(delta_seg) > 20:
-                st.warning(
-                    "⚠️ Se detectó un salto inusual en los datos. Verifica la consistencia de las capturas manuales."
-                )
+                st.warning("⚠️ Salto inusual detectado. Verifica la consistencia de las capturas.")
         except Exception:
             # Si delta_seg no está definido o hay error, no hacer nada
             pass
@@ -322,6 +337,8 @@ def render(df=None):
     anomalia_seguidores = df_m_month.get("anomalia_seguidores", pd.Series(False)).any()
     anomalia_interacciones = df_m_month.get("anomalia_interacciones", pd.Series(False)).any()
 
+    # Limpiar skeleton y mostrar KPIs reales
+    kpi_placeholder.empty()
     k1, k2, k3, k4 = st.columns(4)
     # Mostrar MoM y YoY juntos cuando estén disponibles
     if mes_anterior:
@@ -412,17 +429,17 @@ def render(df=None):
 
     # Alertas suaves basadas en análisis de crecimiento
     if mes_anterior and delta_seg < 0:
-        st.info("💡 **Crecimiento mensual por debajo del promedio**: Considera revisar estrategias de engagement en las plataformas con menor rendimiento.")
+        st.caption("💡 Crecimiento mensual por debajo del promedio. Considera revisar estrategias de engagement.")
 
     # Alerta de salud digital baja
     if health_score < 60:
-        st.warning("⚠️ **Salud Digital baja**: El engagement general está por debajo del umbral recomendado. Revisa el contenido y la frecuencia de publicación.")
+        st.caption("⚠️ Salud Digital baja. El engagement está por debajo del umbral recomendado.")
 
     # Microcopy contextual para lectura ejecutiva
     if delta_seg > 10:
-        st.success("🚀 **Excelente crecimiento**: La red está expandiéndose a buen ritmo. Mantén las estrategias actuales.")
+        st.caption("🚀 Excelente crecimiento: La red está expandiéndose a buen ritmo.")
     elif delta_seg > 0:
-        st.info("📈 **Crecimiento positivo**: La tendencia es favorable, pero hay oportunidad de acelerar el crecimiento.")
+        st.caption("📈 Crecimiento positivo: La tendencia es favorable.")
 
     # Botón de descarga PDF
     school_name = st.session_state.get('filtro_entidad', 'Todos')
@@ -462,21 +479,19 @@ def render(df=None):
                 help="Genera y descarga un reporte PDF ejecutivo con los datos actuales"
             )
             if clicked:
-                try:
-                    # st.toast es reciente; intentar y fallback a st.success
-                    if hasattr(st, 'toast'):
-                        st.toast('PDF generado correctamente')
-                    else:
-                        st.success('PDF generado correctamente')
-                except Exception:
-                    st.success('PDF generado correctamente')
+                toast_success("PDF generado correctamente")
         else:
-            st.info('No se pudo generar el PDF en este momento.')
+            st.caption("📄 No se pudo generar el PDF en este momento.")
 
     st.markdown("---")
 
     # --- Seguidores totales por red social ---
     st.subheader("Seguidores Totales por Red Social")
+
+    # Mostrar skeleton mientras se genera gráfico
+    chart_placeholder = st.empty()
+    with chart_placeholder.container():
+        show_chart_skeleton(height=400)
 
     # Calcular datos para el gráfico de barras
     platform_data = df_m_month.groupby("plataforma")["seguidores"].sum().reset_index()
@@ -511,6 +526,7 @@ def render(df=None):
 
     # Crear gráfico de barras
     if px is None:
+        chart_placeholder.empty()
         st.error("Plotly no está disponible. Instala `plotly` para ver gráficos.")
     else:
         fig_platform = px.bar(
@@ -540,7 +556,9 @@ def render(df=None):
             margin={"l": 20, "r": 20, "t": 40, "b": 20}
         )
 
-        st.plotly_chart(fig_platform, config=PLOTLY_CONFIG)
+        # Limpiar skeleton y mostrar gráfico real
+        chart_placeholder.empty()
+        chart_placeholder.plotly_chart(fig_platform, config=PLOTLY_CONFIG, use_container_width=True)
 
     st.markdown("---")
 
@@ -556,7 +574,14 @@ def render(df=None):
         df_evo = (
             df_full.groupby(["fecha", "plataforma"])["seguidores"].sum().reset_index()
         )
+        
+        # Skeleton loader para evolución de seguidores
+        evolution_placeholder = st.empty()
+        with evolution_placeholder.container():
+            show_chart_skeleton(height=400)
+        
         if px is None:
+            evolution_placeholder.empty()
             st.error("Plotly no está disponible. Instala `plotly` para ver gráficos.")
             fig_area = None
         else:
@@ -594,6 +619,7 @@ def render(df=None):
             logging.warning(f"No se pudo agregar línea de tendencia: {e}")
 
         if fig_area is not None:
+            evolution_placeholder.empty()  # Remover skeleton
             st.plotly_chart(
                 fig_area,
                 width='stretch',
@@ -606,7 +632,14 @@ def render(df=None):
                 df_int = (
                     df_full.groupby(["fecha", "plataforma"])["interacciones"].sum().reset_index()
                 )
+                
+                # Skeleton loader para interacciones
+                interactions_placeholder = st.empty()
+                with interactions_placeholder.container():
+                    show_chart_skeleton(height=350)
+                
                 if px is None:
+                    interactions_placeholder.empty()
                     st.error("Plotly no está disponible. Instala `plotly` para ver gráficos.")
                     fig_int = None
                 else:
@@ -638,6 +671,7 @@ def render(df=None):
                         )
                 if fig_int is not None:
                     fig_int.update_layout(autosize=True)
+                    interactions_placeholder.empty()  # Remover skeleton
                     st.plotly_chart(
                         fig_int,
                         width='stretch',
@@ -650,6 +684,11 @@ def render(df=None):
         pass
 
     with tab_rank:
+        # Skeleton loader para ranking
+        ranking_placeholder = st.empty()
+        with ranking_placeholder.container():
+            show_chart_skeleton(height=450)
+        
         # Barras: ranking por institución para el mes seleccionado
         resumen = (
             df_m_month.groupby(["entidad", "plataforma"])["seguidores"].sum().reset_index()
@@ -657,6 +696,7 @@ def render(df=None):
         # Ordenar para mostrar mejores arriba
         resumen = resumen.sort_values("seguidores", ascending=False)
         if px is None:
+            ranking_placeholder.empty()
             st.error("Plotly no está disponible. Instala `plotly` para ver gráficos.")
         else:
             fig_bar = px.bar(
@@ -671,6 +711,7 @@ def render(df=None):
             )
             fig_bar.update_traces(textposition="outside")
             fig_bar.update_layout(autosize=True)
+            ranking_placeholder.empty()  # Remover skeleton
             st.plotly_chart(
                 fig_bar,
                 width='stretch',
@@ -695,12 +736,19 @@ def render(df=None):
             health_points.append(score_m)
 
         if labels and health_points:
+            # Skeleton loader para salud digital
+            health_placeholder = st.empty()
+            with health_placeholder.container():
+                show_chart_skeleton(height=300)
+            
             if px is None:
+                health_placeholder.empty()
                 st.error("Plotly no está disponible. Instala `plotly` para ver gráficos.")
             else:
                 fig_health = px.line(x=labels, y=health_points, markers=True, labels={"x": "Mes", "y": "Salud"}, title="Evolución de la Salud Digital (últimos 6 meses)")
                 fig_health.update_traces(line=dict(color="#0056B3", width=3))  # Azul info WCAG AA
                 fig_health.update_layout(autosize=True, yaxis=dict(range=[0,100]))
+                health_placeholder.empty()  # Remover skeleton
                 st.plotly_chart(fig_health, width='stretch', config=PLOTLY_CONFIG)
     except Exception as e:
         logging.warning(f"No se pudo generar la serie histórica de salud: {e}")
@@ -714,7 +762,7 @@ def render(df=None):
         )
 
         if total_pages and total_pages > 1:
-            st.info(f"📄 Mostrando página de datos (total: {len(df_full):,} filas)")
+            st.caption(f"📄 Mostrando página de datos (total: {len(df_full):,} filas)")
 
         st.dataframe(df_paginated, width='stretch')
     

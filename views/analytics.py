@@ -10,22 +10,10 @@ try:
 except Exception:
     px = None
 from utils.data_provider import data_provider
-from components import COLOR_MAP
+from components import COLOR_MAP, PLOTLY_CONFIG
+from components.skeleton_loaders import show_chart_skeleton
 from utils.data_manager import get_reverse_lookup
 from utils.helpers import generate_social_url
-
-
-# Configuración optimizada para gráficos Plotly (rendimiento en la nube)
-PLOTLY_CONFIG = {
-    "displayModeBar": False,  # Ocultar barra de herramientas
-    "responsive": True,       # Responsive
-    "displaylogo": False,     # Ocultar logo Plotly
-    "modeBarButtonsToRemove": [
-        "pan2d", "select2d", "lasso2d", "autoScale2d", "resetScale2d",
-        "zoom2d", "zoomIn2d", "zoomOut2d", "toImage"
-    ],  # Remover botones innecesarios
-    "staticPlot": False,      # Mantener interactividad mínima
-}
 
 
 def render(df=None):
@@ -38,7 +26,26 @@ def render(df=None):
 
     # Cargar datos usando data provider con force_reload para datos frescos
     if df is None:
+        # Progress bar con pasos para analytics
+        progress_bar = st.progress(0)
+        status = st.empty()
+        
+        status.text("📥 1/3: Cargando datos comparativos...")
+        progress_bar.progress(33)
+        import time
+        time.sleep(0.2)
+        
+        status.text("🔄 2/3: Procesando métricas...")
+        progress_bar.progress(66)
         df = data_provider.get_merged_data(force_reload=True)
+        
+        status.text("✅ 3/3: Aplicando normalización...")
+        progress_bar.progress(100)
+        time.sleep(0.2)
+        
+        # Limpiar progress bar
+        progress_bar.empty()
+        status.empty()
 
     if df.empty:
         st.warning("⚠️ No hay registros después de la normalización. Verifica los filtros o la conexión a datos.")
@@ -68,12 +75,19 @@ def render(df=None):
             if df_plat.empty:
                 st.info("ℹ️ No hay datos para la distribución.")
             else:
+                # Skeleton loader para pie chart
+                pie_placeholder = st.empty()
+                with pie_placeholder.container():
+                    show_chart_skeleton(height=400)
+                
                 if px is None:
+                    pie_placeholder.empty()
                     st.error("Plotly no está disponible. Instala `plotly` para ver gráficos.")
                 else:
                     fig = px.pie(df_plat, names="plataforma", values="seguidores", color="plataforma", color_discrete_map=COLOR_MAP)
                     fig.update_traces(textposition="inside", textinfo="percent+label")
                     fig.update_layout(margin=dict(t=30, b=10))
+                    pie_placeholder.empty()  # Remover skeleton
                     st.plotly_chart(fig, width='stretch', config=PLOTLY_CONFIG)
 
     with tab_perf:
@@ -88,11 +102,18 @@ def render(df=None):
                 st.info("ℹ️ No hay datos para el ranking de instituciones.")
             else:
                 df_ent = df_ent.sort_values("seguidores", ascending=False)
+                # Skeleton loader para bar chart
+                bar_placeholder = st.empty()
+                with bar_placeholder.container():
+                    show_chart_skeleton(height=450)
+                
                 if px is None:
+                    bar_placeholder.empty()
                     st.error("Plotly no está disponible. Instala `plotly` para ver gráficos.")
                 else:
                     fig2 = px.bar(df_ent, x="seguidores", y="entidad", orientation="h", text="seguidores")
                     fig2.update_layout(margin=dict(t=30, b=10))
+                    bar_placeholder.empty()  # Remover skeleton
                     st.plotly_chart(fig2, width='stretch', config=PLOTLY_CONFIG)
 
     with tab_cuenta:
@@ -192,7 +213,7 @@ def render(df=None):
                 st.divider()
 
                 # Opción adicional: comparación vs promedio de todas las plataformas
-                with st.expander("Comparación vs Promedio de Todas las Plataformas"):
+                with st.expander("📊 Comparación vs Promedio de Todas las Plataformas", expanded=False):
                     st.markdown("**Comparación de la cuenta seleccionada contra el promedio de cada red social:**")
 
                     # Obtener todas las plataformas disponibles
