@@ -80,6 +80,8 @@ def _get_service_account_config() -> Optional[Dict[str, Any]]:
     client_email = os.getenv("GCP_CLIENT_EMAIL")
     project_id = os.getenv("GCP_PROJECT_ID")
     pk_id = os.getenv("GCP_PRIVATE_KEY_ID")
+    # NOTA: Los endpoints OAuth (auth_uri, token_uri, client_x509_cert_url) son estándar de Google.
+    # Las credenciales privadas (keys, client_email, etc.) deben almacenarse SIEMPRE en variables de entorno o archivos seguros, nunca hardcodeadas.
     auth_uri = os.getenv("GCP_AUTH_URI", "https://accounts.google.com/o/oauth2/auth")
     token_uri = os.getenv("GCP_TOKEN_URI", "https://oauth2.googleapis.com/token")
     auth_provider_cert = os.getenv("GCP_AUTH_PROVIDER_CERT_URL", "https://www.googleapis.com/oauth2/v1/certs")

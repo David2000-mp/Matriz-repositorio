@@ -185,6 +185,8 @@ def simular(
     data: List[Dict] = []
 
     # Para cada cuenta, generar serie histórica con crecimiento realista
+    # NOTA: El uso de random en este módulo es SOLO para simulación de datos y pruebas.
+    # No se utiliza para generar contraseñas, tokens ni datos sensibles.
     for c in cuentas:
         seguidores_prev = random.randint(1000, 10000)
         

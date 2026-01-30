@@ -78,6 +78,22 @@ COLOR_MAP = {
 
 
 def inject_custom_css():
+    # Selector ultra específico para forzar estilos de glass-box
+    st.markdown(
+        """
+        <style>
+        section[data-testid="stMain"] div[data-testid="stMarkdownContainer"] .glass-box {
+            background: rgba(0, 64, 133, 0.22) !important;
+            border-radius: 32px !important;
+            padding: 2rem 2rem !important;
+            backdrop-filter: blur(10px) !important;
+            text-align: center !important;
+            font-family: 'Inter', 'Segoe UI', sans-serif !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
     """
     Inyecta CSS global institucional para toda la aplicación CHAMPILEAKS.
     
@@ -90,21 +106,89 @@ def inject_custom_css():
     - Contraste WCAG AA en todos los elementos
     - Optimización móvil responsive (tablets, móviles)
     """
+    # Selector ultra específico para forzar estilos de glassbox hero
+    st.markdown(
+        """
+        <style>
+        section[data-testid="stMain"] div[data-testid="stMarkdownContainer"] p.hero-title {
+            color: #fff !important;
+            font-size: 3.2rem !important;
+            font-family: 'Futura', 'Segoe UI', sans-serif !important;
+            font-weight: 800 !important;
+            letter-spacing: 1px !important;
+            text-align: center !important;
+            margin-bottom: .1rem !important;
+            text-shadow: 0 3px 20px rgba(0,0,0,0.18) !important;
+        }
+        section[data-testid="stMain"] div[data-testid="stMarkdownContainer"] p.hero-subtitle {
+            color: #FFFFFF !important;
+            font-size: 1.3rem !important;
+            font-family: 'Futura', 'Segoe UI', sans-serif !important;
+            font-weight: 600 !important;
+            margin-bottom: -10 !important;
+            text-align: center !important;
+            text-shadow: 0 1px 8px rgba(0,0,0,0.12) !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
     from utils.global_styles import get_global_institutional_css
     from utils.mobile_styles import get_mobile_css
-    
+
     # Inyectar estilos base globales
     st.markdown(get_global_institutional_css(), unsafe_allow_html=True)
-    
+
     # Inyectar estilos móviles responsive
     st.markdown(get_mobile_css(), unsafe_allow_html=True)
+
+    # Inyectar estilos personalizados para glassbox y hero
+    st.markdown(
+        """
+        <style>
+        .glass-box {
+            background: rgba(255,255,255,0.22);
+            border-radius: 32px;
+            padding: 2rem 2rem;
+            box-shadow: 0 12px 40px rgba(0,0,0,0.18);
+            backdrop-filter: blur(50px);
+            text-align: center;
+            font-family: 'Inter', 'Segoe UI', sans-serif;
+        }
+        .hero-title {
+            color: #FFFFFF;
+            font-size: 10rem;      /* Más grande y protagonista */
+            font-family: 'Inter', 'Segoe UI', sans-serif;
+            font-weight:2500;
+            letter-spacing: 3px;
+            margin-bottom: 1.2rem;
+            text-shadow: 0 2px 16px rgba(0,0,0,0.18);
+        }
+        .hero-subtitle {
+            color: #FFB81C;         /* Amarillo institucional para destacar */
+            font-size: 1.7rem;      /* Más grande */
+            font-family: 'Inter', 'Segoe UI', sans-serif;
+            font-weight: 600;
+            margin-bottom: 0;
+            text-shadow: 0 1px 8px rgba(0,0,0,0.12);
+        }
+        /* Forzar color blanco en p.hero-title y p.hero-subtitle dentro de stMarkdownContainer */
+        div[data-testid='stMarkdownContainer'] p.hero-title,
+        div[data-testid='stMarkdownContainer'] p.hero-subtitle {
+            color: #fff !important;
+        }
+        div[data-testid="stMarkdownContainer"] .hero-title,
+        div[data-testid="stMarkdownContainer"] .hero-subtitle {
+            color: #fff !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
     
     st.markdown("""
         <style>
-        /* ========================================
-           INPUTS Y FORMULARIOS (Accesibilidad AA)
-        ======================================== */
-        
+
         /* Labels de inputs - tamaño legible */
         .stSelectbox label,
         .stTextInput label,

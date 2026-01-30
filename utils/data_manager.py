@@ -197,12 +197,13 @@ def invalidate_caches() -> None:
     # 1) Intentar limpiar caché de Streamlit
     try:
         st.cache_data.clear()
-    except Exception:
+    except Exception as e:
+        logger.warning(f"Error limpiando cache_data: {e}")
         try:
             # versiones antiguas de streamlit
             st.legacy_caching.clear_cache()
-        except Exception:
-            pass
+        except Exception as e2:
+            logger.warning(f"Error limpiando legacy_caching: {e2}")
 
     # 2) Intentar invalidar caches del data_provider si existe
     try:
@@ -211,10 +212,10 @@ def invalidate_caches() -> None:
         if hasattr(data_provider, "invalidate_cache"):
             try:
                 data_provider.invalidate_cache()
-            except Exception:
+            except Exception as e:
+                logger.warning(f"Error invalidando cache de data_provider: {e}")
                 # fallback manual
                 data_provider._data_cache = None
                 data_provider._merged_cache = None
-    except Exception:
-        # No hay provider disponible o fallo; no romper flujo de guardado
-        pass
+    except Exception as e:
+        logger.warning(f"No hay provider disponible o fallo al invalidar cache: {e}")

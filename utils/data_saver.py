@@ -75,7 +75,7 @@ def get_id(entidad: str, plataforma: str, usuario: str, **kwargs) -> str:
     
     # Generar hash único
     unique_str = f"{u_entidad}|{u_plataforma}|{u_usuario}"
-    hash_id = hashlib.md5(unique_str.encode()).hexdigest()[:8]
+    hash_id = hashlib.md5(unique_str.encode()).hexdigest()
     # Garantizar que es string
     return str(hash_id)
 
@@ -100,15 +100,13 @@ def _invalidate_caches():
         logger.debug("Cache st.cache_data limpiado")
     except Exception as e:
         logger.warning(f"Error limpiando st.cache_data: {e}")
-    
     # Invalidar caché del DataProvider si está disponible
     try:
         from utils.data_provider import data_provider
         data_provider.invalidate_cache()
         logger.debug("Cache DataProvider invalidado")
-    except ImportError:
-        # data_provider podría no estar importado aún
-        pass
+    except ImportError as e:
+        logger.warning(f"DataProvider no importado: {e}")
     except Exception as e:
         logger.warning(f"Error invalidando DataProvider: {e}")
 
@@ -233,7 +231,8 @@ def guardar_datos(nuevo_df: pd.DataFrame, modo: str = "append") -> bool:
             try:
                 existing_records = ws_cuentas.get_all_records()
                 existing_ids = set([str(r.get("id_cuenta", "")).strip() for r in existing_records])
-            except:
+            except Exception as e:
+                logger.warning(f"Error obteniendo registros existentes de cuentas: {e}")
                 existing_ids = set()
             
             # Identificar cuentas nuevas
@@ -321,8 +320,8 @@ def guardar_datos(nuevo_df: pd.DataFrame, modo: str = "append") -> bool:
             import streamlit as st
             st.cache_data.clear()
             logger.info("✅ Cachés invalidados")
-        except:
-            pass
+        except Exception as e:
+            logger.warning(f"Error invalidando cachés tras guardar datos: {e}")
         _invalidate_caches()
     
     return success
@@ -332,7 +331,11 @@ def save_batch(df: pd.DataFrame) -> bool:
     """
     Guarda un batch de métricas.
     Alias conveniente para guardar_datos.
+    Permite pasar tanto un DataFrame como una lista de dicts.
     """
+    import pandas as pd
+    if isinstance(df, list):
+        df = pd.DataFrame(df)
     return guardar_datos(df)
 
 

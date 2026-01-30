@@ -93,16 +93,17 @@ def get_global_institutional_css() -> str:
     [data-testid="stVerticalBlock"] span,
     [data-testid="stVerticalBlock"] label,
     [data-testid="stVerticalBlock"] li,
-    section[data-testid="stMain"] p,
-    section[data-testid="stMain"] span,
-    section[data-testid="stMain"] label,
+    section[data-testid="stMain"] p:not([data-testid="stSidebar"] *),
+    section[data-testid="stMain"] span:not([data-testid="stSidebar"] *),
+    section[data-testid="stMain"] label:not([data-testid="stSidebar"] *),
     section[data-testid="stMain"] li,
     .main p,
     .main span,
     .main label,
     .main li,
     .main div:not([data-testid="stSidebar"] *) {{
-        color: {TEXT_PRIMARY} !important;
+        color: #ffffff !important;
+        opacity: 1 !important;
         font-family: 'Inter', 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif !important;
         font-size: 16px !important;
         line-height: 1.6 !important;

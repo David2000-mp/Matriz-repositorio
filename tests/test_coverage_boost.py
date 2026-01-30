@@ -62,6 +62,7 @@ def test_save_batch_con_multiples_registros_sin_duplicados(
             "alcance": 5000,
             "interacciones": 200,
             "likes_promedio": 40,
+            "engagement_rate": 20.0,
         },
         {
             "id_cuenta": "test2",
@@ -73,6 +74,7 @@ def test_save_batch_con_multiples_registros_sin_duplicados(
             "alcance": 10000,
             "interacciones": 500,
             "likes_promedio": 100,
+            "engagement_rate": 25.0,
         },
         {
             "id_cuenta": "test3",
@@ -84,6 +86,7 @@ def test_save_batch_con_multiples_registros_sin_duplicados(
             "alcance": 2000,
             "interacciones": 80,
             "likes_promedio": 16,
+            "engagement_rate": 16.0,
         },
     ]
 
@@ -177,6 +180,7 @@ def test_save_batch_con_datos_duplicados_elimina_correctamente(
             "alcance": 5500,
             "interacciones": 220,
             "likes_promedio": 44,
+            "engagement_rate": 20.0,
         },
         {
             "id_cuenta": "duplicate_test",
@@ -188,6 +192,7 @@ def test_save_batch_con_datos_duplicados_elimina_correctamente(
             "alcance": 6000,
             "interacciones": 240,
             "likes_promedio": 48,
+            "engagement_rate": 22.0,
         },
     ]
 
@@ -241,6 +246,7 @@ def test_save_batch_maneja_error_en_guardar_datos(mock_conectar_sheets, tmp_path
             "alcance": 5000,
             "interacciones": 200,
             "likes_promedio": 40,
+            "engagement_rate": 20.0,
         }
     ]
 
