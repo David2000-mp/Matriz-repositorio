@@ -90,10 +90,33 @@ def _load_data_impl() -> Tuple[pd.DataFrame, pd.DataFrame]:
             # Cargar Métricas
             try:
                 ws_m = spreadsheet.worksheet("metricas")
-                m_data = ws_m.get_all_records()
-                if m_data:
-                    metricas_df = pd.DataFrame(m_data).fillna('')  # Limpiar NaN inmediatamente
+                
+                # Usar get() crudo para evitar conversiones automáticas problemáticas
+                raw_data = ws_m.get()
+                if raw_data and len(raw_data) > 1:
+                    headers = raw_data[0]
+                    data_rows = raw_data[1:]
+                    
+                    # Procesar filas para asegurar longitud correcta
+                    max_cols = len(headers)
+                    processed_rows = []
+                    for row in data_rows:
+                        if len(row) < max_cols:
+                            row.extend([''] * (max_cols - len(row)))
+                        elif len(row) > max_cols:
+                            row = row[:max_cols]
+                        processed_rows.append(row)
+                    
+                    metricas_df = pd.DataFrame(processed_rows, columns=headers).fillna('')
                     metricas_df = validate_and_fill_columns(metricas_df, COLS_METRICAS)
+                    
+                    logger.info(f"Cargadas {len(metricas_df)} métricas usando método crudo")
+                else:
+                    # Fallback a get_all_records si get() falla
+                    m_data = ws_m.get_all_records()
+                    if m_data:
+                        metricas_df = pd.DataFrame(m_data).fillna('')
+                        metricas_df = validate_and_fill_columns(metricas_df, COLS_METRICAS)
             except:
                 logger.warning("Hoja 'metricas' no encontrada.")
             

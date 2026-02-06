@@ -3,9 +3,11 @@ App refactorizado para CHAMPILEAKS.
 Provee enrutamiento limpio a las vistas y asegura inyección de estilos.
 """
 import streamlit as st
+import pandas as pd
 from components import inject_custom_css, render_custom_header
 from utils.helpers import load_image
 from utils.logger import set_production_mode
+from utils.sheets_connector import cargar_respuestas_forms
 
 
 def main():
@@ -62,7 +64,7 @@ def main():
         st.subheader("Navegación")
         
         # Navegación simplificada sin index calculado
-        menu_options = ["🏠 Inicio", "📊 Dashboard Global", "📈 Comparativas", "📝 Captura", "⚙️ Configuración"]
+        menu_options = ["🏠 Inicio", "📊 Dashboard Global", "📈 Comparativas", "📝 Captura", "🔍 Auditoría de Respuestas", "⚙️ Configuración"]
         selected_display = st.radio(
             "Seleccionar página", 
             menu_options, 
@@ -76,6 +78,7 @@ def main():
             "📊 Dashboard Global": "Dashboard Global", 
             "📈 Comparativas": "Comparativas",
             "📝 Captura": "Captura",
+            "🔍 Auditoría de Respuestas": "Auditoría de Respuestas",
             "⚙️ Configuración": "Configuración",
         }
         
@@ -137,34 +140,21 @@ def main():
         if "app_data" not in st.session_state:
             with st.spinner("Cargando datos..."):
                 try:
-                    # Imports lazy para mejor rendimiento - solo cuando se necesitan
-                    import pandas as pd
-                    from utils.data_provider import get_data, get_merged_data
-
-                    cuentas, metricas = get_data()
-
-                    # Procesar datos
-                    if not cuentas.empty and "id_cuenta" in cuentas.columns:
-                        cuentas["id_cuenta"] = cuentas["id_cuenta"].astype(str)
-                    if not metricas.empty and "id_cuenta" in metricas.columns:
-                        metricas["id_cuenta"] = metricas["id_cuenta"].astype(str)
-
-                    # Merge de datos
-                    df_global = pd.DataFrame()
-                    if not metricas.empty and not cuentas.empty:
-                        df_global = pd.merge(metricas, cuentas, on="id_cuenta", how="left")
-
-                        # Normalizar columnas
-                        for logical in ("entidad", "plataforma", "usuario_red"):
-                            if logical in df_global.columns:
-                                continue
-                            for suff in (f"{logical}_y", f"{logical}_x", f"{logical}"):
-                                if suff in df_global.columns:
-                                    df_global.rename(columns={suff: logical}, inplace=True)
-                                    break
-
-                        if "fecha" in df_global.columns:
-                            df_global["fecha"] = pd.to_datetime(df_global["fecha"], errors="coerce")
+                    # Cargar datos desde RespuestasForms
+                    from utils.sheets_connector import cargar_respuestas_forms
+                    df_global = cargar_respuestas_forms()
+                    
+                    # Generar IDs automáticos
+                    df_global['id'] = range(len(df_global))
+                    df_global['id'] = df_global['id'].astype(str)
+                    
+                    # Procesar fecha
+                    if 'fecha' in df_global.columns:
+                        df_global['fecha'] = pd.to_datetime(df_global['fecha'], errors='coerce')
+                    
+                    # Asegurar columnas estándar
+                    expected_columns = ['id', 'entidad', 'plataforma', 'usuario_red', 'fecha', 'seguidores', 'engagement_rate', 'alcance', 'interacciones', 'comentarios']
+                    df_global = df_global.reindex(columns=expected_columns, fill_value='')
 
                     # Actualizar filtros globales disponibles usando data_provider
                     try:
@@ -175,16 +165,16 @@ def main():
                             meses = sorted(merged["fecha"].dt.strftime("%Y-%m").dropna().unique(), reverse=True)
                             st.session_state.global_months = meses
                     except Exception:
-                        # Fallback a cuentas/metricas
-                        if not cuentas.empty and "entidad" in cuentas.columns:
-                            st.session_state.global_entities = sorted(cuentas["entidad"].unique().tolist())
-                        if not metricas.empty and "fecha" in df_global.columns:
+                        # Fallback a df_global
+                        if not df_global.empty and "entidad" in df_global.columns:
+                            st.session_state.global_entities = sorted(df_global["entidad"].unique().tolist())
+                        if not df_global.empty and "fecha" in df_global.columns:
                             meses = sorted(df_global["fecha"].dt.strftime("%Y-%m").dropna().unique(), reverse=True)
                             st.session_state.global_months = meses
 
                     st.session_state.app_data = {
-                        "cuentas": cuentas,
-                        "metricas": metricas,
+                        "cuentas": pd.DataFrame(),  # Vacío ya que usamos forms
+                        "metricas": pd.DataFrame(),  # Vacío
                         "df_global": df_global
                     }
 
@@ -232,11 +222,71 @@ def main():
         from views import comparison
         comparison.render_comparison_view()
     elif selected == "Captura":
-        data = load_data_lazy()
-        if data:
-            df_filtered = apply_filters(data["df_global"])
-            from views import data_entry
-            data_entry.render(df_filtered)
+        # Nueva implementación: Captura externa vía Google Forms
+        st.header("📝 Captura de Datos Externa")
+        st.markdown("""
+        La captura de datos ahora se realiza a través de un formulario externo para mayor estabilidad y facilidad de uso.
+        Completa el formulario en Google Forms y los datos se procesarán automáticamente.
+        """)
+        
+        # Botón para ir al formulario
+        form_url = "https://docs.google.com/forms/d/e/1FAIpQLSdyENRU-OPiD9VTEMC_AQeCusksvK450UTQQFGcnKS9tQJINA/viewform"
+        st.link_button("📝 Ir al Formulario de Captura", form_url, width='stretch')
+        
+        # Opcional: Mostrar el formulario en iframe
+        st.markdown("---")
+        st.subheader("Vista Previa del Formulario")
+        st.components.v1.iframe(form_url, width=None, height=1200, scrolling=True)
+    elif selected == "Auditoría de Respuestas":
+        # Nueva sección: Auditoría de Respuestas
+        st.header("🔍 Auditoría de Respuestas")
+
+        try:
+            df_forms = cargar_respuestas_forms()
+            
+            if df_forms.empty:
+                st.warning("No hay datos nuevos del formulario")
+                st.stop()
+            
+            # Métricas rápidas
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                total_registros = len(df_forms)
+                st.metric("Total de Registros", total_registros)
+            
+            with col2:
+                promedio_engagement = df_forms['engagement_rate'].mean()
+                st.metric("Promedio de Engagement", f"{promedio_engagement:.2f}%")
+            
+            with col3:
+                ultima_fecha = df_forms['fecha'].max()
+                st.metric("Última Fecha de Reporte", ultima_fecha.strftime('%Y-%m-%d') if pd.notna(ultima_fecha) else "N/A")
+            
+            # Data Editor para correcciones manuales
+            st.subheader("Datos del Formulario")
+            edited_df = st.data_editor(
+                df_forms,
+                use_container_width=True,
+                num_rows="dynamic",
+                column_config={
+                    "fecha": st.column_config.DateColumn("Fecha del Reporte"),
+                    "seguidores": st.column_config.NumberColumn("Seguidores Totales", min_value=0),
+                    "engagement_rate": st.column_config.NumberColumn("Engagement Rate (%)", min_value=0.0, max_value=100.0, step=0.01),
+                    "alcance": st.column_config.NumberColumn("Alcance Total", min_value=0),
+                    "interacciones": st.column_config.NumberColumn("Interacciones Totales", min_value=0),
+                }
+            )
+            
+            # Mostrar filas con errores
+            errores = df_forms[df_forms['error_validacion'] != '']
+            if not errores.empty:
+                st.error("Filas con errores de validación:")
+                st.dataframe(errores[['entidad', 'plataforma', 'error_validacion']], use_container_width=True)
+
+        except Exception as e:
+            st.error(f"Error cargando datos del formulario: {e}")
+            import logging
+            logging.error(f"Error en auditoría de respuestas: {e}")
     elif selected == "Configuración":
         from views import settings
         settings.render()

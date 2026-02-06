@@ -98,6 +98,23 @@ def _get_engagement_health(plataforma: str, engagement_rate: float) -> Tuple[str
         return "Excelente", "🟢"
 
 
+def get_engagement_status(interacciones, seguidores):
+    """
+    Determina el estado del engagement basado en datos disponibles.
+    Retorna un mensaje explicativo si no se puede calcular o es de referencia.
+    """
+    if seguidores == 0 and interacciones == 0:
+        return "No hay datos registrados (seguidores e interacciones ausentes). Este es un dato de referencia provisional."
+    elif seguidores == 0:
+        return "No hay seguidores registrados para calcular engagement. Este es un dato de referencia provisional."
+    elif interacciones == 0:
+        return "No hay interacciones registradas en este período. Este es un dato de referencia provisional."
+    elif seguidores < 10:  # Umbral mínimo para "datos insuficientes"
+        return "Datos insuficientes: audiencia muy pequeña para referencia precisa. Este es un dato de referencia provisional."
+    else:
+        return None  # Datos suficientes
+
+
 def render_comparison_view():
     """
     Renderiza vista de comparación lado a lado.
@@ -118,6 +135,15 @@ def render_comparison_view():
     
     # Estado global
     state = get_app_state()
+    
+    # Asegurar que los datos tengan engagement_rate como numérico
+    if hasattr(state, 'data') and state.data is not None and not state.data.empty:
+        state.data = state.data.copy()
+        if 'engagement_rate' in state.data.columns:
+            state.data['engagement_rate'] = pd.to_numeric(
+                state.data['engagement_rate'].astype(str).str.replace(',', '.', regex=False), 
+                errors='coerce'
+            ).fillna(0)
     
     # Selector de tipo de comparación
     comparison_type = st.radio(
@@ -307,20 +333,33 @@ def _render_entity_kpis(data: pd.DataFrame, color: str = "#1f77b4"):
         st.metric("Total Interacciones", "0", delta=None)
         return
     
-    # Calcular métricas agregadas
-    total_followers = data["seguidores"].sum() if "seguidores" in data.columns else 0
-    avg_engagement = data["engagement_rate"].mean() if "engagement_rate" in data.columns else 0
+    # CORRECCIÓN CRÍTICA: Usar max() en lugar de sum() para seguidores
+    # Anteriormente sumaba valores acumulados inflando los totales
+    # Ahora toma el último valor disponible para total actual
+    total_followers = data["seguidores"].max() if "seguidores" in data.columns else 0
     
     # Calcular interacciones: usar columna interacciones si existe, sino estimar
     if "interacciones" in data.columns:
         total_interactions = data["interacciones"].sum()
+        avg_interactions = data["interacciones"].mean() if not data.empty else 0
     elif "engagement_rate" in data.columns and "seguidores" in data.columns:
-        # Estimar: interacciones ≈ (engagement_rate / 100) * seguidores
+        # Estimar: interacciones ≈ (engagement_rate / 100) * alcance_estimado (seguidores * 2.5)
         data_copy = data.copy()
-        data_copy["interacciones_estimadas"] = (data_copy["engagement_rate"] / 100) * data_copy["seguidores"]
+        data_copy["interacciones_estimadas"] = (data_copy["engagement_rate"] / 100) * (data_copy["seguidores"] * 2.5)
         total_interactions = data_copy["interacciones_estimadas"].sum()
+        avg_interactions = data_copy["interacciones_estimadas"].mean() if not data_copy.empty else 0
     else:
         total_interactions = 0
+        avg_interactions = 0
+    
+    # Calcular engagement promedio directamente de los datos
+    if "engagement_rate" in data.columns and not data.empty:
+        weighted_engagement = data["engagement_rate"].mean()
+    else:
+        weighted_engagement = 0
+    
+    # Verificar estado del engagement con get_engagement_status
+    status = get_engagement_status(total_interactions, total_followers)
     
     # Mostrar KPIs
     st.metric(
@@ -329,24 +368,83 @@ def _render_entity_kpis(data: pd.DataFrame, color: str = "#1f77b4"):
         delta=None,
     )
     
-    # Determinar estado de engagement (usar primera plataforma si hay datos)
-    engagement_status = ""
-    if not data.empty and "plataforma" in data.columns and avg_engagement > 0:
-        first_platform = data["plataforma"].iloc[0]
-        status, emoji = _get_engagement_health(first_platform, avg_engagement)
-        engagement_status = f"{emoji} {status}"
+    # Engagement metric: manejar insuficiencia de datos
+    if status:
+        # Datos insuficientes: mostrar mensaje en lugar de métricas
+        st.metric(
+            "Engagement Promedio",
+            "Datos insuficientes",
+            delta=None,
+        )
+        st.caption(f"💡 Nota sobre Engagement: {status}")
+    else:
+        # Datos suficientes: calcular y mostrar engagement ponderado
+        # Determinar estado de engagement (usar primera plataforma si hay datos)
+        engagement_status = ""
+        if not data.empty and "plataforma" in data.columns and weighted_engagement > 0:
+            first_platform = data["plataforma"].iloc[0]
+            status_health, emoji = _get_engagement_health(first_platform, weighted_engagement)
+            engagement_status = f"{emoji} {status_health}"
+        
+        st.metric(
+            "Engagement Promedio",
+            f"{weighted_engagement:.2f}%",
+            delta=engagement_status if engagement_status else None,
+        )
     
     st.metric(
-        "Engagement Promedio",
-        f"{avg_engagement:.2f}%",
-        delta=engagement_status if engagement_status else None,
-    )
-    
-    st.metric(
-        "Total Interacciones",
-        f"{total_interactions:,.0f}",
+        "Promedio Interacciones",
+        f"{avg_interactions:,.1f}",
         delta=None,
     )
+    
+    # Desglose por plataforma
+    if not data.empty and "plataforma" in data.columns:
+        st.markdown("### 📊 Desglose por Plataforma")
+        
+        # Agrupar por plataforma
+        platform_summary = data.groupby("plataforma").agg({
+            "seguidores": "max",
+            "interacciones": "sum" if "interacciones" in data.columns else None,
+            "engagement_rate": "mean"
+        }).reset_index()
+        
+        # Calcular métricas por plataforma
+        for _, row in platform_summary.iterrows():
+            platform_name = row["plataforma"]
+            platform_followers = row["seguidores"]
+            
+            # Calcular interacciones por plataforma
+            if "interacciones" in data.columns:
+                platform_interactions = row["interacciones"]
+            else:
+                # Estimar usando engagement_rate promedio de la plataforma
+                platform_engagement = row["engagement_rate"]
+                platform_interactions = (platform_engagement / 100) * platform_followers
+            
+            # Calcular engagement ponderado por plataforma
+            platform_engagement_weighted = (platform_interactions / platform_followers * 100) if platform_followers > 0 else 0
+            
+            # Verificar estado por plataforma
+            platform_status = get_engagement_status(platform_interactions, platform_followers)
+            
+            with st.expander(f"📱 {platform_name}", expanded=False):
+                col1, col2, col3 = st.columns(3)
+                
+                with col1:
+                    st.metric("Seguidores", f"{platform_followers:,.0f}")
+                
+                with col2:
+                    if platform_status:
+                        st.metric("Engagement", "Datos insuficientes")
+                        st.caption(f"💡 {platform_status}")
+                    else:
+                        # Determinar estado de salud
+                        health_status, emoji = _get_engagement_health(platform_name, platform_engagement_weighted)
+                        st.metric("Engagement", f"{platform_engagement_weighted:.2f}%", delta=f"{emoji} {health_status}")
+                
+                with col3:
+                    st.metric("Interacciones Promedio", f"{platform_interactions/platform_followers if platform_followers > 0 else 0:,.1f}")
 
 
 def _render_followers_evolution_comparison(
@@ -369,8 +467,8 @@ def _render_followers_evolution_comparison(
     
     # Línea para entidad A - agrupar por fecha
     if not data_a.empty and "fecha" in data_a.columns and "seguidores" in data_a.columns:
-        # Agrupar por fecha y sumar seguidores (todas las plataformas)
-        data_a_grouped = data_a.groupby("fecha")["seguidores"].sum().reset_index()
+        # Agrupar por fecha y tomar máximo seguidores (último valor por fecha)
+        data_a_grouped = data_a.groupby("fecha")["seguidores"].max().reset_index()
         data_a_grouped = data_a_grouped.sort_values("fecha")
         
         fig.add_trace(go.Scatter(
@@ -384,8 +482,8 @@ def _render_followers_evolution_comparison(
     
     # Línea para entidad B - agrupar por fecha
     if not data_b.empty and "fecha" in data_b.columns and "seguidores" in data_b.columns:
-        # Agrupar por fecha y sumar seguidores (todas las plataformas)
-        data_b_grouped = data_b.groupby("fecha")["seguidores"].sum().reset_index()
+        # Agrupar por fecha y tomar máximo seguidores (último valor por fecha)
+        data_b_grouped = data_b.groupby("fecha")["seguidores"].max().reset_index()
         data_b_grouped = data_b_grouped.sort_values("fecha")
         
         fig.add_trace(go.Scatter(
@@ -499,7 +597,7 @@ def _render_platform_distribution(data: pd.DataFrame, color: str = "#1f77b4"):
         return
     
     # Agrupar por plataforma
-    platform_data = data.groupby("plataforma")["seguidores"].sum().reset_index()
+    platform_data = data.groupby("plataforma")["seguidores"].max().reset_index()
     platform_data = platform_data.sort_values("seguidores", ascending=False)
     
     # Gráfica de barras
@@ -579,12 +677,11 @@ def _get_available_entities() -> list:
     if entities:
         return sorted(entities)
     
-    # Fallback: obtener de datos frescos
+    # Fallback: obtener directamente del formulario
     try:
-        from utils.data_provider import DataProvider
+        from utils.sheets_connector import cargar_respuestas_forms
         
-        provider = DataProvider()
-        all_data = provider.get_merged_data()
+        all_data = cargar_respuestas_forms()
         
         if all_data is not None and not all_data.empty and "entidad" in all_data.columns:
             return sorted(all_data["entidad"].unique().tolist())
@@ -612,12 +709,13 @@ def _get_entity_data(
         DataFrame con datos filtrados
     """
     try:
-        from utils.data_provider import DataProvider
+        from utils.sheets_connector import cargar_respuestas_forms
         
-        provider = DataProvider()
-        all_data = provider.get_merged_data()
+        # Cargar datos directamente del formulario (no usar merge que puede fallar)
+        all_data = cargar_respuestas_forms()
         
         if all_data is None or all_data.empty:
+            logger.warning("No hay datos disponibles en el formulario")
             return pd.DataFrame()
         
         # Filtrar por entidad
@@ -625,6 +723,10 @@ def _get_entity_data(
         
         # Filtrar por rango de fechas
         data = filtrar_por_rango_fechas(data, start_date, end_date)
+        
+        # CORRECCIÓN: Eliminar duplicados manteniendo último registro por cuenta
+        if not data.empty and 'fecha' in data.columns:
+            data = data.drop_duplicates(subset=['entidad', 'plataforma'], keep='last')
         
         return data
     

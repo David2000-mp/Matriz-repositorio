@@ -343,85 +343,113 @@ def render(df=None):
                         st.error("❌ Errores de validación:")
                         for error in form_errors:
                             st.error(f"   • {error}")
-                    else:
-                        try:
-                            # Preparar datos para guardar
-                            cuentas_cache, _ = data_provider.get_data()
+                        st.warning("No se guardó el registro. Completa todos los campos obligatorios.")
+                        st.stop()
+                    try:
+                        # Preparar datos para guardar
+                        cuentas_cache, metricas_cache = data_provider.get_data()
 
-                            # Usar usuario_red (URL literal o vacío) para generar ID consistente
-                            id_cuenta = get_id(
-                                entidad,
-                                plataforma,
-                                usuario_red if usuario_red and usuario_red.strip() else "",
-                                df_cuentas_cache=cuentas_cache,
+                        # Usar usuario_red (URL literal o vacío) para generar ID consistente
+                        id_cuenta = get_id(
+                            entidad,
+                            plataforma,
+                            usuario_red if usuario_red and usuario_red.strip() else "",
+                            df_cuentas_cache=cuentas_cache,
+                        )
+
+                        # Validar campos obligatorios antes de guardar
+                        required_fields = [entidad, plataforma, usuario_red, seguidores, engagement_rate, fecha_captura]
+                        if not all(required_fields) or seguidores <= 0 or engagement_rate <= 0:
+                            st.error("❌ No se guardó el registro. Todos los campos obligatorios deben estar completos y válidos.")
+                            st.stop()
+
+                        # Redondear engagement para guardado
+                        engagement_rate_guardado = round(float(engagement_rate), 2)
+                        likes_promedio_guardado = calculate_likes_promedio(engagement_rate_guardado, seguidores)
+                        alcance_final = int(alcance) if ('alcance' in locals() and alcance > 0) else int(
+                            estimate_reach(plataforma, seguidores, engagement_rate_guardado)
+                        )
+
+                        # Construir registro SOLO con campos indispensables
+                        nuevo_registro = {
+                            "id_cuenta": id_cuenta,
+                            "entidad": entidad,
+                            "plataforma": plataforma,
+                            "usuario_red": usuario_red,
+                            "fecha": pd.to_datetime(fecha_captura).strftime("%Y-%m-%d"),
+                            "seguidores": int(seguidores),
+                            "alcance": alcance_final,
+                            "interacciones": int(interacciones) if interacciones > 0 else int(likes_promedio_guardado),
+                            "likes_promedio": round(likes_promedio_guardado, 2),
+                            "engagement_rate": engagement_rate_guardado,
+                        }
+
+                        # --- Validación de duplicado exacto (id_cuenta + fecha) ---
+                        existe_duplicado = False
+                        if metricas_cache is not None and not metricas_cache.empty:
+                            metricas_cache["id_cuenta"] = metricas_cache["id_cuenta"].astype(str)
+                            metricas_cache["fecha"] = pd.to_datetime(metricas_cache["fecha"], errors="coerce").dt.strftime("%Y-%m-%d")
+                            existe_duplicado = (
+                                (metricas_cache["id_cuenta"] == id_cuenta)
+                                & (metricas_cache["fecha"] == nuevo_registro["fecha"])
+                            ).any()
+
+                        if existe_duplicado:
+                            st.error(
+                                f"❌ Ya existe un registro para esta cuenta ({entidad} - {plataforma} - {usuario_red}) en la fecha {nuevo_registro['fecha']}. "
+                                "No se guardó el registro para evitar duplicados."
                             )
+                            st.stop()
 
-                            # Redondear engagement para guardado
-                            engagement_rate_guardado = round(float(engagement_rate), 2)
+                        # --- DEFENSIVO: Bloquear si hay campos extra/no reconocidos ---
+                        campos_permitidos = set([
+                            "id_cuenta", "entidad", "plataforma", "usuario_red", "fecha", "seguidores", "alcance", "interacciones", "likes_promedio", "engagement_rate"
+                        ])
+                        if set(nuevo_registro.keys()) - campos_permitidos:
+                            st.error("❌ El registro contiene campos no permitidos. Revisa la entrada.")
+                            st.stop()
 
-                            # Likes promedio ya calculado en tiempo real
-                            likes_promedio_guardado = calculate_likes_promedio(engagement_rate_guardado, seguidores)
+                        df_nuevo = pd.DataFrame([nuevo_registro])
 
-                            # Calcular alcance usando estimator si el usuario no proporcionó un valor explícito
-                            alcance_final = int(alcance) if ('alcance' in locals() and alcance > 0) else int(
-                                estimate_reach(plataforma, seguidores, engagement_rate_guardado)
-                            )
+                        with st.status("Guardando entrada..."):
+                            success = save_batch(df_nuevo)
 
-                            # Construir registro
-                            nuevo_registro = {
-                                "id_cuenta": id_cuenta,
-                                "entidad": entidad,
-                                "plataforma": plataforma,
-                                "usuario_red": usuario_red,
-                                "fecha": pd.to_datetime(fecha_captura).strftime("%Y-%m-%d"),
-                                "seguidores": int(seguidores),
-                                "alcance": alcance_final,
-                                "interacciones": int(interacciones) if interacciones > 0 else int(likes_promedio_guardado),
-                                "likes_promedio": round(likes_promedio_guardado, 2),
-                                "engagement_rate": engagement_rate_guardado,
-                            }
+                            # Guardar comentarios contextuales si existen (no bloquear)
+                            try:
+                                if comentarios and comentarios.strip():
+                                    mes_formato = pd.to_datetime(fecha_captura).strftime("%Y-%m")
+                                    save_comment(entidad, mes_formato, comentarios.strip())
+                            except Exception:
+                                pass
 
-                            df_nuevo = pd.DataFrame([nuevo_registro])
+                        # Feedback
+                        if success:
+                            toast_data_saved(f"{entidad} - {plataforma}")
+                            toast_info(f"Alcance estimado: {alcance_final:,}", duration=2)
+                            try:
+                                st.balloons()
+                            except Exception:
+                                pass
 
-                            with st.status("Guardando entrada..."):
-                                success = save_batch(df_nuevo)
+                            # Invalida cachés centralmente
+                            try:
+                                invalidate_caches()
+                            except Exception as e:
+                                logging.warning(f"No se pudo invalidar cachés centralmente: {e}")
 
-                                # Guardar comentarios contextuales si existen (no bloquear)
-                                try:
-                                    if comentarios and comentarios.strip():
-                                        mes_formato = pd.to_datetime(fecha_captura).strftime("%Y-%m")
-                                        save_comment(entidad, mes_formato, comentarios.strip())
-                                except Exception:
-                                    pass
+                            # Persistir valores para siguiente captura usando AppState
+                            state.set_form_defaults({
+                                "capture_entidad_default": entidad,
+                                "capture_plataforma_default": plataforma,
+                                "capture_fecha_default": fecha_captura,
+                            })
 
-                            # Feedback
-                            if success:
-                                toast_data_saved(f"{entidad} - {plataforma}")
-                                toast_info(f"Alcance estimado: {alcance_final:,}", duration=2)
-                                try:
-                                    st.balloons()
-                                except Exception:
-                                    pass
+                        else:
+                            st.error("❌ Error al guardar el registro. Intenta nuevamente. Si el problema persiste, verifica tu conexión a Google Sheets.")
 
-                                # Invalida cachés centralmente
-                                try:
-                                    invalidate_caches()
-                                except Exception as e:
-                                    logging.warning(f"No se pudo invalidar cachés centralmente: {e}")
-
-                                # Persistir valores para siguiente captura usando AppState
-                                state.set_form_defaults({
-                                    "capture_entidad_default": entidad,
-                                    "capture_plataforma_default": plataforma,
-                                    "capture_fecha_default": fecha_captura,
-                                })
-
-                            else:
-                                st.error("❌ Error al guardar el registro. Intenta nuevamente.")
-
-                        except Exception as e:
-                            st.error(f"⚠️ Error al guardar el registro: {e}")
-                            logging.error(f"Error al guardar registro: {e}", exc_info=True)
+                    except Exception as e:
+                        st.error(f"⚠️ Error al guardar el registro: {e}")
+                        logging.error(f"Error al guardar registro: {e}", exc_info=True)
 
     elif opcion == "Carga Masiva":
         st.subheader("Carga Masiva de Datos")

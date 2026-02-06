@@ -10,6 +10,7 @@ try:
 except Exception:
     px = None
 import logging
+from typing import Tuple
 from utils import (
     simular,
     save_batch,
@@ -38,6 +39,92 @@ from components.toast_notifications import (
 
 # Importar configuración Plotly centralizada
 from components import PLOTLY_CONFIG, PLOTLY_LAYOUT_DEFAULTS, show_kpi_skeleton, show_chart_skeleton
+
+
+def get_traffic_light_indicator(metric, value):
+    """
+    Retorna indicador visual de confiabilidad basado en umbrales por métrica.
+    🟢 Verde: Valores óptimos
+    🟡 Amarillo: Valores aceptables pero requieren atención
+    🔴 Rojo: Valores problemáticos que requieren acción inmediata
+    """
+    if metric == 'engagement':
+        # Engagement realista: 1-15% óptimo, hasta 20% aceptable
+        if value <= 15:
+            return "🟢"
+        elif value <= 20:
+            return "🟡"
+        else:
+            return "🔴"
+    elif metric == 'growth':
+        # Crecimiento: positivo óptimo, ligeramente negativo aceptable
+        if value >= 0:
+            return "🟢"
+        elif value >= -5:
+            return "🟡"
+        else:
+            return "🔴"
+    elif metric == 'coverage':
+        # Cobertura: óptima >=80%, aceptable >=50%, baja <50%
+        if value >= 80:
+            return "🟢"
+        elif value >= 50:
+            return "🟡"
+        else:
+            return "🔴"
+
+
+def _get_engagement_health(plataforma: str, engagement_rate: float) -> Tuple[str, str]:
+    """
+    Determina el estado de salud del engagement según la plataforma.
+    
+    Args:
+        plataforma: Nombre de la plataforma social
+        engagement_rate: Tasa de engagement en porcentaje
+    
+    Returns:
+        Tuple[estado, emoji] donde estado es "Bajo", "Correcto", "Bueno", "Excelente"
+    """
+    # Rangos específicos por plataforma (basado en estándares de la industria)
+    platform_ranges = {
+        "Instagram": {"bajo": 1.5, "correcto": 3.0, "bueno": 6.0},
+        "Facebook": {"bajo": 0.5, "correcto": 1.0, "bueno": 2.0},
+        "TikTok": {"bajo": 5.0, "correcto": 10.0, "bueno": 15.0},
+        "LinkedIn": {"bajo": 2.0, "correcto": 4.0, "bueno": 7.0},
+        "Twitter": {"bajo": 0.05, "correcto": 0.2, "bueno": 0.5},
+        "X": {"bajo": 0.05, "correcto": 0.2, "bueno": 0.5},
+        "YouTube": {"bajo": 2.0, "correcto": 4.0, "bueno": 8.0},
+    }
+    
+    # Obtener rangos para la plataforma (default genérico si no existe)
+    ranges = platform_ranges.get(plataforma, {"bajo": 1.0, "correcto": 2.5, "bueno": 5.0})
+    
+    # Determinar estado
+    if engagement_rate < ranges["bajo"]:
+        return "Bajo", "🔴"
+    elif engagement_rate < ranges["correcto"]:
+        return "Correcto", "🟡"
+    elif engagement_rate < ranges["bueno"]:
+        return "Bueno", "🟢"
+    else:
+        return "Excelente", "🟢"
+
+
+def get_engagement_status(interacciones, seguidores):
+    """
+    Determina el estado del engagement basado en datos disponibles.
+    Retorna un mensaje explicativo si no se puede calcular o es de referencia.
+    """
+    if seguidores == 0 and interacciones == 0:
+        return "No hay datos registrados (seguidores e interacciones ausentes). Este es un dato de referencia provisional."
+    elif seguidores == 0:
+        return "No hay seguidores registrados para calcular engagement. Este es un dato de referencia provisional."
+    elif interacciones == 0:
+        return "No hay interacciones registradas en este período. Este es un dato de referencia provisional."
+    elif seguidores < 10:  # Umbral mínimo para "datos insuficientes"
+        return "Datos insuficientes: audiencia muy pequeña para referencia precisa. Este es un dato de referencia provisional."
+    else:
+        return None  # Datos suficientes
 
 
 def paginate_dataframe(df, page_size=1000, page_key="page"):
@@ -122,6 +209,7 @@ def render(df=None):
         periodo_seleccionado = st.radio(
             "Periodo de análisis:",
             ["Último mes", "Últimos 3 meses", "Histórico"],
+            index=2,
             horizontal=True,
             help="Selecciona el periodo para el análisis de datos"
         )
@@ -184,7 +272,7 @@ def render(df=None):
                 df_full[logical] = "Unknown"
 
         # Asegurar que las columnas numéricas estén en formato correcto para evitar errores
-        for _col in ("seguidores", "interacciones"):
+        for _col in ("seguidores", "interacciones", "engagement_rate"):
             if _col in df_full.columns:
                 df_full[_col] = pd.to_numeric(df_full[_col], errors="coerce").fillna(0)
 
@@ -230,6 +318,27 @@ def render(df=None):
         )
         return
 
+    # ========================================================================
+    # VALIDACIONES DE CALIDAD DE DATOS
+    # ========================================================================
+    data_quality_issues = []
+    if 'seguidores' in df_m_month.columns and (df_m_month['seguidores'] < 0).any():
+        data_quality_issues.append("Valores negativos detectados en seguidores")
+    if 'interacciones' in df_m_month.columns and (df_m_month['interacciones'] < 0).any():
+        data_quality_issues.append("Valores negativos detectados en interacciones")
+    if 'seguidores' in df_m_month.columns and df_m_month['seguidores'].isna().any():
+        data_quality_issues.append("Datos faltantes en seguidores")
+    if 'interacciones' in df_m_month.columns and df_m_month['interacciones'].isna().any():
+        data_quality_issues.append("Datos faltantes en interacciones")
+    if 'fecha' in df_m_month.columns and df_m_month['fecha'].isna().any():
+        data_quality_issues.append("Fechas inválidas o faltantes")
+
+    if data_quality_issues:
+        st.warning("⚠️ **Problemas de calidad de datos detectados:**\n" + "\n".join(f"- {issue}" for issue in data_quality_issues))
+
+    # Crear df_unique para cálculos consistentes
+    df_unique = df_m_month.drop_duplicates(subset=['entidad', 'plataforma'], keep='last')
+
     # Botón de descarga del reporte HTML usando utils.generar_reporte_html
     try:
         report_html = generar_reporte_html(df_m_month, f"Reporte {periodo_label}")
@@ -244,9 +353,9 @@ def render(df=None):
         st.caption("📊 No se pudo generar el reporte HTML para descarga.")
 
     # Verificar anomalías en el mes actual
-    anomalias_mes = df_m_month[
-        (df_m_month.get("anomalia_seguidores", False)) | 
-        (df_m_month.get("anomalia_interacciones", False))
+    anomalias_mes = df_unique[
+        (df_unique.get("anomalia_seguidores", False)) | 
+        (df_unique.get("anomalia_interacciones", False))
     ]
     plataformas_anomalas = anomalias_mes["plataforma"].unique() if not anomalias_mes.empty else []
 
@@ -266,21 +375,22 @@ def render(df=None):
     with kpi_placeholder.container():
         show_kpi_skeleton(count=4)
 
-    # KPIs principales con snapshot consolidado por cuenta
-    followers_resume = summarize_followers_growth(df_full)
-    tot_seg = int(followers_resume.get("total", 0))
-    seg_prev_total = int(followers_resume.get("total_prev", 0))
+    # KPIs principales con snapshot consolidado por cuenta DEL MES ACTUAL
+    tot_seg = df_unique['seguidores'].sum() if 'seguidores' in df_unique.columns else 0
+    seg_prev_total = 0
 
     try:
-        if "id_cuenta" in df_m_month.columns:
-            int_series = df_m_month.drop_duplicates(subset=["id_cuenta"])['interacciones']
-        else:
-            int_series = df_m_month.drop_duplicates(subset=["entidad", "plataforma", "fecha"])['interacciones']
-        tot_int = int(int_series.sum())
+        # CÁLCULO DE ENGAGEMENT GLOBAL (Promedio Ponderado Real)
+        # kpi_engagement = (df_filtered['interacciones'].sum() / df_filtered['seguidores'].sum()) * 100
+        tot_int = df_unique['interacciones'].sum() if 'interacciones' in df_unique.columns else 0
+        tot_seg_for_er = df_unique['seguidores'].sum() if 'seguidores' in df_unique.columns else 0
+        er_global = (tot_int / tot_seg_for_er * 100.0) if tot_seg_for_er > 0 else 0.0
     except Exception:
-        tot_int = int(df_m_month['interacciones'].sum()) if 'interacciones' in df_m_month.columns else 0
+        tot_int = df_unique['interacciones'].sum() if 'interacciones' in df_unique.columns else 0
+        er_global = (tot_int / tot_seg * 100.0) if tot_seg > 0 else 0.0
 
-    er_global = (tot_int / tot_seg * 100.0) if tot_seg > 0 else 0.0
+    # Calcular promedio de interacciones
+    avg_int = df_unique['interacciones'].mean() if not df_unique.empty and 'interacciones' in df_unique.columns else 0
 
     # Mes anterior para MoM
     meses_disponibles = sorted(df_full["fecha"].dropna().dt.strftime("%Y-%m").unique(), reverse=True)  # type: ignore
@@ -289,13 +399,11 @@ def render(df=None):
     yoy_seg = None
     if mes_anterior:
         df_prev = df_full[df_full["fecha"].dt.strftime("%Y-%m") == mes_anterior]  # type: ignore
-        # usar desduplicación consistente para comparar
-        if "id_cuenta" in df_prev.columns:
-            seg_prev = df_prev.drop_duplicates(subset=["id_cuenta"] )['seguidores'].sum()
-            int_prev = df_prev.drop_duplicates(subset=["id_cuenta"] )['interacciones'].sum()
-        else:
-            seg_prev = df_prev.drop_duplicates(subset=["entidad", "plataforma", "fecha"] )['seguidores'].sum()
-            int_prev = df_prev.drop_duplicates(subset=["entidad", "plataforma", "fecha"] )['interacciones'].sum()
+        df_prev_unique = df_prev.drop_duplicates(subset=['entidad', 'plataforma'], keep='last')
+        # usar suma total para comparar
+        seg_prev = df_prev_unique['seguidores'].sum()
+        int_prev = df_prev_unique['interacciones'].sum()
+        seg_prev_total = seg_prev
         er_prev = (int_prev / seg_prev * 100.0) if seg_prev > 0 else 0.0
         delta_seg = ((tot_seg - seg_prev) / seg_prev * 100.0) if seg_prev > 0 else 0.0
         delta_int = ((tot_int - int_prev) / int_prev * 100.0) if int_prev > 0 else 0.0
@@ -318,7 +426,8 @@ def render(df=None):
                 df_prev_year = df_temp[df_temp["fecha"].dt.strftime("%Y-%m") == prev_year_str]  # type: ignore
             else:
                 df_prev_year = pd.DataFrame()  # DataFrame vacío si fecha no es datetime
-            seg_prev_year = df_prev_year["seguidores"].sum() if not df_prev_year.empty else 0
+            df_prev_year_unique = df_prev_year.drop_duplicates(subset=['entidad', 'plataforma'], keep='last')
+            seg_prev_year = df_prev_year_unique["seguidores"].sum() if not df_prev_year_unique.empty else 0  # Último valor del año anterior
             if seg_prev_year > 0:
                 yoy_seg = (tot_seg - seg_prev_year) / seg_prev_year * 100.0
             else:
@@ -334,8 +443,11 @@ def render(df=None):
     health_score = calculate_health_score(df_full)
 
     # Verificar si hay anomalías en el mes actual para badges
-    anomalia_seguidores = df_m_month.get("anomalia_seguidores", pd.Series(False)).any()
-    anomalia_interacciones = df_m_month.get("anomalia_interacciones", pd.Series(False)).any()
+    anomalia_seguidores = df_unique.get("anomalia_seguidores", pd.Series(False)).any()
+    anomalia_interacciones = df_unique.get("anomalia_interacciones", pd.Series(False)).any()
+
+    # Calcular estado del engagement global
+    status_global = get_engagement_status(tot_int, tot_seg_for_er)
 
     # Limpiar skeleton y mostrar KPIs reales
     kpi_placeholder.empty()
@@ -351,7 +463,7 @@ def render(df=None):
 
     with k1:
         st.metric(
-            label="Seguidores",
+            label=f"Seguidores {get_traffic_light_indicator('growth', delta_seg)}",
             value=f"{tot_seg:,.0f}",
             delta=delta_display,
         )
@@ -360,17 +472,20 @@ def render(df=None):
 
     with k2:
         st.metric(
-            label="Interacciones",
-            value=f"{tot_int:,.0f}",
+            label=f"Interacciones Promedio {get_traffic_light_indicator('growth', delta_int)}",
+            value=f"{avg_int:.1f}",
             delta=f"{delta_int:+.1f}%" if mes_anterior else "-",
         )
         if anomalia_interacciones:
             st.markdown("⚠️ **Anomalía detectada**", help="Variación >20% vs promedio móvil o mes anterior")
     k3.metric(
-        "Engagement",
+        f"Engagement Promedio {get_traffic_light_indicator('engagement', er_global)}",
         f"{er_global:.2f}%",
         delta=f"{delta_er:+.2f} pp" if mes_anterior else "-",
+        help=f"Porcentaje de engagement promedio. {'Nota: ' + status_global if status_global else ''}"
     )
+    if status_global:
+        st.caption(f"💡 Nota sobre Engagement: {status_global}")
     # Salud Digital: mostrar número y color (WCAG AA)
     score_label = f"{health_score:.0f}"
     if health_score > 80:
@@ -381,21 +496,71 @@ def render(df=None):
         color = "#C82333"  # Rojo oscuro - 5.94:1 ✓
     # Badge Pro: tarjeta con borde dinámico y tooltip explicativo
     tooltip = (
-        "Este score promedia tu Engagement (50%), Crecimiento Anual (30%) y Consistencia (20%)."
+        "Salud Digital: Score que mide la salud general de tus redes sociales. Se calcula promediando Engagement (50%), Crecimiento Anual (30%) y Consistencia (20%). Un score alto indica cuentas saludables con buen engagement y crecimiento sostenido. "
+        f"Indicador de confiabilidad: {get_traffic_light_indicator('health', health_score)} (🟢 >80 óptimo, 🟡 >60 aceptable, 🔴 ≤60 requiere atención)"
     )
     k4.markdown(
         f"<div title='{tooltip}' style='padding:12px;border-radius:8px;border:2px solid {color};background:#ffffff;text-align:center;'>"
-        f"<div style='font-size:14px;color:#4A5568;margin-bottom:8px;font-weight:600;'>Salud Digital</div>"
+        f"<div style='font-size:14px;color:#4A5568;margin-bottom:8px;font-weight:600;'>Salud Digital {get_traffic_light_indicator('health', health_score)}</div>"
         f"<div style='font-size:28px;font-weight:800;color:{color};'>{score_label}</div>"
         f"<div style='font-size:14px;color:#1A1A1A;margin-top:8px;'>Score (0-100)</div>"
         f"</div>",
         unsafe_allow_html=True,
     )
 
+    # Desglose por Red Social
+    st.subheader("Desglose por Red Social")
+    
+    # Asegurar que engagement_rate sea numérico para los cálculos
+    df_m_month = df_m_month.copy()
+    df_m_month['engagement_rate'] = pd.to_numeric(df_m_month['engagement_rate'].astype(str).str.replace(',', '.', regex=False), errors='coerce').fillna(0)
+    
+    # df_unique ya definido arriba para consistencia
+    
+    platform_summary = df_unique.groupby('plataforma').agg({
+        'seguidores': 'sum',
+        'interacciones': 'sum',
+        'engagement_rate': 'mean'
+    }).reset_index()
+    platform_summary['engagement_promedio'] = platform_summary['engagement_rate']
+    
+    for _, row in platform_summary.iterrows():
+        status = get_engagement_status(row['interacciones'], row['seguidores'])
+        engagement_display = status if status else f"{row['engagement_promedio']:.2f}%"
+        total_interactions = row['interacciones']
+        st.write(f"**{row['plataforma']}**: Seguidores totales: {row['seguidores']:,.0f}, Interacciones totales: {total_interactions:,.0f}, Engagement promedio: {engagement_display}")
+
+    # Desglose detallado por plataforma
+    st.markdown("### 📱 Desglose Detallado por Plataforma")
+    
+    for _, row in platform_summary.iterrows():
+        platform_name = row['plataforma']
+        platform_followers = row['seguidores']
+        platform_interactions = row['interacciones']
+        platform_engagement = row['engagement_promedio']
+        
+        with st.expander(f"📱 {platform_name}", expanded=False):
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                st.metric("Seguidores Totales", f"{platform_followers:,.0f}")
+            
+            with col2:
+                status = get_engagement_status(platform_interactions, platform_followers)
+                if status:
+                    st.metric("Engagement Promedio", "Datos insuficientes")
+                    st.caption(f"💡 {status}")
+                else:
+                    health_status, emoji = _get_engagement_health(platform_name, platform_engagement)
+                    st.metric("Engagement Promedio", f"{platform_engagement:.2f}%", delta=f"{emoji} {health_status}")
+            
+            with col3:
+                st.metric("Interacciones Totales", f"{platform_interactions:,.0f}")
+
     # Métricas de cobertura usando la tabla de cuentas
     st.markdown("### 📊 Cobertura de Plataformas")
     total_schools = len(COLEGIOS_MARISTAS)
-    schools_with_data = df_m_month["entidad"].nunique() if not df_m_month.empty else 0
+    schools_with_data = df_unique["entidad"].nunique() if not df_unique.empty else 0
     coverage_percentage = (schools_with_data / total_schools * 100) if total_schools > 0 else 0
 
     # Cobertura por plataforma
@@ -407,24 +572,27 @@ def render(df=None):
     col_cov1, col_cov2, col_cov3, col_cov4 = st.columns(4)
     with col_cov1:
         st.metric(
-            label="Instituciones con Datos",
+            label=f"Instituciones con Datos {get_traffic_light_indicator('coverage', coverage_percentage)}",
             value=f"{schools_with_data}/{total_schools}",
             delta=f"{coverage_percentage:.1f}%"
         )
     with col_cov2:
+        fb_cov = platform_coverage.get('Facebook', 0)
         st.metric(
-            label="Facebook",
-            value=f"{platform_coverage.get('Facebook', 0):.1f}%"
+            label=f"Facebook {get_traffic_light_indicator('coverage', fb_cov)}",
+            value=f"{fb_cov:.1f}%"
         )
     with col_cov3:
+        ig_cov = platform_coverage.get('Instagram', 0)
         st.metric(
-            label="Instagram",
-            value=f"{platform_coverage.get('Instagram', 0):.1f}%"
+            label=f"Instagram {get_traffic_light_indicator('coverage', ig_cov)}",
+            value=f"{ig_cov:.1f}%"
         )
     with col_cov4:
+        tt_cov = platform_coverage.get('TikTok', 0)
         st.metric(
-            label="TikTok",
-            value=f"{platform_coverage.get('TikTok', 0):.1f}%"
+            label=f"TikTok {get_traffic_light_indicator('coverage', tt_cov)}",
+            value=f"{tt_cov:.1f}%"
         )
 
     # Alertas suaves basadas en análisis de crecimiento
@@ -494,7 +662,7 @@ def render(df=None):
         show_chart_skeleton(height=400)
 
     # Calcular datos para el gráfico de barras
-    platform_data = df_m_month.groupby("plataforma")["seguidores"].sum().reset_index()
+    platform_data = df_unique.groupby("plataforma")["seguidores"].sum().reset_index()
     platform_data = platform_data.sort_values("seguidores", ascending=False)
 
     # Calcular porcentajes y tendencias vs mes anterior
@@ -512,7 +680,8 @@ def render(df=None):
             df_prev_month = df_full_temp[df_full_temp["fecha"].dt.strftime("%Y-%m") == mes_anterior].copy()  # type: ignore
         else:
             df_prev_month = pd.DataFrame()  # DataFrame vacío si fecha no es datetime
-        prev_platform_data = df_prev_month.groupby("plataforma")["seguidores"].sum().reset_index()
+        df_prev_month_unique = df_prev_month.drop_duplicates(subset=['entidad', 'plataforma'], keep='last')
+        prev_platform_data = df_prev_month_unique.groupby("plataforma")["seguidores"].sum().reset_index()
 
         # Merge calculado para asignar tendencia vectorizada
         platform_data = platform_data.merge(prev_platform_data, on="plataforma", how="left", suffixes=("", "_prev"))
@@ -572,7 +741,7 @@ def render(df=None):
     with tab_evo:
         # Área: evolución de seguidores por plataforma (usar df_full para mostrar tendencia completa)
         df_evo = (
-            df_full.groupby(["fecha", "plataforma"])["seguidores"].sum().reset_index()
+            df_full.groupby(["fecha", "plataforma"])["seguidores"].max().reset_index()
         )
         
         # Skeleton loader para evolución de seguidores
@@ -599,7 +768,7 @@ def render(df=None):
         try:
             if "seguidores_ma3" in df_full.columns:
                 df_trend = (
-                    df_full.groupby(["fecha", "plataforma"])["seguidores_ma3"].sum().reset_index()
+                    df_full.groupby(["fecha", "plataforma"])["seguidores_ma3"].max().reset_index()
                 )
                 import plotly.graph_objects as go
 
@@ -691,7 +860,7 @@ def render(df=None):
         
         # Barras: ranking por institución para el mes seleccionado
         resumen = (
-            df_m_month.groupby(["entidad", "plataforma"])["seguidores"].sum().reset_index()
+            df_unique.groupby(["entidad", "plataforma"])["seguidores"].sum().reset_index()
         )
         # Ordenar para mostrar mejores arriba
         resumen = resumen.sort_values("seguidores", ascending=False)
@@ -777,4 +946,19 @@ def render(df=None):
             st.write(f"**IDs solo en Cuentas:** {info['solo_cuentas']}")
             if info['ejemplos_huerfanos']:
                 st.write(f"**Ejemplos de IDs huérfanos en Métricas:** {info['ejemplos_huerfanos']}")
+
+    # Detectar duplicados para transparencia al final del dashboard
+    duplicados = df_m_month[df_m_month.duplicated(subset=['entidad', 'plataforma'], keep=False)]
+
+    if not duplicados.empty:
+        num_dupes = duplicados['entidad'].nunique()
+        st.warning(
+            f"⚠️ **Atención:** Se detectaron registros duplicados para {num_dupes} cuentas en este periodo.\n"
+            "El Dashboard está usando automáticamente el dato más reciente para evitar sumas incorrectas."
+        )
+        with st.expander("Ver cuentas duplicadas (Causa de discrepancia con Excel)"):
+            st.dataframe(
+                duplicados.sort_values(['entidad', 'plataforma', 'fecha'])
+                [['fecha', 'entidad', 'plataforma', 'seguidores']]
+            )
 

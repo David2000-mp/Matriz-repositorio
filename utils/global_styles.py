@@ -51,6 +51,30 @@ def get_global_institutional_css() -> str:
        Diseño: Profesional Corporativo Marista
        Versión: 2.0 - Institucional Claro
        ============================================ */
+
+    /* === TOASTS - FORZAR TEXTO BLANCO EN NOTIFICACIONES === */
+    .stToast, .stToast * {{
+        color: #fff !important;
+        background: #222 !important;
+        border-radius: 10px !important;
+        font-weight: 500 !important;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.7) !important;
+    }}
+    .stToast svg[title="Close"] path {{
+        fill: #fff !important;
+    }}
+    .stToast [data-testid="stToastDynamicIcon"] {{
+        color: #fff !important;
+    }}
+    .stToast [data-testid="stMarkdownContainer"] p,
+    .stToast [data-testid="stMarkdownContainer"] span {{
+        color: #fff !important;
+    }}
+    .stToast [data-testid="stMetricDelta"],
+    .stToast .st-emotion-cache-1bwm5qy,
+    .stToast .st-emotion-cache-zcfef7 {{
+        color: #fff !important;
+    }}
     
     /* === RESET Y BASE === */
     
@@ -883,6 +907,16 @@ def get_global_institutional_css() -> str:
     span.st-emotion-cache-leahp2 span {{
         color: {TEXT_PRIMARY} !important;
         visibility: visible !important;
+    }}
+    
+    /* Ocultar texto literal de iconos en expanders (como "keyboard_arrow_right") */
+    summary [data-testid="stIconMaterial"] {{
+        font-size: 0 !important;
+        text-indent: -9999px !important;
+        overflow: hidden !important;
+        display: inline-block !important;
+        width: 24px !important;
+        height: 24px !important;
     }}
     
     .streamlit-expanderContent {{

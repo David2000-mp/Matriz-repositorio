@@ -17,12 +17,18 @@ REGLA CRÍTICA: Las importaciones de data_loader y data_saver
 están AL FINAL del archivo para evitar bloqueos.
 """
 
+
 import streamlit as st
 import pandas as pd
 import gspread
 from google.oauth2.service_account import Credentials
 from typing import Dict, Tuple
 from utils import catalog as catalog
+from utils.logger import get_logger
+from utils.data_loader import DATA_DIR
+
+# Logger global para pruebas y producción
+logger = get_logger(__name__)
 
 # ============================================================================
 # 1. CATÁLOGO MAESTRO - Blindado, nunca se borra

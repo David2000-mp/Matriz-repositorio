@@ -10,6 +10,7 @@ from gspread.exceptions import APIError, SpreadsheetNotFound
 from google.oauth2.service_account import Credentials
 import os
 import json
+import pandas as pd
 from typing import Optional, Dict, Any
 from dotenv import load_dotenv
 from utils.logger import get_logger
@@ -263,3 +264,202 @@ def get_sheets_connection() -> Optional[gspread.Spreadsheet]:
     Establece conexión con Google Sheets.
     """
     return conectar_sheets()
+
+
+def cargar_respuestas_forms() -> pd.DataFrame:
+    """
+    Carga y sanitiza datos de la hoja 'Respuestas de formulario 3' en Google Sheets.
+    
+    Returns:
+        pd.DataFrame: DataFrame con datos limpios y validados
+    """
+    try:
+        ss = get_sheets_connection()
+        if not ss:
+            logger.error("No se pudo conectar a Google Sheets")
+            return pd.DataFrame()
+        
+        # Acceder a la hoja 'Respuestas de formulario 3'
+        ws = ss.worksheet("Respuestas de formulario 3")
+        records = ws.get_all_records()
+        
+        if not records:
+            logger.info("La hoja 'Respuestas de formulario 3' está vacía")
+            return pd.DataFrame()
+        
+        df = pd.DataFrame(records)
+        
+        # Ignorar columna 'Marca temporal' si existe (primera columna A1)
+        df = df.drop(columns=['Marca temporal'], errors='ignore')
+        
+        # 1. Limpiar espacios externos
+        df.columns = df.columns.str.strip()
+        # 2. Reemplazar múltiples espacios internos por uno solo (Regex)
+        df.columns = df.columns.str.replace(r'\s+', ' ', regex=True)
+        
+        # Renombrar columnas para consistencia con la app
+        rename_dict = {
+            "Fecha del Reporte": "fecha",
+            "Institución Marista": "entidad",
+            "Plataforma Social": "plataforma",
+            "Usuario o URL de la red": "usuario_red",
+            "Seguidores Totales: Validación: Es un número > Mayor que 0": "seguidores",
+            "Engagement Rate (%): Validación: Es un número > Entre 0 y 100": "engagement_rate",
+            "Alcance Total": "alcance",
+            "Interacciones Totales": "interacciones",
+            "Comentarios Contextuales": "comentarios"
+        }
+        # Solo renombrar 'Fecha del Reporte' si 'fecha' no existe
+        if 'fecha' not in df.columns and 'Fecha del Reporte' in df.columns:
+            rename_dict["Fecha del Reporte"] = "fecha"
+        
+        df.rename(columns=rename_dict, inplace=True)
+        
+        # VALIDACIÓN FINAL: Verificar columna crítica 'fecha'
+        if 'fecha' not in df.columns:
+            # Intento de rescate: buscar si existe la columna original limpia
+            if 'Fecha del Reporte' in df.columns:
+                df['fecha'] = pd.to_datetime(df['Fecha del Reporte'], errors='coerce')
+            else:
+                st.error(f"Error crítico: No se encuentra la columna 'fecha'. Columnas disponibles: {list(df.columns)}")
+                return pd.DataFrame()  # Retorno vacío seguro
+        
+        # Sanitización y validación
+        
+        # Sanitización y validación
+        
+        # Sanitización y validación
+        df = df.fillna('')  # Llenar vacíos con string vacío
+        
+        # CONVERSIÓN OBLIGATORIA DE FECHAS
+        if 'fecha' in df.columns:
+            # Método ultra-seguro: procesar cada fecha individualmente
+            def convert_date_safe(date_str):
+                if pd.isna(date_str) or date_str == '' or date_str is None:
+                    return pd.NaT
+
+                # Convertir a string y limpiar
+                date_str = str(date_str).strip()
+
+                # Intentar formatos comunes
+                formats_to_try = [
+                    '%d/%m/%Y',  # 30/01/2026
+                    '%d/%m/%y',  # 30/01/26
+                    '%Y-%m-%d',  # 2026-01-30
+                    '%Y/%m/%d',  # 2026/01/30
+                    '%m/%d/%Y',  # 01/30/2026
+                ]
+
+                for fmt in formats_to_try:
+                    try:
+                        return pd.to_datetime(date_str, format=fmt)
+                    except (ValueError, TypeError):
+                        continue
+
+                # Último intento sin formato específico
+                try:
+                    return pd.to_datetime(date_str, errors='coerce')
+                except Exception:
+                    return pd.NaT
+
+            # Aplicar conversión segura
+            df['fecha'] = df['fecha'].apply(convert_date_safe)
+
+            # Verificar si tenemos al menos algunas fechas válidas
+            valid_dates = df['fecha'].notna().sum()
+            logger.warning(f"Fechas válidas encontradas: {valid_dates} de {len(df)}. Continuando procesamiento...")
+
+            # TEMPORAL: No retornar vacío por fechas inválidas
+            # if valid_dates == 0:
+            #     logger.error("No se pudo convertir ninguna fecha. Verificar formato de datos.")
+            #     return pd.DataFrame()  # Retornar vacío si no hay fechas válidas
+        
+        # Convertir columnas numéricas de forma robusta
+        cols_numericas = ['seguidores', 'alcance', 'interacciones']
+        for col in cols_numericas:
+            if col in df.columns:
+                # CORRECCIÓN CRÍTICA: Remover comas como separadores de miles
+                df[col] = pd.to_numeric(df[col].astype(str).str.replace(',', '', regex=False), errors='coerce').fillna(0)
+        
+        # Engagement rate especial (tiene %)
+        if 'engagement_rate' in df.columns:
+            df['engagement_rate'] = pd.to_numeric(df['engagement_rate'].astype(str).str.rstrip('%').str.replace(',', '.', regex=False), errors='coerce').fillna(0)
+        
+        # CORRECCIÓN DE ENGAGEMENT RATE: Calcular valores realistas
+        if 'engagement_rate' in df.columns and 'seguidores' in df.columns and 'interacciones' in df.columns:
+            logger.info("Corrigiendo valores de engagement rate irrealistas...")
+
+            # Función para determinar si un engagement rate es realista
+            def is_realistic_engagement(eng_rate):
+                return 0 <= eng_rate <= 100  # Máximo 100% engagement
+
+            # Identificar registros con engagement irrealista
+            unrealistic_mask = ~df['engagement_rate'].apply(is_realistic_engagement)
+
+            if unrealistic_mask.any():
+                logger.warning(f"Encontrados {unrealistic_mask.sum()} registros con engagement irrealista. Recalculando...")
+
+                # Calcular engagement real: (interacciones / seguidores) * 100
+                df.loc[unrealistic_mask, 'engagement_rate'] = (
+                    df.loc[unrealistic_mask, 'interacciones'] /
+                    df.loc[unrealistic_mask, 'seguidores'] * 100
+                ).round(2)
+
+                logger.info("Engagement rates corregidos exitosamente")
+        
+        # Validaciones específicas después de conversión
+        if 'seguidores' in df.columns:
+            invalid_seguidores = df['seguidores'] <= 0
+            if invalid_seguidores.any():
+                df.loc[invalid_seguidores, 'error_validacion'] = 'Seguidores Totales debe ser > 0'
+        
+        if 'engagement_rate' in df.columns:
+            # Validación más segura para engagement rate
+            invalid_engagement = (df['engagement_rate'] < 0) | (df['engagement_rate'] > 100)
+            # Asegurarse de que no haya NaN causando problemas
+            invalid_engagement = invalid_engagement.fillna(False)
+            if invalid_engagement.any():
+                df.loc[invalid_engagement, 'error_validacion'] = 'Engagement Rate debe estar entre 0 y 100'
+        
+        # Agregar columna de error general si no existe
+        if 'error_validacion' not in df.columns:
+            df['error_validacion'] = ''
+        
+        return df
+    
+    except Exception as e:
+        logger.error(f"Error cargando respuestas de forms: {e}")
+        return pd.DataFrame()
+
+
+# Función de testing (comentada para uso en desarrollo)
+# def test_data_integrity():
+#     print("=== TEST DE INTEGRIDAD DE DATOS ===")
+#     df = cargar_respuestas_forms()
+#     
+#     # Check conexión
+#     if df.empty:
+#         print("❌ Conexión fallida o hoja vacía")
+#         return
+#     print("✅ Conexión exitosa")
+#     
+#     # Check columnas
+#     expected_cols = ["marca_temporal", "fecha_reporte", "entidad", "plataforma", "usuario_red", "seguidores", "engagement_rate", "alcance", "interacciones", "comentarios"]
+#     missing_cols = [col for col in expected_cols if col not in df.columns]
+#     if missing_cols:
+#         print(f"❌ Columnas faltantes: {missing_cols}")
+#     else:
+#         print("✅ Todas las columnas esperadas existen")
+#     
+#     # Check nulos en campos críticos
+#     critical_cols = ["entidad", "fecha_reporte"]
+#     for col in critical_cols:
+#         nulls = df[col].isnull().sum()
+#         if nulls > 0:
+#             print(f"⚠️ {nulls} valores nulos en {col}")
+#         else:
+#             print(f"✅ No hay nulos en {col}")
+#     
+#     # Primeras 5 filas
+#     print("\n=== PRIMERAS 5 FILAS ===")
+#     print(df.head().to_string())

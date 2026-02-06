@@ -134,7 +134,10 @@ class DataProvider:
                 'solo_cuentas': len(ids_cuentas - ids_metricas),
                 'ejemplos_huerfanos': list(ids_metricas - ids_cuentas)[:3] if len(ids_metricas - ids_cuentas) > 0 else []
             }
-            
+
+            # --- LIMPIEZA: Eliminar registros de métricas que no tienen cuenta vinculada ---
+            metricas = metricas[metricas["id_cuenta"].isin(cuentas["id_cuenta"])]
+
             # Fusión: métricas es la tabla principal (hechos)
             df_merged = pd.merge(metricas, cuentas, on="id_cuenta", how="left")
             
@@ -164,6 +167,8 @@ class DataProvider:
             numeric_columns = ['seguidores', 'alcance', 'interacciones', 'likes_promedio', 'engagement_rate']
             for col in numeric_columns:
                 if col in df_merged.columns:
+                    # Convertir strings con coma decimal (formato europeo) a punto decimal
+                    df_merged[col] = df_merged[col].astype(str).str.replace(',', '.', regex=False)
                     df_merged[col] = pd.to_numeric(df_merged[col], errors='coerce').fillna(0)
 
             # Consolidar: mantener solo el último registro por cuenta y mes para evitar duplicados

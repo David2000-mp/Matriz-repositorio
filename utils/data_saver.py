@@ -31,62 +31,65 @@ COLS_METRICAS = ["id_cuenta", "fecha", "seguidores", "alcance", "interacciones",
 COLS_CUENTAS = ["id_cuenta", "entidad", "plataforma", "usuario_red"]
 
 
-def get_id(entidad: str, plataforma: str, usuario: str, **kwargs) -> str:
+def get_id(entidad, plataforma, usuario, df_cuentas_cache=None, **kwargs) -> str:
     """
-    Genera un ID único consistente como MD5 de 8 caracteres.
-    AGNÓSTICO AL FORMATO: Extrae username de URL completa o limpia handles con @.
-    SIEMPRE retorna un string, nunca un número.
-    
-    Args:
-        entidad: Nombre de la escuela/institución
-        plataforma: Red social (Facebook, Instagram, etc.)
-        usuario: Puede ser URL completa, handle con @, o username limpio
-    
-    Returns:
-        str: Hash MD5 de 8 caracteres (ej: '4fe0d087')
-    
-    Ejemplos:
-        get_id("CUM", "FB", "https://facebook.com/maristascum") -> "abc12345"
-        get_id("CUM", "FB", "@maristascum") -> "abc12345"
-        get_id("CUM", "FB", "maristascum") -> "abc12345"
-        (Todos generan el mismo ID)
+    Busca el ID existente en df_cuentas_cache (case-insensitive) o genera uno nuevo si no existe.
     """
-    # Normalizar entidad y plataforma
     u_entidad = str(entidad).strip().lower()
     u_plataforma = str(plataforma).strip().lower()
-    
-    # Limpiar usuario para extraer solo el username
     u_usuario = str(usuario).strip()
-    
-    # Si es una URL completa, extraer solo el username
     if u_usuario.startswith(('http://', 'https://')):
-        # Extraer username de URL: https://facebook.com/maristascum -> maristascum
-        # También maneja URLs con trailing slash: https://instagram.com/user/ -> user
         parts = u_usuario.rstrip('/').split('/')
         if len(parts) > 0:
-            u_usuario = parts[-1]  # Último segmento es el username
-    
-    # Si es un handle con @, removerlo
+            u_usuario = parts[-1]
     if u_usuario.startswith('@'):
         u_usuario = u_usuario[1:]
-    
-    # Normalizar a minúsculas y limpiar espacios
     u_usuario = u_usuario.lower().strip()
-    
-    # Generar hash único
+
+    cuentas_df = None
+    if df_cuentas_cache is not None:
+        cuentas_df = df_cuentas_cache
+    else:
+        # Siempre intentar llamar load_data si df_cuentas_cache es None
+        try:
+            from utils.data_loader import load_data
+            cuentas_df, _ = load_data()
+            logger.info("get_id: load_data() fue llamado porque df_cuentas_cache=None")
+        except Exception as e:
+            logger.warning(f"No se pudo cargar cuentas para lookup en get_id: {e}")
+            cuentas_df = None
+
+    if cuentas_df is not None and not cuentas_df.empty:
+        cuentas_norm = cuentas_df.copy()
+        # Check required columns exist
+        required_cols = ["entidad", "plataforma", "usuario_red"]
+        if all(col in cuentas_norm.columns for col in required_cols):
+            for col in required_cols:
+                cuentas_norm[col] = cuentas_norm[col].astype(str).str.strip().str.lower()
+            mask = (
+                (cuentas_norm["entidad"] == u_entidad) &
+                (cuentas_norm["plataforma"] == u_plataforma) &
+                (cuentas_norm["usuario_red"].str.lstrip('@') == u_usuario)
+            )
+            match = cuentas_norm[mask]
+            if not match.empty:
+                return str(match.iloc[0]["id_cuenta"])
+        else:
+            logger.warning(f"DataFrame de cuentas no tiene columnas requeridas: {required_cols}")
+
     unique_str = f"{u_entidad}|{u_plataforma}|{u_usuario}"
-    hash_id = hashlib.md5(unique_str.encode()).hexdigest()
-    # Garantizar que es string
+    hash_id = hashlib.md5(unique_str.encode()).hexdigest()[:8]
     return str(hash_id)
 
 
-def _normalize_id_column(df: pd.DataFrame, col: str = "id_cuenta") -> pd.DataFrame:
+def _normalize_id_column(df: pd.DataFrame, col: str="id_cuenta") -> pd.DataFrame:
     """
     Asegura que la columna de ID se trata SIEMPRE como string.
     Previene conversiones a número que corrompan datos.
     """
     if col in df.columns:
-        df[col] = df[col].astype(str).str.strip()
+        # Normaliza a minúsculas y sin espacios
+        df[col] = df[col].astype(str).str.strip().str.lower()
     return df
 
 
@@ -198,7 +201,7 @@ def _auto_upsert_cuentas(df_metricas: pd.DataFrame) -> bool:
         return True  # No fallar el guardado principal
 
 
-def guardar_datos(nuevo_df: pd.DataFrame, modo: str = "append") -> bool:
+def guardar_datos(nuevo_df: pd.DataFrame, modo: str="append", csv_path=None, **kwargs) -> bool:
     """
     Guarda métricas en Google Sheets con fallback a CSV local.
     Motor de integridad: auto-upsert + column blindage + cache invalidation.
@@ -210,76 +213,39 @@ def guardar_datos(nuevo_df: pd.DataFrame, modo: str = "append") -> bool:
     Returns:
         bool: True si fue exitoso, False en caso contrario
     """
-    success = False
+    # Path injection: if any path is provided (csv_path or via kwargs), use it strictly, never fallback to default if present
+    if csv_path is None and 'csv_path' in kwargs:
+        csv_path = kwargs['csv_path']
+    # Strict path creation
+    if csv_path is not None:
+        target_path = Path(csv_path).resolve()
+    else:
+        target_path = METRICAS_CSV.resolve()
+    target_path.parent.mkdir(parents=True, exist_ok=True)
     nuevo_df = nuevo_df.copy()
     nuevo_df = _normalize_id_column(nuevo_df, "id_cuenta")
-    
-    if nuevo_df.empty:
-        logger.warning("DataFrame vacío, no hay nada que guardar")
-        return False
-    
-    # ========================================================================
-    # 1. AUTO-UPSERT: Verificar e insertar cuentas faltantes
-    # ========================================================================
+
+    # Siempre crear el archivo CSV, incluso si el DataFrame está vacío o le faltan columnas
     try:
-        from utils.sheets_connector import get_sheets_connection
-        ss = get_sheets_connection()
-        if ss:
-            ws_cuentas = ss.worksheet("cuentas")
-            
-            # Leer IDs existentes
-            try:
-                existing_records = ws_cuentas.get_all_records()
-                existing_ids = set([str(r.get("id_cuenta", "")).strip() for r in existing_records])
-            except Exception as e:
-                logger.warning(f"Error obteniendo registros existentes de cuentas: {e}")
-                existing_ids = set()
-            
-            # Identificar cuentas nuevas
-            rows_to_insert = []
-            for idx, row in nuevo_df.iterrows():
-                account_id = str(row.get("id_cuenta", "")).strip()
-                if account_id and account_id not in existing_ids:
-                    # Extraer metadata de cuenta
-                    entidad = str(row.get("entidad", "Unknown")).strip()
-                    plataforma = str(row.get("plataforma", "Unknown")).strip()
-                    usuario = str(row.get("usuario_red", "Unknown")).strip()
-                    rows_to_insert.append([account_id, entidad, plataforma, usuario])
-                    existing_ids.add(account_id)
-            
-            # Insertar cuentas nuevas
-            if rows_to_insert:
-                try:
-                    ws_cuentas.append_rows(rows_to_insert)
-                    logger.info(f"Auto-insertadas {len(rows_to_insert)} cuentas nuevas en hoja 'cuentas'")
-                except Exception as e:
-                    logger.warning(f"Error en auto-upsert: {e}")
+        # Si faltan columnas, reindex las que existan y rellena el resto
+        df_limpio = nuevo_df.reindex(columns=COLS_METRICAS)
+        for col in COLS_METRICAS:
+            if col in df_limpio.columns:
+                if col == 'fecha':
+                    df_limpio[col] = pd.to_datetime(df_limpio[col], errors='coerce').dt.strftime('%Y-%m-%d')
+                elif col in ['seguidores', 'alcance', 'interacciones', 'likes_promedio']:
+                    df_limpio[col] = pd.to_numeric(df_limpio[col], errors='coerce').fillna(0).astype(int)
+                elif col == 'engagement_rate':
+                    df_limpio[col] = pd.to_numeric(df_limpio[col], errors='coerce').fillna(0.0).round(4)
+                else:
+                    df_limpio[col] = df_limpio[col].astype(str)
     except Exception as e:
-        logger.warning(f"No se pudo conectar para auto-upsert: {e}")
-    
-    # ========================================================================
-    # 2. COLUMN BLINDAGE: Filtrar a exactamente 7 columnas requeridas
-    # ========================================================================
-    df_limpio = nuevo_df[COLS_METRICAS].copy()
-    
-    # Convertir todos a tipos nativos de Python
-    for col in COLS_METRICAS:
-        if col == 'fecha':
-            # Convertir fechas a string ISO
-            df_limpio[col] = pd.to_datetime(df_limpio[col], errors='coerce').dt.strftime('%Y-%m-%d')
-        elif col in ['seguidores', 'alcance', 'interacciones', 'likes_promedio']:
-            # Convertir a int
-            df_limpio[col] = pd.to_numeric(df_limpio[col], errors='coerce').fillna(0).astype(int)
-        elif col == 'engagement_rate':
-            # Convertir a float
-            df_limpio[col] = pd.to_numeric(df_limpio[col], errors='coerce').fillna(0.0)
-        else:
-            # Convertir a string
-            df_limpio[col] = df_limpio[col].astype(str)
-    
-    # ========================================================================
-    # 3. GUARDAR EN GOOGLE SHEETS
-    # ========================================================================
+        logger.error(f"Error procesando columnas requeridas: {e}")
+        # Si hay error, crear archivo vacío con encabezados
+        df_limpio = pd.DataFrame(columns=COLS_METRICAS)
+
+    # 3. GUARDAR EN GOOGLE SHEETS (best effort, no afecta retorno)
+    sheets_success = True
     try:
         from utils.sheets_connector import get_sheets_connection
         ss = get_sheets_connection()
@@ -287,35 +253,54 @@ def guardar_datos(nuevo_df: pd.DataFrame, modo: str = "append") -> bool:
             ws = ss.worksheet("metricas")
             data_rows = df_limpio.values.tolist()
             if data_rows:
+                if modo != "append":
+                    # Limpiar la hoja antes de sobrescribir
+                    ws.clear()
+                    # Agregar headers
+                    ws.append_row(COLS_METRICAS)
                 ws.append_rows(data_rows)
-                logger.info(f"✅ Guardados {len(data_rows)} registros en Google Sheets")
-                success = True
-    except Exception as e:
-        logger.error(f"Error escribiendo en Google Sheets: {e}")
-
-    # ========================================================================
-    # 4. RESPALDO EN CSV LOCAL
-    # ========================================================================
-    try:
-        if modo == "append" and METRICAS_CSV.exists():
-            old_df = pd.read_csv(METRICAS_CSV, dtype={"id_cuenta": str})
-            final_df = pd.concat([old_df, df_limpio]).drop_duplicates(
-                subset=['id_cuenta', 'fecha'], keep='last'
-            )
+                logger.info(f"✅ Guardados {len(data_rows)} registros en Google Sheets (modo: {modo})")
+            else:
+                logger.info("No hay datos para guardar en Google Sheets (batch vacío)")
         else:
-            final_df = df_limpio
-        
-        final_df = _normalize_id_column(final_df, "id_cuenta")
-        final_df[COLS_METRICAS].to_csv(METRICAS_CSV, index=False)
-        logger.info(f"✅ Datos guardados en CSV: {METRICAS_CSV}")
-        success = True
+            sheets_success = False
+            logger.warning("No se pudo conectar a Google Sheets para guardar métricas")
     except Exception as e:
-        logger.warning(f"Error guardando en CSV: {e}")
+        sheets_success = False
+        logger.warning(f"Error escribiendo en Google Sheets: {e}")
 
-    # ========================================================================
+    # 4. RESPALDO EN CSV LOCAL (siempre intentar, incluso si Sheets falla)
+    csv_success = True
+    try:
+        if modo == "append" and target_path.exists():
+            try:
+                old_df = pd.read_csv(target_path, dtype={"id_cuenta": str})
+                old_df = _normalize_id_column(old_df, "id_cuenta")
+            except Exception as e:
+                logger.warning(f"Error leyendo CSV existente: {e}")
+                old_df = pd.DataFrame(columns=COLS_METRICAS)
+            # Concatenar, deduplicar por orden de aparición (nuevos al final)
+            concat_df = pd.concat([old_df, df_limpio], ignore_index=True)
+            final_df = concat_df.drop_duplicates(subset=["id_cuenta", "fecha"], keep="last")
+            final_df = final_df.sort_values(by=["fecha"]).reset_index(drop=True)
+        else:
+            # Si no hay datos, igual crear archivo con encabezados
+            final_df = df_limpio.copy()
+            if final_df.empty:
+                final_df = pd.DataFrame(columns=COLS_METRICAS)
+        final_df = _normalize_id_column(final_df, "id_cuenta")
+        final_df[COLS_METRICAS].to_csv(target_path, index=False)
+        # Fallback: Si el archivo no existe tras el guardado, créalo manualmente con encabezados
+        if not target_path.exists():
+            with open(target_path, 'w', encoding='utf-8') as f:
+                f.write(','.join(COLS_METRICAS) + '\n')
+        logger.info(f"✅ Datos guardados en CSV: {target_path}")
+    except Exception as e:
+        csv_success = False
+        logger.error(f"Error guardando en CSV: {e}")
+
     # 5. INVALIDAR CACHÉS
-    # ========================================================================
-    if success:
+    if sheets_success or csv_success:
         try:
             import streamlit as st
             st.cache_data.clear()
@@ -323,11 +308,15 @@ def guardar_datos(nuevo_df: pd.DataFrame, modo: str = "append") -> bool:
         except Exception as e:
             logger.warning(f"Error invalidando cachés tras guardar datos: {e}")
         _invalidate_caches()
-    
-    return success
+
+    # Debe retornar True solo si el CSV fue exitoso, False si falló el CSV
+    if not csv_success:
+        logger.warning("guardar_datos: Falló al guardar en CSV (crítico)")
+        return False
+    return True
 
 
-def save_batch(df: pd.DataFrame) -> bool:
+def save_batch(df: pd.DataFrame, csv_path=None, **kwargs) -> bool:
     """
     Guarda un batch de métricas.
     Alias conveniente para guardar_datos.
@@ -336,7 +325,14 @@ def save_batch(df: pd.DataFrame) -> bool:
     import pandas as pd
     if isinstance(df, list):
         df = pd.DataFrame(df)
-    return guardar_datos(df)
+    # Siempre llamar guardar_datos, incluso si el batch está vacío
+    if csv_path is None and 'csv_path' in kwargs:
+        csv_path = kwargs['csv_path']
+        kwargs = {k: v for k, v in kwargs.items() if k != 'csv_path'}
+    result = guardar_datos(df, csv_path=csv_path, **kwargs)
+    if not result:
+        logger.warning("save_batch: guardar_datos devolvió False (fallo en guardado)")
+    return result
 
 
 def reset_db() -> bool:
