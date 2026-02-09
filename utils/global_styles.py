@@ -92,6 +92,132 @@ def get_global_institutional_css() -> str:
         max-width: 95% !important;
     }}
     
+    /* === ANIMACIONES DE HOVER PARA CAJAS Y TARJETAS === */
+    
+    /* Animación para métricas KPI (st.metric) */
+    [data-testid="stMetric"],
+    [data-testid="metric-container"] {{
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        border-radius: 12px !important;
+        padding: 1.2rem !important;
+        background: {BG_WHITE} !important;
+        border: 1px solid {BORDER_LIGHT} !important;
+    }}
+    
+    [data-testid="stMetric"]:hover,
+    [data-testid="metric-container"]:hover {{
+        transform: translateY(-4px) scale(1.02) !important;
+        box-shadow: 0 8px 24px rgba(0, 54, 150, 0.12), 0 4px 8px rgba(0, 0, 0, 0.08) !important;
+        border-color: {PRIMARY_BLUE} !important;
+        background: linear-gradient(135deg, rgba(0, 54, 150, 0.02) 0%, {BG_WHITE} 100%) !important;
+    }}
+    
+    /* Animación para columnas que contienen métricas */
+    div[data-testid="column"] {{
+        transition: all 0.3s ease !important;
+    }}
+    
+    div[data-testid="column"]:hover [data-testid="stMetric"] {{
+        transform: translateY(-2px) !important;
+        box-shadow: 0 6px 16px rgba(0, 54, 150, 0.1) !important;
+    }}
+    
+    /* Animación para expanders (desgloses por plataforma) */
+    [data-testid="stExpander"] {{
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        border-radius: 8px !important;
+        overflow: hidden !important;
+    }}
+    
+    [data-testid="stExpander"]:hover {{
+        transform: translateX(4px) !important;
+        box-shadow: 0 4px 12px rgba(0, 54, 150, 0.08) !important;
+        background: rgba(0, 54, 150, 0.02) !important;
+    }}
+    
+    /* Animación para tarjetas de contenido (divs con borde) */
+    .stMarkdown > div[style*="padding"],
+    .stMarkdown > div[style*="border"] {{
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    }}
+    
+    .stMarkdown > div[style*="padding"]:hover,
+    .stMarkdown > div[style*="border"]:hover {{
+        transform: translateY(-2px) !important;
+        box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1) !important;
+    }}
+    
+    /* Animación para tablas */
+    table {{
+        transition: all 0.3s ease !important;
+    }}
+    
+    table:hover {{
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08) !important;
+    }}
+    
+    table tbody tr {{
+        transition: all 0.2s ease !important;
+    }}
+    
+    table tbody tr:hover {{
+        background-color: rgba(0, 54, 150, 0.04) !important;
+        transform: scale(1.01) !important;
+    }}
+    
+    /* Animación para gráficas de Plotly */
+    .js-plotly-plot {{
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    }}
+    
+    .js-plotly-plot:hover {{
+        transform: translateY(-4px) !important;
+        box-shadow: 0 8px 24px rgba(0, 54, 150, 0.12) !important;
+    }}
+    
+    /* Animación keyframes para efectos adicionales */
+    @keyframes shimmer {{
+        0% {{
+            background-position: -1000px 0;
+        }}
+        100% {{
+            background-position: 1000px 0;
+        }}
+    }}
+    
+    @keyframes float {{
+        0%, 100% {{
+            transform: translateY(0);
+        }}
+        50% {{
+            transform: translateY(-6px);
+        }}
+    }}
+    
+    /* Efecto de brillo sutil en hover para tarjetas importantes */
+    [data-testid="stMetric"]:hover::before {{
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(
+            90deg,
+            transparent,
+            rgba(255, 255, 255, 0.3),
+            transparent
+        );
+        animation: shimmer 1.5s infinite;
+        pointer-events: none;
+    }}
+    
+    /* Posición relativa para que el pseudo-elemento funcione */
+    [data-testid="stMetric"] {{
+        position: relative !important;
+        overflow: hidden !important;
+    }}
+    
     /* Tipografía base global con font smoothing ULTRA-REFORZADO */
     body,
     .stApp,

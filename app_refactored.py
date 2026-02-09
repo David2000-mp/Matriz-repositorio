@@ -64,7 +64,7 @@ def main():
         st.subheader("Navegación")
         
         # Navegación simplificada sin index calculado
-        menu_options = ["🏠 Inicio", "📊 Dashboard Global", "📈 Comparativas", "📝 Captura", "🔍 Auditoría de Respuestas", "⚙️ Configuración"]
+        menu_options = ["🏠 Inicio", "📊 Dashboard Global", "📈 Comparativas", "� Calc. Engagement", "�📝 Captura", "🔍 Auditoría de Respuestas", "⚙️ Configuración"]
         selected_display = st.radio(
             "Seleccionar página", 
             menu_options, 
@@ -77,7 +77,8 @@ def main():
             "🏠 Inicio": "Inicio",
             "📊 Dashboard Global": "Dashboard Global", 
             "📈 Comparativas": "Comparativas",
-            "📝 Captura": "Captura",
+            "� Calc. Engagement": "Calc. Engagement",
+            "�📝 Captura": "Captura",
             "🔍 Auditoría de Respuestas": "Auditoría de Respuestas",
             "⚙️ Configuración": "Configuración",
         }
@@ -221,6 +222,10 @@ def main():
         # Sprint 2 Week 3: Nueva vista de comparación lado a lado
         from views import comparison
         comparison.render_comparison_view()
+    elif selected == "Calc. Engagement":
+        # Calculadora de Engagement para Facebook y TikTok
+        from views import engagement_calculator_v2 as engagement_calculator
+        engagement_calculator.render()
     elif selected == "Captura":
         # Nueva implementación: Captura externa vía Google Forms
         st.header("📝 Captura de Datos Externa")

@@ -451,6 +451,41 @@ def render(df=None):
                         st.error(f"⚠️ Error al guardar el registro: {e}")
                         logging.error(f"Error al guardar registro: {e}", exc_info=True)
 
+        # ========================================================================
+        # HERRAMIENTA AUXILIAR: CALCULADORA DE ENGAGEMENT (dentro de Captura Manual)
+        # ========================================================================
+        st.divider()
+        with st.expander("🧮 Calculadora de Engagement - Herramienta Auxiliar", expanded=False):
+            st.markdown("""
+            Usa esta herramienta para calcular y analizar tu engagement en **Facebook** o **TikTok** 
+            antes de registrarlo en el sistema. Ingresa tus últimas 15 publicaciones/videos y obtén 
+            métricas detalladas con recomendaciones.
+            """)
+            
+            # Crear dos columnas para las opciones
+            calc_col1, calc_col2 = st.columns(2)
+            
+            with calc_col1:
+                if st.button("📘 Calculadora Facebook", key="calc_fb_btn", use_container_width=True):
+                    st.session_state["calc_active_tab"] = "facebook"
+                    st.rerun()
+            
+            with calc_col2:
+                if st.button("🎵 Calculadora TikTok", key="calc_tk_btn", use_container_width=True):
+                    st.session_state["calc_active_tab"] = "tiktok"
+                    st.rerun()
+            
+            # Mostrar calculadora seleccionada
+            if st.session_state.get("calc_active_tab") == "facebook":
+                st.markdown("---")
+                from views import engagement_calculator
+                engagement_calculator.render_facebook_tab()
+            
+            elif st.session_state.get("calc_active_tab") == "tiktok":
+                st.markdown("---")
+                from views import engagement_calculator
+                engagement_calculator.render_tiktok_tab()
+
     elif opcion == "Carga Masiva":
         st.subheader("Carga Masiva de Datos")
         st.info("🚧 Esta funcionalidad está en desarrollo.")

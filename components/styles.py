@@ -685,6 +685,164 @@ def inject_custom_css():
         </style>
     """, unsafe_allow_html=True)
 
+    # ========================================
+    # ESTILOS PARA CALCULADORA DE ENGAGEMENT
+    # ========================================
+    st.markdown("""
+        <style>
+        /* Tarjetas de publicación/video en la calculadora */
+        .engagement-post-card {
+            background: #F2F4F7;
+            border: 2px solid #DEE2E6;
+            border-radius: 10px;
+            padding: 16px;
+            transition: all 0.3s ease;
+            margin-bottom: 12px;
+        }
+
+        .engagement-post-card:hover {
+            border-color: #003696;
+            box-shadow: 0 4px 12px rgba(0, 54, 150, 0.15);
+        }
+
+        .engagement-post-number {
+            font-weight: bold;
+            color: #003696;
+            margin-bottom: 12px;
+            font-size: 14px;
+        }
+
+        /* Cajas de resultados con animación de entrada */
+        .engagement-result-container {
+            animation: slideInUp 0.4s ease;
+        }
+
+        @keyframes slideInUp {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Cajas de información (benchmark, recomendación) */
+        .engagement-info-box {
+            background: #F2F4F7;
+            padding: 20px;
+            border-radius: 10px;
+            border-left: 4px solid #003696;
+            margin-top: 10px;
+        }
+
+        .engagement-info-box.success {
+            border-left-color: #0A7D35;
+        }
+
+        .engagement-info-box.warning {
+            border-left-color: #CC7000;
+        }
+
+        .engagement-info-box.danger {
+            border-left-color: #B42318;
+        }
+
+        /* Valores de métricas grandes */
+        .engagement-metric-value {
+            font-size: 32px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        /* Labels de métricas */
+        .engagement-metric-label {
+            color: #495057;
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+
+        /* Descripción de métricas */
+        .engagement-metric-description {
+            color: #495057;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        /* Botones de calculadora */
+        .engagement-btn {
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: 600;
+            border: none;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .engagement-btn-primary {
+            background: linear-gradient(135deg, #003696 0%, #002566 100%);
+            color: white;
+        }
+
+        .engagement-btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(0, 54, 150, 0.3);
+        }
+
+        .engagement-btn-secondary {
+            background: #E8EEF5;
+            color: #003696;
+            border: 2px solid #003696;
+        }
+
+        .engagement-btn-secondary:hover {
+            background: #003696;
+            color: white;
+        }
+
+        /* Estados de colores para engagement */
+        .engagement-status-good {
+            color: #0A7D35;
+            font-weight: 600;
+        }
+
+        .engagement-status-warning {
+            color: #CC7000;
+            font-weight: 600;
+        }
+
+        .engagement-status-poor {
+            color: #B42318;
+            font-weight: 600;
+        }
+
+        /* Grid responsivo para publicaciones */
+        .engagement-posts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 12px;
+        }
+
+        @media (max-width: 768px) {
+            .engagement-posts-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .engagement-metric-value {
+                font-size: 24px;
+            }
+
+            .engagement-info-box {
+                font-size: 13px;
+            }
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
 
 def aplicar_estilo_personalizado():
     """

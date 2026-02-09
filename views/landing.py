@@ -108,6 +108,42 @@ def render(df=None):
     /* -------------------------------------------
        1. ESTILOS DE VIDEO Y CONTENIDO (50% IZQUIERDA)
        ------------------------------------------- */
+    
+    /* ANIMACIONES PERSONALIZADAS PARA GLASS-BOX */
+    @keyframes glassBoxEnter {
+        0% {
+            opacity: 0;
+            transform: translateY(40px);
+        }
+        100% {
+            opacity: 1;
+            transform: translateY(0px);
+        }
+    }
+    
+    @keyframes glassBoxFloat {
+        0%, 100% {
+            transform: translateY(0px);
+        }
+        50% {
+            transform: translateY(-15px);
+        }
+    }
+    
+    @keyframes glassBoxGlow {
+        0%, 100% {
+            box-shadow: 0 8px 32px 0 rgba(31,38,135,0.18),
+                        inset 0 0 20px rgba(255,184,28,0);
+            border-color: rgba(255,255,255,0.28);
+        }
+        50% {
+            box-shadow: 0 12px 42px 0 rgba(31,38,135,0.25),
+                        inset 0 0 30px rgba(255,184,28,0.08),
+                        0 0 30px rgba(255,184,28,0.2);
+            border-color: rgba(255,184,28,0.4);
+        }
+    }
+    
     .hero-bg-video {
         position: fixed;
         top: 0;
@@ -129,6 +165,7 @@ def render(df=None):
         justify-content: center;
         margin-left: 0;
         padding-left: 0;
+        perspective: 1200px;
     }
 
     .glass-box {
@@ -143,6 +180,38 @@ def render(df=None):
         display: flex;
         flex-direction: column;
         align-items: flex-start;
+        animation: glassBoxEnter 0.8s ease-out 0.3s both,
+                   glassBoxFloat 4s ease-in-out 1.1s infinite,
+                   glassBoxGlow 5s ease-in-out 1.1s infinite;
+        transition: transform 0.1s ease-out, box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        transform-style: preserve-3d;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .glass-box::before {
+        content: '';
+        position: absolute;
+        top: -50%;
+        left: -50%;
+        width: 200%;
+        height: 200%;
+        background: radial-gradient(circle, rgba(255,184,28,0.4) 0%, transparent 70%);
+        opacity: 0;
+        transition: opacity 0.3s ease-out;
+        pointer-events: none;
+        z-index: 1;
+    }
+    
+    .glass-box:hover {
+        background: rgba(255,255,255,0.25);
+        border-color: rgba(255,184,28,0.6);
+        box-shadow: 0 16px 48px 0 rgba(31,38,135,0.35),
+                    0 0 40px rgba(255,184,28,0.3);
+    }
+    
+    .glass-box:hover::before {
+        opacity: 1;
     }
 
     .hero-title {
@@ -241,6 +310,43 @@ def render(df=None):
         }
     }
     </style>
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const glassBox = document.querySelector('.glass-box');
+        const heroOverlay = document.querySelector('.hero-overlay');
+        
+        if (!glassBox || !heroOverlay) return;
+        
+        heroOverlay.addEventListener('mousemove', function(e) {
+            const rect = glassBox.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            // Calcular ángulo de inclinación (max 15° en cada dirección)
+            const centerX = rect.width / 2;
+            const centerY = rect.height / 2;
+            const rotateY = ((x - centerX) / centerX) * 15;
+            const rotateX = -((y - centerY) / centerY) * 15;
+            
+            // Aplicar rotación 3D
+            glassBox.style.transform = `rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
+            
+            // Mover el spotlight (pseudo-elemento ::before)
+            const spotX = (x / rect.width) * 100;
+            const spotY = (y / rect.height) * 100;
+            glassBox.style.setProperty('--spotX', spotX + '%');
+            glassBox.style.setProperty('--spotY', spotY + '%');
+            const beforeElement = glassBox.querySelector('::before');
+            if (beforeElement) {
+                beforeElement.style.backgroundPosition = spotX + '% ' + spotY + '%';
+            }
+        });
+        
+        heroOverlay.addEventListener('mouseleave', function() {
+            glassBox.style.transform = 'rotateX(0deg) rotateY(0deg)';
+        });
+    });
+    </script>
     """, unsafe_allow_html=True)
     if video_b64:
         html_code = f'''
