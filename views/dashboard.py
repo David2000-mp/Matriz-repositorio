@@ -517,12 +517,18 @@ def render(df=None):
     
     # df_unique ya definido arriba para consistencia
     
+    # Agrupar por plataforma y recalcular engagement_promedio correctamente
     platform_summary = df_unique.groupby('plataforma').agg({
         'seguidores': 'sum',
-        'interacciones': 'sum',
-        'engagement_rate': 'mean'
+        'interacciones': 'sum'
     }).reset_index()
-    platform_summary['engagement_promedio'] = platform_summary['engagement_rate']
+    
+    # FÓRMULA OFICIAL: Engagement Rate Promedio = (Total Interacciones / Total Seguidores) × 100
+    # Recalcula desde cero: suma todos los registros por plataforma y divide
+    platform_summary['engagement_promedio'] = (
+        (platform_summary['interacciones'] / platform_summary['seguidores'] * 100.0)
+        .where(platform_summary['seguidores'] > 0, 0.0)
+    )
     
     for _, row in platform_summary.iterrows():
         status = get_engagement_status(row['interacciones'], row['seguidores'])
