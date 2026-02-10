@@ -15,21 +15,53 @@ from utils.report_generator import generate_engagement_report_html
 # FUNCIONES AUXILIARES - VALIDACIÓN EN TIEMPO REAL
 # ============================================================================
 
-def calculate_expected_engagement(followers: int) -> dict:
+def get_engagement_thresholds(platform: str, metric_type: str = "comunidad") -> dict:
     """
-    Calcula engagement esperado por rango de seguidores.
-    Basado en benchmarks de industry para social media.
+    Retorna thresholds fijos de engagement según plataforma y tipo de métrica.
+    Reglas oficiales actualizadas - Thresholds fijos, no dinámicos.
+    
+    Args:
+        platform: 'facebook' o 'tiktok'
+        metric_type: 'comunidad' (engagement general/por post) o 'vistas' (solo TikTok)
     """
-    if followers < 1000:
-        return {"min": 5, "max": 15, "typical": 10, "label": "Cuenta nueva/pequeña"}
-    elif followers < 5000:
-        return {"min": 3, "max": 10, "typical": 6, "label": "Cuenta en crecimiento"}
-    elif followers < 10000:
-        return {"min": 2, "max": 8, "typical": 4, "label": "Cuenta establecida"}
-    elif followers < 50000:
-        return {"min": 1, "max": 5, "typical": 2.5, "label": "Marca mediana"}
-    else:
-        return {"min": 0.5, "max": 3, "typical": 1.5, "label": "Marca grande"}
+    if platform == "facebook":
+        return {
+            "bajo": 0.5,
+            "aceptable": 1.0,
+            "bueno": 2.0,
+            "labels": {
+                "bajo": "< 0.5% → Bajo",
+                "aceptable": "0.5% - 1% → Aceptable",
+                "bueno": "1% - 2% → Bueno",
+                "alto": "> 2% → Alto"
+            }
+        }
+    elif platform == "tiktok":
+        if metric_type == "vistas":
+            return {
+                "bajo": 1.0,
+                "aceptable": 3.0,
+                "bueno": 6.0,
+                "labels": {
+                    "bajo": "< 1% → Bajo",
+                    "aceptable": "1% - 3% → Aceptable",
+                    "bueno": "3% - 6% → Bueno",
+                    "alto": "> 6% → Alto"
+                }
+            }
+        else:  # comunidad
+            return {
+                "bajo": 3.0,
+                "promedio": 6.0,
+                "bueno": 10.0,
+                "labels": {
+                    "bajo": "< 3% → Bajo",
+                    "promedio": "3% - 6% → Promedio",
+                    "bueno": "6% - 10% → Bueno",
+                    "alto": "> 10% → Alto"
+                }
+            }
+    return {}
 
 
 def validate_post_engagement(reactions: int, comments: int, shares: int, followers: int) -> dict:
@@ -322,17 +354,8 @@ def render_step_2_posts():
                         label_visibility="collapsed"
                     )
                     
-                    st.markdown("**💾 Guardados**")
-                    st.caption("Guardados en favoritos o colecciones")
-                    saves = st.number_input(
-                        "Guardados",
-                        min_value=0,
-                        value=st.session_state.get(f"wizard_post_{post_num}_saves", 0),
-                        key=f"wizard_post_{post_num}_saves",
-                        label_visibility="collapsed"
-                    )
-                    
-                    total = int(likes) + int(comments) + int(shares) + int(saves)
+                    # Total: Solo likes + comentarios + compartidos (según reglas oficiales)
+                    total = int(likes) + int(comments) + int(shares)
                     
                     # Validación visual en tiempo real
                     validation = validate_post_engagement(int(likes), int(comments), int(shares), followers)
@@ -420,13 +443,12 @@ def calculate_and_render_results():
             likes = st.session_state.get(f"wizard_post_{i}_likes", 0)
             comments = st.session_state.get(f"wizard_post_{i}_comments", 0)
             shares = st.session_state.get(f"wizard_post_{i}_shares", 0)
-            saves = st.session_state.get(f"wizard_post_{i}_saves", 0)
             post["views"] = views
             post["likes"] = likes
             post["comments"] = comments
             post["shares"] = shares
-            post["saves"] = saves
-            post["total"] = likes + comments + shares + saves
+            # Total: Solo likes + comentarios + compartidos (no guardados ni vistas)
+            post["total"] = likes + comments + shares
             total_interactions += post["total"]
             total_views += views
         
@@ -444,8 +466,11 @@ def calculate_and_render_results():
     # ========================================================================
     
     num_posts = 15
+    # Engagement general de la cuenta
     engagement_pct = (total_interactions / followers) * 100
-    engagement_per_post = engagement_pct / num_posts
+    # Engagement por post (comunidad): (Promedio interacciones / Seguidores) * 100
+    avg_interactions = total_interactions / num_posts
+    engagement_per_post = (avg_interactions / followers) * 100
     posts_per_week = num_posts / (days / 7)
     
     # Para TikTok
@@ -465,25 +490,43 @@ def calculate_and_render_results():
         content_stats[ctype]["posts"] += 1
         content_stats[ctype]["engagement"] = (content_stats[ctype]["total_interactions"] / content_stats[ctype]["posts"] / followers) * 100
     
-    # Diagnóstico
-    expected = calculate_expected_engagement(followers)
+    # Diagnóstico basado en thresholds fijos por plataforma
+    thresholds = get_engagement_thresholds(platform, "comunidad")
     
-    if engagement_pct >= expected["max"]:
-        diagnosis = "🟢 EXCELENTE"
-        diagnosis_color = "#0A7D35"
-        diagnosis_level = "excellent"
-    elif engagement_pct >= expected["typical"]:
-        diagnosis = "🟡 BUENO"
-        diagnosis_color = "#003696"
-        diagnosis_level = "good"
-    elif engagement_pct >= expected["min"]:
-        diagnosis = "⚠️ MODERADO"
-        diagnosis_color = "#CC7000"
-        diagnosis_level = "moderate"
-    else:
-        diagnosis = "🔴 BAJO"
-        diagnosis_color = "#B42318"
-        diagnosis_level = "poor"
+    if platform == "facebook":
+        if engagement_pct >= thresholds["bueno"]:
+            diagnosis = "🟢 ALTO"
+            diagnosis_color = "#0A7D35"
+            diagnosis_level = "alto"
+        elif engagement_pct >= thresholds["aceptable"]:
+            diagnosis = "🟡 BUENO"
+            diagnosis_color = "#003696"
+            diagnosis_level = "bueno"
+        elif engagement_pct >= thresholds["bajo"]:
+            diagnosis = "⚠️ ACEPTABLE"
+            diagnosis_color = "#CC7000"
+            diagnosis_level = "aceptable"
+        else:
+            diagnosis = "🔴 BAJO"
+            diagnosis_color = "#B42318"
+            diagnosis_level = "bajo"
+    else:  # TikTok
+        if engagement_pct >= thresholds["bueno"]:
+            diagnosis = "🟢 ALTO"
+            diagnosis_color = "#0A7D35"
+            diagnosis_level = "alto"
+        elif engagement_pct >= thresholds["promedio"]:
+            diagnosis = "🟡 BUENO"
+            diagnosis_color = "#003696"
+            diagnosis_level = "bueno"
+        elif engagement_pct >= thresholds["bajo"]:
+            diagnosis = "⚠️ PROMEDIO"
+            diagnosis_color = "#CC7000"
+            diagnosis_level = "promedio"
+        else:
+            diagnosis = "🔴 BAJO"
+            diagnosis_color = "#B42318"
+            diagnosis_level = "bajo"
     
     # Potencial de crecimiento
     growth_scenarios = calculate_growth_potential(engagement_pct, followers, platform)
@@ -525,6 +568,62 @@ def calculate_and_render_results():
         """, unsafe_allow_html=True)
     
     # ========================================================================
+    # SECCIÓN ESPECIAL: ENGAGEMENT POR VISTAS (SOLO TIKTOK)
+    # ========================================================================
+    
+    if platform == "tiktok" and engagement_by_views > 0:
+        st.divider()
+        st.markdown("### 🎬 Engagement por Vistas (Rendimiento de Contenido)")
+        st.caption("Este métrico mide qué tan bien funciona tu contenido, no tu comunidad")
+        
+        # Diagnóstico específico para engagement por vistas
+        thresholds_vistas = get_engagement_thresholds("tiktok", "vistas")
+        
+        if engagement_by_views >= thresholds_vistas["bueno"]:
+            vistas_diagnosis = "🟢 ALTO"
+            vistas_color = "#0A7D35"
+        elif engagement_by_views >= thresholds_vistas["aceptable"]:
+            vistas_diagnosis = "🟡 BUENO"
+            vistas_color = "#003696"
+        elif engagement_by_views >= thresholds_vistas["bajo"]:
+            vistas_diagnosis = "⚠️ ACEPTABLE"
+            vistas_color = "#CC7000"
+        else:
+            vistas_diagnosis = "🔴 BAJO"
+            vistas_color = "#B42318"
+        
+        col_v1, col_v2, col_v3 = st.columns([2, 1, 1])
+        with col_v1:
+            st.markdown(f"""
+            <div style='background: {vistas_color}15; padding: 20px; border-radius: 10px; border-left: 4px solid {vistas_color};'>
+                <div style='color: #6C757D; font-size: 12px; font-weight: 600; text-transform: uppercase; margin-bottom: 8px;'>Engagement por Vistas</div>
+                <div style='color: {vistas_color}; font-size: 36px; font-weight: bold;'>{engagement_by_views:.2f}%</div>
+                <div style='color: #495057; font-size: 13px; margin-top: 8px;'>{vistas_diagnosis} • {total_views:,} vistas totales</div>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with col_v2:
+            st.markdown(f"""
+            <div style='background: #F2F4F7; padding: 20px; border-radius: 10px; text-align: center;'>
+                <div style='color: #6C757D; font-size: 11px; font-weight: 600; text-transform: uppercase; margin-bottom: 4px;'>Interacciones</div>
+                <div style='color: #003696; font-size: 24px; font-weight: bold;'>{total_interactions:,}</div>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with col_v3:
+            st.markdown(f"""
+            <div style='background: #F2F4F7; padding: 20px; border-radius: 10px; text-align: center;'>
+                <div style='color: #6C757D; font-size: 11px; font-weight: 600; text-transform: uppercase; margin-bottom: 4px;'>Vistas</div>
+                <div style='color: #003696; font-size: 24px; font-weight: bold;'>{total_views:,}</div>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        st.info(f"""
+        **📘 Interpretación:** Este métrico te dice qué % de personas que vieron tu contenido interactuaron con él.  
+        **Thresholds TikTok (por vistas):** {thresholds_vistas['labels']['bajo']} | {thresholds_vistas['labels']['aceptable']} | {thresholds_vistas['labels']['bueno']} | {thresholds_vistas['labels']['alto']}
+        """)
+    
+    # ========================================================================
     # SECCIÓN: ANÁLISIS POR TIPO DE CONTENIDO
     # ========================================================================
     
@@ -552,10 +651,10 @@ def calculate_and_render_results():
     
     st.markdown("### 🎯 Diagnóstico y Acciones Recomendadas")
     
-    if diagnosis_level == "excellent":
+    if diagnosis_level == "alto":
         st.markdown(f"""
         <div style='background: #0A7D3515; padding: 20px; border-radius: 10px; border-left: 5px solid #0A7D35;'>
-            <h4 style='color: #0A7D35; margin-top: 0;'>🟢 ¡Tu engagement es EXCELENTE!</h4>
+            <h4 style='color: #0A7D35; margin-top: 0;'>🟢 ¡Tu engagement es ALTO!</h4>
             <p>Tu audiencia está muy comprometida. Este es el resultado de contenido de calidad y conexión genuina con tu comunidad.</p>
             
             <h5>📌 Qué hacer esta semana:</h5>
@@ -567,7 +666,7 @@ def calculate_and_render_results():
         </div>
         """, unsafe_allow_html=True)
     
-    elif diagnosis_level == "good":
+    elif diagnosis_level == "bueno":
         st.markdown(f"""
         <div style='background: #00369615; padding: 20px; border-radius: 10px; border-left: 5px solid #003696;'>
             <h4 style='color: #003696; margin-top: 0;'>🟡 Tu engagement es BUENO</h4>
@@ -582,11 +681,11 @@ def calculate_and_render_results():
         </div>
         """, unsafe_allow_html=True)
     
-    elif diagnosis_level == "moderate":
+    elif diagnosis_level in ["aceptable", "promedio"]:
         st.markdown(f"""
         <div style='background: #CC700015; padding: 20px; border-radius: 10px; border-left: 5px solid #CC7000;'>
-            <h4 style='color: #CC7000; margin-top: 0;'>⚠️ Tu engagement es MODERADO</h4>
-            <p>Por debajo del promedio para tu tamaño. Hay mucho potencial para mejorar.</p>
+            <h4 style='color: #CC7000; margin-top: 0;'>⚠️ Tu engagement necesita mejorar</h4>
+            <p>Por debajo del promedio para tu plataforma. Hay mucho potencial para mejorar.</p>
             
             <h5>📌 Qué hacer esta semana:</h5>
             <ul>
@@ -598,7 +697,7 @@ def calculate_and_render_results():
         </div>
         """, unsafe_allow_html=True)
     
-    else:  # poor
+    else:  # bajo
         st.markdown(f"""
         <div style='background: #B4231815; padding: 20px; border-radius: 10px; border-left: 5px solid #B42318;'>
             <h4 style='color: #B42318; margin-top: 0;'>🔴 Tu engagement es BAJO - ¡Acción Urgente!</h4>
@@ -667,6 +766,7 @@ def calculate_and_render_results():
     with col3:
         if st.button("📥 Descargar Reporte", use_container_width=True, type="primary"):
             # Generar reporte HTML
+            thresholds_info = get_engagement_thresholds(platform, "comunidad")
             report_html = generate_engagement_report_html(
                 platform=platform,
                 followers=followers,
@@ -679,7 +779,7 @@ def calculate_and_render_results():
                 diagnosis=diagnosis,
                 content_stats=content_stats,
                 growth_scenarios=growth_scenarios,
-                expected=expected
+                expected=thresholds_info
             )
             
             # Crear descarga
