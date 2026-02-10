@@ -267,7 +267,13 @@ def render_step_2_posts():
             with col:
                 st.markdown(f"### Post #{post_num}")
                 
-                # Tipo de contenido
+                # Tipo de contenido - Si es TikTok, pre-seleccionar Video
+                default_index = 1 if platform == "tiktok" else 0  # 🎥 Video para TikTok, 📸 Imagen para Facebook
+                
+                # Si ya existe valor en session_state, usarlo; si no, usar default
+                if f"wizard_post_{post_num}_type" not in st.session_state:
+                    st.session_state[f"wizard_post_{post_num}_type"] = content_types[default_index]
+                
                 content_type = st.selectbox(
                     "Tipo de contenido",
                     content_types,
