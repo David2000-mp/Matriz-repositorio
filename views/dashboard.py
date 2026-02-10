@@ -511,24 +511,20 @@ def render(df=None):
     # Desglose por Red Social
     st.subheader("Desglose por Red Social")
     
-    # Asegurar que engagement_rate sea numérico para los cálculos
-    df_m_month = df_m_month.copy()
-    df_m_month['engagement_rate'] = pd.to_numeric(df_m_month['engagement_rate'].astype(str).str.replace(',', '.', regex=False), errors='coerce').fillna(0)
+    # CRÍTICO: Asegurar que engagement_rate esté NUMÉRICO en df_unique ANTES de agrupar
+    df_unique = df_unique.copy()
+    df_unique['engagement_rate'] = pd.to_numeric(
+        df_unique['engagement_rate'].astype(str).str.replace(',', '.', regex=False), 
+        errors='coerce'
+    ).fillna(0)
     
-    # df_unique ya definido arriba para consistencia
-    
-    # Agrupar por plataforma y recalcular engagement_promedio correctamente
+    # Agrupar por plataforma (respetando los valores que tú ingresaste en Sheets)
     platform_summary = df_unique.groupby('plataforma').agg({
         'seguidores': 'sum',
-        'interacciones': 'sum'
+        'interacciones': 'sum',
+        'engagement_rate': 'mean'  # Promedio de tus valores ingresados
     }).reset_index()
-    
-    # FÓRMULA OFICIAL: Engagement Rate Promedio = (Total Interacciones / Total Seguidores) × 100
-    # Recalcula desde cero: suma todos los registros por plataforma y divide
-    platform_summary['engagement_promedio'] = (
-        (platform_summary['interacciones'] / platform_summary['seguidores'] * 100.0)
-        .where(platform_summary['seguidores'] > 0, 0.0)
-    )
+    platform_summary['engagement_promedio'] = platform_summary['engagement_rate']
     
     for _, row in platform_summary.iterrows():
         status = get_engagement_status(row['interacciones'], row['seguidores'])
