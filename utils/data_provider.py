@@ -76,18 +76,28 @@ class DataProvider:
             # Limpiar caché de Streamlit cuando se fuerza recarga
             try:
                 import streamlit as st
+                logger.info("🔄 Limpiando caché de Streamlit para recargar datos...")
                 st.cache_data.clear()
+                logger.info("✓ Caché de Streamlit limpiado")
             except Exception as e:
                 logger.warning(f"No se pudo limpiar caché de Streamlit: {e}")
             
             self._data_cache = None
             self._merged_cache = None
+            logger.info("Forzando recarga de datos desde Google Sheets...")
         
         if self._data_cache is None:
             try:
                 from utils.data_loader import load_data
+                logger.debug("Llamando a load_data()...")
                 self._data_cache = load_data()
-                logger.debug("Datos cargados desde load_data")
+                cuentas_df, metricas_df = self._data_cache
+                logger.info(f"✓ Datos cargados: {len(cuentas_df)} cuentas, {len(metricas_df)} métricas")
+                if len(cuentas_df) > 0:
+                    logger.debug(f"  Entidades: {cuentas_df['entidad'].unique().tolist()}")
+            except Exception as e:
+                logger.error(f"Error cargando datos en DataProvider: {e}")
+                self._data_cache = (pd.DataFrame(), pd.DataFrame())
             except Exception as e:
                 logger.error(f"Error cargando datos en DataProvider: {e}")
                 self._data_cache = (pd.DataFrame(), pd.DataFrame())
