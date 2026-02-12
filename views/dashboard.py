@@ -110,21 +110,35 @@ def _get_engagement_health(plataforma: str, engagement_rate: float) -> Tuple[str
         return "Excelente", "🟢"
 
 
-def get_engagement_status(interacciones, seguidores):
+def get_engagement_status(interacciones, seguidores, engagement_rate=None):
     """
     Determina el estado del engagement basado en datos disponibles.
     Retorna un mensaje explicativo si no se puede calcular o es de referencia.
+    
+    Args:
+        interacciones: Número de interacciones (puede ser 0 si se calcula desde engagement_rate)
+        seguidores: Número de seguidores
+        engagement_rate: Tasa de engagement (opcional) para validar si hay datos reales
+    
+    Returns:
+        str o None: Mensaje si hay limitaciones de datos, None si los datos son suficientes
     """
-    if seguidores == 0 and interacciones == 0:
-        return "No hay datos registrados (seguidores e interacciones ausentes). Este es un dato de referencia provisional."
-    elif seguidores == 0:
-        return "No hay seguidores registrados para calcular engagement. Este es un dato de referencia provisional."
-    elif interacciones == 0:
+    # Si hay un engagement_rate válido (>0), considerar que tenemos datos suficientes
+    has_engagement = engagement_rate is not None and engagement_rate > 0
+    
+    if seguidores == 0:
+        if interacciones == 0 and not has_engagement:
+            return "No hay datos registrados (seguidores e interacciones ausentes). Este es un dato de referencia provisional."
+        elif not has_engagement:
+            return "No hay seguidores registrados para calcular engagement. Este es un dato de referencia provisional."
+    
+    if interacciones == 0 and not has_engagement:
         return "No hay interacciones registradas en este período. Este es un dato de referencia provisional."
-    elif seguidores < 10:  # Umbral mínimo para "datos insuficientes"
+    
+    if seguidores < 10 and not has_engagement:  # Umbral mínimo para "datos insuficientes"
         return "Datos insuficientes: audiencia muy pequeña para referencia precisa. Este es un dato de referencia provisional."
-    else:
-        return None  # Datos suficientes
+    
+    return None  # Datos suficientes
 
 
 def paginate_dataframe(df, page_size=1000, page_key="page"):
@@ -168,7 +182,6 @@ def render(df=None):
     inject_custom_css()
 
     st.title("Dashboard Global")
-
     # Cargar datos usando data provider si no se proporcionaron
     if df is None:
         # Progress bar con pasos
@@ -365,10 +378,17 @@ def render(df=None):
         plataformas_limpia = [str(p) for p in plataformas_anomalas if pd.notna(p) and str(p).strip() != '']
         if plataformas_limpia:
             plataformas_str = ", ".join(plataformas_limpia)
-            st.warning(f"⚠️ Nota: Se detectó un comportamiento inusual en {plataformas_str} durante este periodo.")
+            st.toast(f"⚠️ Se detectó comportamiento inusual en {plataformas_str}", icon="⚠️")
 
     # --- Resumen Ejecutivo ---
-    st.subheader("Resumen Ejecutivo")
+    col_title, col_refresh = st.columns([5, 1])
+    with col_title:
+        st.subheader("Resumen Ejecutivo")
+    with col_refresh:
+        if st.button("↻", help="Actualizar datos desde Google Sheets", key="refresh_btn"):
+            st.cache_data.clear()
+            st.session_state.force_data_refresh = True
+            st.rerun()
 
     # Mostrar skeleton mientras se calculan métricas
     kpi_placeholder = st.empty()
@@ -447,7 +467,7 @@ def render(df=None):
     anomalia_interacciones = df_unique.get("anomalia_interacciones", pd.Series(False)).any()
 
     # Calcular estado del engagement global
-    status_global = get_engagement_status(tot_int, tot_seg_for_er)
+    status_global = get_engagement_status(tot_int, tot_seg_for_er, engagement_rate=er_global)
 
     # Limpiar skeleton y mostrar KPIs reales
     kpi_placeholder.empty()
@@ -527,7 +547,7 @@ def render(df=None):
     platform_summary['engagement_promedio'] = platform_summary['engagement_rate']
     
     for _, row in platform_summary.iterrows():
-        status = get_engagement_status(row['interacciones'], row['seguidores'])
+        status = get_engagement_status(row['interacciones'], row['seguidores'], engagement_rate=row['engagement_promedio'])
         engagement_display = status if status else f"{row['engagement_promedio']:.2f}%"
         total_interactions = row['interacciones']
         st.write(f"**{row['plataforma']}**: Seguidores totales: {row['seguidores']:,.0f}, Interacciones totales: {total_interactions:,.0f}, Engagement promedio: {engagement_display}")
@@ -548,7 +568,7 @@ def render(df=None):
                 st.metric("Seguidores Totales", f"{platform_followers:,.0f}")
             
             with col2:
-                status = get_engagement_status(platform_interactions, platform_followers)
+                status = get_engagement_status(platform_interactions, platform_followers, engagement_rate=platform_engagement)
                 if status:
                     st.metric("Engagement Promedio", "Datos insuficientes")
                     st.caption(f"💡 {status}")
@@ -660,76 +680,88 @@ def render(df=None):
 
     # Mostrar skeleton mientras se genera gráfico
     chart_placeholder = st.empty()
-    with chart_placeholder.container():
-        show_chart_skeleton(height=400)
-
-    # Calcular datos para el gráfico de barras
-    platform_data = df_unique.groupby("plataforma")["seguidores"].sum().reset_index()
-    platform_data = platform_data.sort_values("seguidores", ascending=False)
-
-    # Calcular porcentajes y tendencias vs mes anterior
-    total_followers = platform_data["seguidores"].sum()
-    platform_data["porcentaje"] = (platform_data["seguidores"] / total_followers * 100).round(1)
-
-    # Inicializar tendencia como float para evitar conflictos de tipos
-    platform_data["tendencia"] = 0.0
-
-    # Calcular tendencia vs mes anterior usando merge vectorizado
-    if mes_anterior:
-        # Asegurar que fecha sea datetime antes de usar strftime
-        if pd.api.types.is_datetime64_any_dtype(df_full["fecha"]):
-            df_full_temp = df_full.copy()
-            df_prev_month = df_full_temp[df_full_temp["fecha"].dt.strftime("%Y-%m") == mes_anterior].copy()  # type: ignore
+    
+    try:
+        # Calcular datos para el gráfico de barras
+        platform_data = df_unique.groupby("plataforma")["seguidores"].sum().reset_index()
+        
+        if platform_data.empty:
+            chart_placeholder.empty()
+            st.warning("No hay datos de seguidores por plataforma disponibles.")
         else:
-            df_prev_month = pd.DataFrame()  # DataFrame vacío si fecha no es datetime
-        df_prev_month_unique = df_prev_month.drop_duplicates(subset=['entidad', 'plataforma'], keep='last')
-        prev_platform_data = df_prev_month_unique.groupby("plataforma")["seguidores"].sum().reset_index()
+            with chart_placeholder.container():
+                show_chart_skeleton(height=400)
+            
+            platform_data = platform_data.sort_values("seguidores", ascending=False)
 
-        # Merge calculado para asignar tendencia vectorizada
-        platform_data = platform_data.merge(prev_platform_data, on="plataforma", how="left", suffixes=("", "_prev"))
-        platform_data["tendencia"] = (
-            ((platform_data["seguidores"] - platform_data["seguidores_prev"]) / platform_data["seguidores_prev"] * 100)
-            .round(1)
-            .fillna(0.0)  # Asegurar float
-        )
-        # Limpiar columna temporal
-        platform_data = platform_data.drop(columns=["seguidores_prev"])
+            # Calcular porcentajes y tendencias vs mes anterior
+            total_followers = platform_data["seguidores"].sum()
+            platform_data["porcentaje"] = (platform_data["seguidores"] / total_followers * 100).round(1)
 
-    # Crear gráfico de barras
-    if px is None:
+            # Inicializar tendencia como float para evitar conflictos de tipos
+            platform_data["tendencia"] = 0.0
+
+            # Calcular tendencia vs mes anterior usando merge vectorizado
+            if mes_anterior:
+                # Asegurar que fecha sea datetime antes de usar strftime
+                if pd.api.types.is_datetime64_any_dtype(df_full["fecha"]):
+                    df_full_temp = df_full.copy()
+                    df_prev_month = df_full_temp[df_full_temp["fecha"].dt.strftime("%Y-%m") == mes_anterior].copy()  # type: ignore
+                else:
+                    df_prev_month = pd.DataFrame()  # DataFrame vacío si fecha no es datetime
+                df_prev_month_unique = df_prev_month.drop_duplicates(subset=['entidad', 'plataforma'], keep='last')
+                prev_platform_data = df_prev_month_unique.groupby("plataforma")["seguidores"].sum().reset_index()
+
+                # Merge calculado para asignar tendencia vectorizada
+                platform_data = platform_data.merge(prev_platform_data, on="plataforma", how="left", suffixes=("", "_prev"))
+                platform_data["tendencia"] = (
+                    ((platform_data["seguidores"] - platform_data["seguidores_prev"]) / platform_data["seguidores_prev"] * 100)
+                    .round(1)
+                    .fillna(0.0)  # Asegurar float
+                )
+                # Limpiar columna temporal
+                platform_data = platform_data.drop(columns=["seguidores_prev"])
+
+            # Crear gráfico de barras
+            if px is None:
+                chart_placeholder.empty()
+                st.error("Plotly no está disponible. Instala `plotly` para ver gráficos.")
+            else:
+                fig_platform = px.bar(
+                    platform_data,
+                    x="plataforma",
+                    y="seguidores",
+                    color="plataforma",
+                    color_discrete_map=COLOR_MAP,
+                    title="Distribución de Seguidores por Plataforma",
+                    labels={"seguidores": "Seguidores", "plataforma": "Red Social"}
+                )
+
+                # Personalizar tooltips y layout
+                fig_platform.update_traces(
+                    hovertemplate="<b>%{x}</b><br>" +
+                                 "Seguidores: %{y:,.0f}<br>" +
+                                 "Porcentaje: %{customdata[0]}%<br>" +
+                                 "Tendencia vs mes anterior: %{customdata[1]}+%",
+                    customdata=platform_data[["porcentaje", "tendencia"]].values,
+                    showlegend=False
+                )
+
+                fig_platform.update_layout(
+                    xaxis_title="",
+                    yaxis_title="Seguidores",
+                    font={"size": 10},
+                    margin={"l": 20, "r": 20, "t": 40, "b": 20}
+                )
+
+                # Limpiar skeleton y mostrar gráfico real
+                chart_placeholder.empty()
+                st.plotly_chart(fig_platform, config=PLOTLY_CONFIG, width='stretch')
+                
+    except Exception as e:
         chart_placeholder.empty()
-        st.error("Plotly no está disponible. Instala `plotly` para ver gráficos.")
-    else:
-        fig_platform = px.bar(
-            platform_data,
-            x="plataforma",
-            y="seguidores",
-            color="plataforma",
-            color_discrete_map=COLOR_MAP,
-            title="Distribución de Seguidores por Plataforma",
-            labels={"seguidores": "Seguidores", "plataforma": "Red Social"}
-        )
-
-        # Personalizar tooltips y layout
-        fig_platform.update_traces(
-            hovertemplate="<b>%{x}</b><br>" +
-                         "Seguidores: %{y:,.0f}<br>" +
-                         "Porcentaje: %{customdata[0]}%<br>" +
-                         "Tendencia vs mes anterior: %{customdata[1]}+%",
-            customdata=platform_data[["porcentaje", "tendencia"]].values,
-            showlegend=False
-        )
-
-        fig_platform.update_layout(
-            xaxis_title="",
-            yaxis_title="Seguidores",
-            font={"size": 10},
-            margin={"l": 20, "r": 20, "t": 40, "b": 20}
-        )
-
-        # Limpiar skeleton y mostrar gráfico real
-        chart_placeholder.empty()
-        chart_placeholder.plotly_chart(fig_platform, config=PLOTLY_CONFIG, use_container_width=True)
+        logging.error(f"Error al generar gráfica de plataformas: {e}")
+        st.error(f"Error en gráfica de plataformas: {str(e)}")
 
     st.markdown("---")
 
@@ -742,114 +774,161 @@ def render(df=None):
 
     with tab_evo:
         # Área: evolución de seguidores por plataforma (usar df_full para mostrar tendencia completa)
-        df_evo = (
-            df_full.groupby(["fecha", "plataforma"])["seguidores"].max().reset_index()
-        )
-        
-        # Skeleton loader para evolución de seguidores
+        fig_area = None
         evolution_placeholder = st.empty()
-        with evolution_placeholder.container():
-            show_chart_skeleton(height=400)
         
-        if px is None:
-            evolution_placeholder.empty()
-            st.error("Plotly no está disponible. Instala `plotly` para ver gráficos.")
-            fig_area = None
-        else:
-            fig_area = px.area(
-                df_evo,
-                x="fecha",
-                y="seguidores",
-                color="plataforma",
-                color_discrete_map=COLOR_MAP,
-                title="Tendencia de Seguidores por Plataforma",
-            )
-            fig_area.update_layout(autosize=True)
-
-        # Añadir línea de tendencia suavizada por plataforma
         try:
-            if "seguidores_ma3" in df_full.columns:
-                df_trend = (
-                    df_full.groupby(["fecha", "plataforma"])["seguidores_ma3"].max().reset_index()
-                )
-                import plotly.graph_objects as go
-
-                for plat in df_trend["plataforma"].unique():
-                    dfp = df_trend[df_trend["plataforma"] == plat].sort_values("fecha")
-                    fig_area.add_trace(
-                        go.Scatter(
-                            x=dfp["fecha"],
-                            y=dfp["seguidores_ma3"],
-                            mode="lines",
-                            name=f"{plat} - Tendencia Suavizada",
-                            line=dict(width=2, dash="dash"),
-                            hoverinfo="skip",
-                        )
+            if df_full.empty:
+                evolution_placeholder.empty()
+                st.warning("No hay datos disponibles para gráficar evolución.")
+            else:
+                with evolution_placeholder.container():
+                    show_chart_skeleton(height=400)
+                
+                if px is None:
+                    evolution_placeholder.empty()
+                    st.error("Plotly no está disponible. Instala `plotly` para ver gráficos.")
+                else:
+                    df_evo = (
+                        df_full.groupby(["fecha", "plataforma"])["seguidores"].max().reset_index()
                     )
-        except Exception as e:
-            logging.warning(f"No se pudo agregar línea de tendencia: {e}")
+                    
+                    # Asegurar que fecha sea datetime para Plotly
+                    df_evo["fecha"] = pd.to_datetime(df_evo["fecha"], errors="coerce")
+                    df_evo = df_evo.dropna(subset=["fecha"]).sort_values(["plataforma", "fecha"])
+                    
+                    # DEBUG: Mostrar información de datos
+                    logging.info(f"DEBUG df_evo: registros={len(df_evo)}, fechas_unicas={df_evo['fecha'].nunique()}, plataformas={df_evo['plataforma'].unique().tolist()}")
+                    for plat in df_evo['plataforma'].unique():
+                        dfp = df_evo[df_evo['plataforma'] == plat]
+                        logging.info(f"  {plat}: {len(dfp)} puntos, fechas={dfp['fecha'].dt.strftime('%Y-%m').tolist()}")
+                    
+                    if df_evo.empty:
+                        evolution_placeholder.empty()
+                        st.warning("No hay datos después de agrupar (seguidores).")
+                    else:
+                        fig_area = px.area(
+                            df_evo,
+                            x="fecha",
+                            y="seguidores",
+                            color="plataforma",
+                            color_discrete_map=COLOR_MAP,
+                            title="Tendencia de Seguidores por Plataforma",
+                            markers=True,
+                        )
+                        fig_area.update_layout(autosize=True)
+                        fig_area.update_xaxes(type="date")
+                        
+                        # DEBUG: Verificar traces de Plotly
+                        logging.info(f"DEBUG fig_area: traces={len(fig_area.data)}, traces_names={[t.name for t in fig_area.data]}")
+                        for i, trace in enumerate(fig_area.data):
+                            logging.info(f"  trace {i} ({trace.name}): {len(trace.x)} puntos")
 
-        if fig_area is not None:
-            evolution_placeholder.empty()  # Remover skeleton
-            st.plotly_chart(
-                fig_area,
-                width='stretch',
-                config=PLOTLY_CONFIG,
-            )
+                        # Añadir línea de tendencia suavizada por plataforma
+                        if "seguidores_ma3" in df_full.columns:
+                            df_trend = (
+                                df_full.groupby(["fecha", "plataforma"])["seguidores_ma3"].max().reset_index()
+                            )
+                            # Asegurar que fecha sea datetime
+                            df_trend["fecha"] = pd.to_datetime(df_trend["fecha"], errors="coerce")
+                            df_trend = df_trend.dropna(subset=["fecha"]).sort_values(["plataforma", "fecha"])
+                            
+                            import plotly.graph_objects as go
+
+                            for plat in df_trend["plataforma"].unique():
+                                dfp = df_trend[df_trend["plataforma"] == plat].sort_values("fecha")
+                                fig_area.add_trace(
+                                    go.Scatter(
+                                        x=dfp["fecha"],
+                                        y=dfp["seguidores_ma3"],
+                                        mode="lines",
+                                        name=f"{plat} - Tendencia Suavizada",
+                                        line=dict(width=2, dash="dash"),
+                                        hoverinfo="skip",
+                                    )
+                                )
+
+                        evolution_placeholder.empty()  # Remover skeleton
+                        st.plotly_chart(
+                            fig_area,
+                            width='stretch',
+                            config=PLOTLY_CONFIG,
+                        )
+        except Exception as e:
+            evolution_placeholder.empty()
+            logging.error(f"Error al generar gráfica de evolución: {e}")
+            st.error(f"Error al gráfica de evolución: {str(e)}")
 
         # Línea adicional: interacciones con tendencia suavizada
+        fig_int = None
+        interactions_placeholder = st.empty()
+        
         try:
             if "interacciones" in df_full.columns:
                 df_int = (
                     df_full.groupby(["fecha", "plataforma"])["interacciones"].sum().reset_index()
                 )
                 
-                # Skeleton loader para interacciones
-                interactions_placeholder = st.empty()
-                with interactions_placeholder.container():
-                    show_chart_skeleton(height=350)
+                # Asegurar que fecha sea datetime para Plotly
+                df_int["fecha"] = pd.to_datetime(df_int["fecha"], errors="coerce")
+                df_int = df_int.dropna(subset=["fecha"]).sort_values(["plataforma", "fecha"])
                 
-                if px is None:
+                if df_int.empty:
                     interactions_placeholder.empty()
-                    st.error("Plotly no está disponible. Instala `plotly` para ver gráficos.")
-                    fig_int = None
+                    st.warning("No hay datos de interacciones disponibles.")
                 else:
-                    fig_int = px.line(
-                        df_int,
-                        x="fecha",
-                        y="interacciones",
-                        color="plataforma",
-                        color_discrete_map=COLOR_MAP,
-                        title="Evolución de Interacciones (Real vs Tendencia)",
-                    )
-                if "interacciones_ma3" in df_full.columns:
-                    df_int_tr = (
-                        df_full.groupby(["fecha", "plataforma"])["interacciones_ma3"].sum().reset_index()
-                    )
-                    import plotly.graph_objects as go
-
-                    for plat in df_int_tr["plataforma"].unique():
-                        dfp = df_int_tr[df_int_tr["plataforma"] == plat].sort_values("fecha")
-                        fig_int.add_trace(
-                            go.Scatter(
-                                x=dfp["fecha"],
-                                y=dfp["interacciones_ma3"],
-                                mode="lines",
-                                name=f"{plat} - Tendencia Suavizada",
-                                line=dict(width=2, dash="dash"),
-                                hoverinfo="skip",
-                            )
+                    with interactions_placeholder.container():
+                        show_chart_skeleton(height=350)
+                    
+                    if px is None:
+                        interactions_placeholder.empty()
+                        st.error("Plotly no está disponible. Instala `plotly` para ver gráficos.")
+                    else:
+                        fig_int = px.line(
+                            df_int,
+                            x="fecha",
+                            y="interacciones",
+                            color="plataforma",
+                            color_discrete_map=COLOR_MAP,
+                            title="Evolución de Interacciones (Real vs Tendencia)",
+                            markers=True,
                         )
-                if fig_int is not None:
-                    fig_int.update_layout(autosize=True)
-                    interactions_placeholder.empty()  # Remover skeleton
-                    st.plotly_chart(
-                        fig_int,
-                        width='stretch',
-                        config=PLOTLY_CONFIG,
-                    )
+                        fig_int.update_xaxes(type="date")
+                        
+                        if "interacciones_ma3" in df_full.columns:
+                            df_int_tr = (
+                                df_full.groupby(["fecha", "plataforma"])["interacciones_ma3"].sum().reset_index()
+                            )
+                            # Asegurar que fecha sea datetime
+                            df_int_tr["fecha"] = pd.to_datetime(df_int_tr["fecha"], errors="coerce")
+                            df_int_tr = df_int_tr.dropna(subset=["fecha"]).sort_values(["plataforma", "fecha"])
+                            
+                            import plotly.graph_objects as go
+
+                            for plat in df_int_tr["plataforma"].unique():
+                                dfp = df_int_tr[df_int_tr["plataforma"] == plat].sort_values("fecha")
+                                fig_int.add_trace(
+                                    go.Scatter(
+                                        x=dfp["fecha"],
+                                        y=dfp["interacciones_ma3"],
+                                        mode="lines",
+                                        name=f"{plat} - Tendencia Suavizada",
+                                        line=dict(width=2, dash="dash"),
+                                        hoverinfo="skip",
+                                    )
+                                )
+                        
+                        fig_int.update_layout(autosize=True)
+                        interactions_placeholder.empty()  # Remover skeleton
+                        st.plotly_chart(
+                            fig_int,
+                            width='stretch',
+                            config=PLOTLY_CONFIG,
+                        )
         except Exception as e:
-            logging.warning(f"No se pudo generar la tendencia de interacciones: {e}")
+            interactions_placeholder.empty()
+            logging.error(f"Error al generar gráfica de interacciones: {e}")
+            st.error(f"Error en gráfica de interacciones: {str(e)}")
 
     with st.status("¡Listo!"):
         pass
@@ -857,39 +936,56 @@ def render(df=None):
     with tab_rank:
         # Skeleton loader para ranking
         ranking_placeholder = st.empty()
-        with ranking_placeholder.container():
-            show_chart_skeleton(height=450)
         
-        # Barras: ranking por institución para el mes seleccionado
-        resumen = (
-            df_unique.groupby(["entidad", "plataforma"])["seguidores"].sum().reset_index()
-        )
-        # Ordenar para mostrar mejores arriba
-        resumen = resumen.sort_values("seguidores", ascending=False)
-        if px is None:
+        try:
+            if df_unique.empty:
+                ranking_placeholder.empty()
+                st.warning("No hay datos para mostrar ranking.")
+            else:
+                with ranking_placeholder.container():
+                    show_chart_skeleton(height=450)
+                
+                # Barras: ranking por institución para el mes seleccionado
+                resumen = (
+                    df_unique.groupby(["entidad", "plataforma"])["seguidores"].sum().reset_index()
+                )
+                
+                if resumen.empty:
+                    ranking_placeholder.empty()
+                    st.warning("No hay datos después de agrupar (ranking).")
+                else:
+                    # Ordenar para mostrar mejores arriba
+                    resumen = resumen.sort_values("seguidores", ascending=False)
+                    if px is None:
+                        ranking_placeholder.empty()
+                        st.error("Plotly no está disponible. Instala `plotly` para ver gráficos.")
+                    else:
+                        fig_bar = px.bar(
+                            resumen,
+                            x="seguidores",
+                            y="entidad",
+                            color="plataforma",
+                            orientation="h",
+                            color_discrete_map=COLOR_MAP,
+                            title=f"Ranking de Seguidores ({periodo_label})",
+                            barmode="group",
+                        )
+                        fig_bar.update_traces(textposition="outside")
+                        fig_bar.update_layout(autosize=True)
+                        ranking_placeholder.empty()  # Remover skeleton
+                        st.plotly_chart(
+                            fig_bar,
+                            width='stretch',
+                            config=PLOTLY_CONFIG,
+                        )
+        except Exception as e:
             ranking_placeholder.empty()
-            st.error("Plotly no está disponible. Instala `plotly` para ver gráficos.")
-        else:
-            fig_bar = px.bar(
-                resumen,
-                x="seguidores",
-                y="entidad",
-                color="plataforma",
-                orientation="h",
-                color_discrete_map=COLOR_MAP,
-                title=f"Ranking de Seguidores ({periodo_label})",
-                barmode="group",
-            )
-            fig_bar.update_traces(textposition="outside")
-            fig_bar.update_layout(autosize=True)
-            ranking_placeholder.empty()  # Remover skeleton
-            st.plotly_chart(
-                fig_bar,
-                width='stretch',
-                config=PLOTLY_CONFIG,
-            )
+            logging.error(f"Error al generar gráfica de ranking: {e}")
+            st.error(f"Error en gráfica de ranking: {str(e)}")
 
     # --- Evolución de la Salud Digital (últimos 6 meses) ---
+    health_placeholder = st.empty()
+    
     try:
         # Obtener meses únicos ordenados (ascendente) y tomar los últimos 6 — usar el histórico completo
         df_full_copy = df_full.copy()
@@ -906,9 +1002,10 @@ def render(df=None):
             labels.append(m.strftime("%Y-%m"))
             health_points.append(score_m)
 
-        if labels and health_points:
-            # Skeleton loader para salud digital
-            health_placeholder = st.empty()
+        if not labels or not health_points:
+            health_placeholder.empty()
+            st.warning("No hay datos suficientes para gráfica de salud digital.")
+        else:
             with health_placeholder.container():
                 show_chart_skeleton(height=300)
             
@@ -922,7 +1019,9 @@ def render(df=None):
                 health_placeholder.empty()  # Remover skeleton
                 st.plotly_chart(fig_health, width='stretch', config=PLOTLY_CONFIG)
     except Exception as e:
-        logging.warning(f"No se pudo generar la serie histórica de salud: {e}")
+        health_placeholder.empty()
+        logging.error(f"Error al generar gráfica de salud digital: {e}")
+        st.warning(f"No se pudo generar la serie histórica de salud: {str(e)}")
 
     # Vista de datos plegable con paginación
     with st.expander("Ver datos fuente"):

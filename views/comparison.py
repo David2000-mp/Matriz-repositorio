@@ -512,7 +512,7 @@ def _render_followers_evolution_comparison(
         ),
     )
     
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width='stretch')
 
 
 def _render_engagement_evolution_comparison(
@@ -580,7 +580,7 @@ def _render_engagement_evolution_comparison(
         ),
     )
     
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width='stretch')
 
 
 def _render_platform_distribution(data: pd.DataFrame, color: str = "#1f77b4"):
@@ -621,7 +621,7 @@ def _render_platform_distribution(data: pd.DataFrame, color: str = "#1f77b4"):
         showlegend=False,
     )
     
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width='stretch')
 
 
 # ============================================

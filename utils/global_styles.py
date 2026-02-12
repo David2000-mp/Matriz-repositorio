@@ -52,28 +52,29 @@ def get_global_institutional_css() -> str:
        Versión: 2.0 - Institucional Claro
        ============================================ */
 
-    /* === TOASTS - FORZAR TEXTO BLANCO EN NOTIFICACIONES === */
+    /* === TOASTS - NOTIFICACIONES TEMA INSTITUCIONAL CLARO === */
     .stToast, .stToast * {{
-        color: #fff !important;
-        background: #222 !important;
+        color: #212529 !important;
+        background: #F2F4F7 !important;
         border-radius: 10px !important;
         font-weight: 500 !important;
-        box-shadow: 0 4px 16px rgba(0,0,0,0.7) !important;
+        border: 1px solid #DEE2E6 !important;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08) !important;
     }}
     .stToast svg[title="Close"] path {{
-        fill: #fff !important;
+        fill: #495057 !important;
     }}
     .stToast [data-testid="stToastDynamicIcon"] {{
-        color: #fff !important;
+        color: #003696 !important;
     }}
     .stToast [data-testid="stMarkdownContainer"] p,
     .stToast [data-testid="stMarkdownContainer"] span {{
-        color: #fff !important;
+        color: #212529 !important;
     }}
     .stToast [data-testid="stMetricDelta"],
     .stToast .st-emotion-cache-1bwm5qy,
     .stToast .st-emotion-cache-zcfef7 {{
-        color: #fff !important;
+        color: #212529 !important;
     }}
     
     /* === RESET Y BASE === */

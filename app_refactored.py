@@ -137,57 +137,72 @@ def main():
         """Carga datos solo cuando se necesitan (lazy loading).
 
         Usa `utils.data_provider` como fuente canónica para filtros y datos.
+        El data_provider incluye el importador de formularios con cálculo de interacciones.
         """
-        if "app_data" not in st.session_state:
-            with st.spinner("Cargando datos..."):
+        refresh_data = st.session_state.get("force_data_refresh", False)
+        
+        if "app_data" not in st.session_state or refresh_data:
+            with st.spinner("Cargando datos desde Google Sheets..."):
                 try:
-                    # Cargar datos desde RespuestasForms
-                    from utils.sheets_connector import cargar_respuestas_forms
-                    df_global = cargar_respuestas_forms()
+                    # PRIORIDAD 1: Usar data_provider que tiene el importador de formulario
+                    from utils.data_provider import data_provider
                     
-                    # Generar IDs automáticos
-                    df_global['id'] = range(len(df_global))
-                    df_global['id'] = df_global['id'].astype(str)
+                    # Cargar datos fusionados con force_reload si se solicita refresh
+                    df_global = data_provider.get_merged_data(force_reload=refresh_data)
                     
-                    # Procesar fecha
-                    if 'fecha' in df_global.columns:
-                        df_global['fecha'] = pd.to_datetime(df_global['fecha'], errors='coerce')
+                    if df_global is None or df_global.empty:
+                        st.warning("No se pudieron cargar datos. Verifica tu conexión a Google Sheets.")
+                        return None
                     
                     # Asegurar columnas estándar
-                    expected_columns = ['id', 'entidad', 'plataforma', 'usuario_red', 'fecha', 'seguidores', 'engagement_rate', 'alcance', 'interacciones', 'comentarios']
-                    df_global = df_global.reindex(columns=expected_columns, fill_value='')
+                    expected_columns = ['id_cuenta', 'entidad', 'plataforma', 'usuario_red', 'fecha', 'seguidores', 'engagement_rate', 'alcance', 'interacciones', 'likes_promedio']
+                    
+                    # Agregar columnas faltantes
+                    for col in expected_columns:
+                        if col not in df_global.columns:
+                            df_global[col] = ''
+                    
+                    # Usar id_cuenta como id
+                    if 'id_cuenta' in df_global.columns:
+                        df_global['id'] = df_global['id_cuenta'].astype(str)
+                    else:
+                        df_global['id'] = range(len(df_global))
+                    
+                    # Procesar fecha si no es datetime
+                    if 'fecha' in df_global.columns:
+                        df_global['fecha'] = pd.to_datetime(df_global['fecha'], errors='coerce')
 
-                    # Actualizar filtros globales disponibles usando data_provider
+                    # Actualizar filtros globales disponibles
                     try:
-                        merged = get_merged_data()
-                        if merged is not None and not merged.empty and "entidad" in merged.columns:
-                            st.session_state.global_entities = sorted(merged["entidad"].unique().tolist())
-                        if merged is not None and not merged.empty and "fecha" in merged.columns:
-                            meses = sorted(merged["fecha"].dt.strftime("%Y-%m").dropna().unique(), reverse=True)
-                            st.session_state.global_months = meses
-                    except Exception:
-                        # Fallback a df_global
                         if not df_global.empty and "entidad" in df_global.columns:
-                            st.session_state.global_entities = sorted(df_global["entidad"].unique().tolist())
+                            st.session_state.global_entities = sorted([str(e) for e in df_global["entidad"].dropna().unique()])
                         if not df_global.empty and "fecha" in df_global.columns:
                             meses = sorted(df_global["fecha"].dt.strftime("%Y-%m").dropna().unique(), reverse=True)
                             st.session_state.global_months = meses
+                    except Exception as e:
+                        logger.warning(f"No se pudieron actualizar filtros globales: {e}")
 
                     st.session_state.app_data = {
-                        "cuentas": pd.DataFrame(),  # Vacío ya que usamos forms
-                        "metricas": pd.DataFrame(),  # Vacío
+                        "cuentas": pd.DataFrame(),
+                        "metricas": pd.DataFrame(),
                         "df_global": df_global
                     }
-
+                    
+                    # Limpiar flag de refresh
+                    if "force_data_refresh" in st.session_state:
+                        st.session_state.force_data_refresh = False
+                    
                     # Toast de éxito
-                    origin = st.session_state.get("data_origin", "local")
+                    origin = st.session_state.get("data_origin", "cloud")
                     if origin == "cloud":
-                        st.toast("🌐 Datos cargados desde la nube", icon="Ⓜ️")
+                        st.toast("🌐 Datos cargados desde Google Sheets", icon="✅")
                     else:
-                        st.toast("💾 Datos locales cargados", icon="Ⓜ️")
+                        st.toast("💾 Datos cargados correctamente", icon="✅")
+                    
+                    return st.session_state.app_data
 
                 except Exception as e:
-                    st.error("Error al cargar datos")
+                    st.error("❌ Error al cargar datos")
                     st.exception(e)
                     return None
 
@@ -271,7 +286,7 @@ def main():
             st.subheader("Datos del Formulario")
             edited_df = st.data_editor(
                 df_forms,
-                use_container_width=True,
+                use_container_width='100%',
                 num_rows="dynamic",
                 column_config={
                     "fecha": st.column_config.DateColumn("Fecha del Reporte"),
@@ -286,7 +301,7 @@ def main():
             errores = df_forms[df_forms['error_validacion'] != '']
             if not errores.empty:
                 st.error("Filas con errores de validación:")
-                st.dataframe(errores[['entidad', 'plataforma', 'error_validacion']], use_container_width=True)
+                st.dataframe(errores[['entidad', 'plataforma', 'error_validacion']], use_container_width='100%')
 
         except Exception as e:
             st.error(f"Error cargando datos del formulario: {e}")

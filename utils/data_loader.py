@@ -63,7 +63,11 @@ def validate_and_fill_columns(df: pd.DataFrame, expected_cols: list) -> pd.DataF
     return df
 def _load_data_impl() -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
-    Carga datos desde Google Sheets con fallback a CSV local.
+    Carga datos desde Google Sheets con la siguiente prioridad:
+    1. Formulario "Respuestas de formulario 3" (fuente principal)
+    2. Hojas "cuentas" y "metricas" (datos manuales)
+    3. CSVs locales (fallback)
+    
     Preserve todos los IDs como strings.
     Aplica .fillna('') para prevenir propagación de NaN.
     """
@@ -77,7 +81,22 @@ def _load_data_impl() -> Tuple[pd.DataFrame, pd.DataFrame]:
         spreadsheet = get_sheets_connection()
         
         if spreadsheet:
-            # Cargar Cuentas
+            # PRIORIDAD 1: INTENTAR CARGAR DEL FORMULARIO (fuente principal)
+            try:
+                from utils.form_response_importer import import_form_responses
+                logger.info("Intentando cargar datos del formulario...")
+                form_cuentas, form_metricas = import_form_responses(spreadsheet)
+                
+                if not form_cuentas.empty and not form_metricas.empty:
+                    cuentas_df = form_cuentas
+                    metricas_df = form_metricas
+                    logger.info(f"Importadas {len(cuentas_df)} cuentas y {len(metricas_df)} metricas desde formulario")
+                    sheets_success = True
+                    return cuentas_df, metricas_df  # Usar datos del formulario como fuente principal
+            except Exception as e:
+                logger.warning(f"No se pudo cargar del formulario: {e}")
+            
+            # PRIORIDAD 2: CARGAR DE LAS HOJAS MANUALES (si el formulario falla)
             try:
                 ws_c = spreadsheet.worksheet("cuentas")
                 c_data = ws_c.get_all_records()
@@ -110,7 +129,7 @@ def _load_data_impl() -> Tuple[pd.DataFrame, pd.DataFrame]:
                     metricas_df = pd.DataFrame(processed_rows, columns=headers).fillna('')
                     metricas_df = validate_and_fill_columns(metricas_df, COLS_METRICAS)
                     
-                    logger.info(f"Cargadas {len(metricas_df)} métricas usando método crudo")
+                    logger.info(f"Cargadas {len(metricas_df)} metricas desde hoja de metricas")
                 else:
                     # Fallback a get_all_records si get() falla
                     m_data = ws_m.get_all_records()
@@ -121,10 +140,11 @@ def _load_data_impl() -> Tuple[pd.DataFrame, pd.DataFrame]:
                 logger.warning("Hoja 'metricas' no encontrada.")
             
             sheets_success = True
+    
     except Exception as e:
         logger.warning(f"Error conectando a Sheets: {e}")
 
-    # Fallback a CSV local solo si no hubo éxito con Sheets
+    # PRIORIDAD 3: Fallback a CSVs locales
     if not sheets_success or (cuentas_df.empty and metricas_df.empty):
         if CUENTAS_CSV.exists():
             try:

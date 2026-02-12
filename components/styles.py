@@ -238,8 +238,8 @@ def inject_custom_css():
         /* Placeholder legible */
         input::placeholder,
         textarea::placeholder {
-            color: var(--text-secondary) !important;
-            opacity: 0.7 !important;
+            color: var(--text-placeholder) !important;
+            opacity: 0.85 !important;
         }
 
         
@@ -886,7 +886,7 @@ def aplicar_estilo_personalizado():
             'text_primary': '#FAFAFA',
             'text_secondary': '#B8B8B8',
             'text_caption': '#8B8B8B',
-            'text_placeholder': '#6B6B6B',
+            'text_placeholder': '#A8A8A8',
             
             # Bordes
             'border_color': '#3A3F47',
@@ -1256,6 +1256,53 @@ def aplicar_estilo_personalizado():
         
         .dataframe td {{
             border-color: var(--border-color) !important;
+        }}
+        
+        /* ========================================
+           TOASTS Y NOTIFICACIONES
+        ======================================== */
+        .stToast {{
+            background-color: var(--bg-card) !important;
+            border: 1px solid var(--border-color) !important;
+            color: var(--text-color) !important;
+        }}
+        
+        .stToast,
+        .stToast *,
+        .stToast p,
+        .stToast span,
+        .stToast [data-testid="stMarkdownContainer"],
+        .stToast [data-testid="stMarkdownContainer"] *,
+        .stToast [data-testid="stMarkdownContainer"] p,
+        [data-testid="stMarkdownContainer"] {{
+            color: var(--text-color) !important;
+            font-weight: 500 !important;
+        }}
+        
+        div[role="alert"][data-testid="stToast"] {{
+            background-color: var(--bg-card) !important;
+            border: 1px solid var(--border-color) !important;
+            color: var(--text-color) !important;
+        }}
+        
+        div[role="alert"][data-testid="stToast"] * {{
+            color: var(--text-color) !important;
+        }}
+        
+        [role="alert"] {{
+            background-color: var(--bg-card) !important;
+            border: 1px solid var(--border-color) !important;
+            color: var(--text-color) !important;
+        }}
+        
+        [role="alert"] * {{
+            color: var(--text-color) !important;
+        }}
+        
+        [role="alert"] p,
+        [role="alert"] span {{
+            color: var(--text-color) !important;
+            font-weight: 500 !important;
         }}
         
         /* ========================================
