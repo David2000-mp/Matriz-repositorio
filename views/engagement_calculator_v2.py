@@ -64,6 +64,32 @@ def get_engagement_thresholds(platform: str, metric_type: str = "comunidad") -> 
     return {}
 
 
+def calculate_expected_engagement(followers: int) -> dict:
+    """
+    Calcula el engagement esperado para una cantidad de seguidores.
+    Basado en benchmarks de industria (promedios reales).
+    
+    Retorna dict con:
+    - typical: engagement típico en %
+    - min: mínimo esperado
+    - max: máximo esperado
+    """
+    if followers < 1000:
+        return {"typical": 8.0, "min": 5.0, "max": 15.0}
+    elif followers < 5000:
+        return {"typical": 6.0, "min": 3.0, "max": 12.0}
+    elif followers < 10000:
+        return {"typical": 4.5, "min": 2.0, "max": 10.0}
+    elif followers < 50000:
+        return {"typical": 3.5, "min": 1.5, "max": 8.0}
+    elif followers < 100000:
+        return {"typical": 2.5, "min": 1.0, "max": 6.0}
+    elif followers < 500000:
+        return {"typical": 1.8, "min": 0.8, "max": 4.0}
+    else:
+        return {"typical": 1.0, "min": 0.4, "max": 2.5}
+
+
 def validate_post_engagement(reactions: int, comments: int, shares: int, followers: int) -> dict:
     """
     Valida engagement de un post individual.
