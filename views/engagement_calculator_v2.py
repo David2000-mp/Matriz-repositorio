@@ -497,9 +497,8 @@ def calculate_and_render_results():
     # CÁLCULOS PRINCIPALES
     # ========================================================================
     
-    # Contar posts reales (que tienen al menos algún dato: reacciones, comentarios o shares)
-    posts_with_data = sum(1 for post in posts_list if post["total"] > 0)
-    num_posts = max(posts_with_data, 1)  # Mínimo 1 para evitar división por cero
+    # SIEMPRE son 15 posts (fijo)
+    num_posts = 15
     
     # Engagement general de la cuenta
     engagement_pct = (total_interactions / followers) * 100
@@ -507,8 +506,9 @@ def calculate_and_render_results():
     avg_interactions = total_interactions / num_posts
     engagement_per_post = (avg_interactions / followers) * 100
     
-    # CORRECCIÓN: Posts por semana debe calcularse basándose en DÍAS reales y POSTS REALES
-    # Si el usuario ingresó datos para 5 posts en 30 días, eso es 5/30 * 7 = 1.17 posts/semana
+    # Posts por semana varía según el período de DÍAS que ingresa el usuario
+    # Fórmula: (número de posts / días) * 7
+    # Ej: 15 posts en 30 días = (15 / 30) * 7 = 3.5 posts/semana
     posts_per_week = (num_posts / days) * 7
     
     # Para TikTok
@@ -517,17 +517,27 @@ def calculate_and_render_results():
     else:
         engagement_by_views = 0
     
-    # Segmentación por tipo de contenido
+    # Segmentación por tipo de contenido (con estadísticas detalladas)
     content_stats = {}
     for post in posts_list:
         ctype = post["type"]
         if ctype not in content_stats:
-            content_stats[ctype] = {"total_interactions": 0, "posts": 0, "engagement": 0}
+            content_stats[ctype] = {
+                "total_interactions": 0, 
+                "posts": 0, 
+                "engagement": 0,
+                "pct": 0,  # Porcentaje del total de posts
+                "avg_engagement": 0  # Engagement promedio por post
+            }
         
         content_stats[ctype]["total_interactions"] += post["total"]
         content_stats[ctype]["posts"] += 1
-        content_stats[ctype]["engagement"] = (content_stats[ctype]["total_interactions"] / content_stats[ctype]["posts"] / followers) * 100
     
+    # Calcular porcentajes y engagement promedio por tipo
+    for ctype in content_stats:
+        posts_count = content_stats[ctype]["posts"]
+        content_stats[ctype]["pct"] = (posts_count / num_posts) * 100
+        content_stats[ctype]["avg_engagement"] = (content_stats[ctype]["total_interactions"] / posts_count / followers) * 100
     # Diagnóstico basado en thresholds fijos por plataforma
     thresholds = get_engagement_thresholds(platform, "comunidad")
     
@@ -668,20 +678,28 @@ def calculate_and_render_results():
     st.markdown("### 📊 Rendimiento por Tipo de Contenido")
     
     content_df = []
-    for ctype, stats in sorted(content_stats.items(), key=lambda x: x[1]["engagement"], reverse=True):
+    for ctype, stats in sorted(content_stats.items(), key=lambda x: x[1]["avg_engagement"], reverse=True):
         content_df.append({
             "Tipo": ctype,
-            "Engagement %": f"{stats['engagement']:.2f}%",
+            "% Posts": f"{stats['pct']:.0f}%",
+            "Engagement x Post": f"{stats['avg_engagement']:.2f}%",
             "Posts": stats["posts"],
             "Total Interacciones": stats["total_interactions"]
         })
     
     if content_df:
-        st.markdown("Mejor rendimiento por tipo de contenido:")
-        best_type = sorted(content_stats.items(), key=lambda x: x[1]["engagement"], reverse=True)[0]
-        st.success(f"✅ **{best_type[0]} es tu estrella:** {best_type[1]['engagement']:.2f}% engagement")
+        best_type = sorted(content_stats.items(), key=lambda x: x[1]["avg_engagement"], reverse=True)[0]
+        st.success(f"✅ **{best_type[0]} es tu estrella:** {best_type[1]['avg_engagement']:.2f}% engagement promedio por post ({int(best_type[1]['pct'])}% de tus posts)")
         
         st.dataframe(pd.DataFrame(content_df), use_container_width=True, hide_index=True)
+        
+        # Agregar análisis detallado
+        st.markdown("#### Interpretación:")
+        for ctype, stats in sorted(content_stats.items(), key=lambda x: x[1]["avg_engagement"], reverse=True):
+            pct = stats['pct']
+            eng = stats['avg_engagement']
+            posts = stats['posts']
+            st.caption(f"**{ctype}:** {posts} post(s) ({pct:.0f}% de tu contenido) con {eng:.2f}% de engagement promedio por post")
     
     # ========================================================================
     # SECCIÓN: DIAGNÓSTICO Y ACCIONES
@@ -712,7 +730,7 @@ def calculate_and_render_results():
             
             <h5>📌 Qué hacer esta semana:</h5>
             <ul>
-                <li><strong>Enfócate en {best_type[0]}:</strong> Estos posts son {best_type[1]['engagement']/engagement_per_post:.1f}x más efectivos</li>
+                <li><strong>Enfócate en {best_type[0]}:</strong> Estos posts son {best_type[1]['avg_engagement']/engagement_per_post:.1f}x más efectivos</li>
                 <li><strong>Mejora la frecuencia:</strong> Intenta pasar de {posts_per_week:.0f} a {posts_per_week + 1:.0f} posts/semana</li>
                 <li><strong>Crea tendencias:</strong> Usa calls-to-action más claros para invitar interacción</li>
             </ul>
@@ -729,7 +747,7 @@ def calculate_and_render_results():
             <ul>
                 <li><strong>Revisa tu contenido:</strong> ¿Está alineado con lo que tu audiencia quiere?</li>
                 <li><strong>Aumenta frecuencia:</strong> Posts más consistentes (intenta diario o casi diario)</li>
-                <li><strong>Testa {best_type[0]}:</strong> Es tu mejor formato ({best_type[1]['engagement']:.2f}%)</li>
+                <li><strong>Testa {best_type[0]}:</strong> Es tu mejor formato ({best_type[1]['avg_engagement']:.2f}% engagement/post)</li>
                 <li><strong>CTA claros:</strong> Pide comentarios, reacciones, shares explícitamente</li>
             </ul>
         </div>
@@ -745,7 +763,7 @@ def calculate_and_render_results():
             <ul>
                 <li><strong>CRÍTICO: Aumenta frequencia:</strong> Pasar de {posts_per_week:.0f} a 5-7 posts/semana</li>
                 <li><strong>Cambia tu contenido:</strong> Analiza qué está funcionando en tu industria</li>
-                <li><strong>Enfócate SOLO en {best_type[0]}:</strong> ({best_type[1]['engagement']:.2f}% vs tu promedio {engagement_per_post:.2f}%)</li>
+                <li><strong>Enfócate SOLO en {best_type[0]}:</strong> ({best_type[1]['avg_engagement']:.2f}% vs tu promedio {engagement_per_post:.2f}%)/post)</li>
                 <li><strong>Interactúa más:</strong> Responde comentarios, sigue cuentas similares, genera comunidad</li>
                 <li><strong>Usa CTAs fuertes:</strong> "Comparte tu opinión en comentarios" vs "Me encanta"</li>
             </ul>
