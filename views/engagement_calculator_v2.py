@@ -497,13 +497,19 @@ def calculate_and_render_results():
     # CÁLCULOS PRINCIPALES
     # ========================================================================
     
-    num_posts = 15
+    # Contar posts reales (que tienen al menos algún dato: reacciones, comentarios o shares)
+    posts_with_data = sum(1 for post in posts_list if post["total"] > 0)
+    num_posts = max(posts_with_data, 1)  # Mínimo 1 para evitar división por cero
+    
     # Engagement general de la cuenta
     engagement_pct = (total_interactions / followers) * 100
     # Engagement por post (comunidad): (Promedio interacciones / Seguidores) * 100
     avg_interactions = total_interactions / num_posts
     engagement_per_post = (avg_interactions / followers) * 100
-    posts_per_week = num_posts / (days / 7)
+    
+    # CORRECCIÓN: Posts por semana debe calcularse basándose en DÍAS reales y POSTS REALES
+    # Si el usuario ingresó datos para 5 posts en 30 días, eso es 5/30 * 7 = 1.17 posts/semana
+    posts_per_week = (num_posts / days) * 7
     
     # Para TikTok
     if platform == "tiktok" and total_views > 0:
