@@ -1125,8 +1125,8 @@ def render(df=None):
                             'engagement_rate': 'mean'  # Promedio de engagement por institución-plataforma
                         }).reset_index()
                         
-                        # Ordenar por engagement descendente
-                        resumen_engagement = resumen_engagement.sort_values('engagement_rate', ascending=False)
+                        # Ordenar por engagement ascendente
+                        resumen_engagement = resumen_engagement.sort_values('engagement_rate', ascending=True)
                         
                         if resumen_engagement.empty or resumen_engagement['engagement_rate'].sum() == 0:
                             engagement_placeholder.empty()
