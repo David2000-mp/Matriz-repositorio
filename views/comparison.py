@@ -497,23 +497,32 @@ def _render_followers_evolution_comparison(
     
     # Layout con formato de fechas en eje X
     fig.update_layout(
-        font={"color": "black"},
-        
+        font={"color": "#000000"},
         title="Evolución de Seguidores",
+        title_font={"color": "#000000"},
         xaxis_title="Fecha",
         yaxis_title="Seguidores",
         hovermode="x unified",
         template="plotly_white",
-        xaxis={"color": "black", "gridcolor": "#E0E0E0"},
-        yaxis={"color": "black", "gridcolor": "#E0E0E0"},
         height=400,
-        xaxis=dict(
-            type="date",
-            tickformat="%d/%m/%Y",
-            tickangle=-45,
-            showgrid=True,
-            gridcolor="rgba(0,0,0,0.1)",
-        ),
+        hoverlabel={"font": {"color": "#000000"}, "bgcolor": "#FFFFFF", "bordercolor": "#003696"},
+        legend={"font": {"color": "#000000"}},
+        xaxis={
+            "type": "date",
+            "tickformat": "%d/%m/%Y",
+            "tickangle": -45,
+            "showgrid": True,
+            "gridcolor": "rgba(0,0,0,0.1)",
+            "color": "#000000",
+            "title": {"font": {"color": "#000000"}},
+            "tickfont": {"color": "#000000"},
+        },
+        yaxis={
+            "color": "#000000",
+            "gridcolor": "#E0E0E0",
+            "title": {"font": {"color": "#000000"}},
+            "tickfont": {"color": "#000000"},
+        },
     )
     
     st.plotly_chart(fig, width='stretch')
@@ -569,21 +578,32 @@ def _render_engagement_evolution_comparison(
     
     # Layout con formato de fechas en eje X
     fig.update_layout(
-        font={"color": "black"},
-        
+        font={"color": "#000000"},
         title="Evolución de Engagement (%)",
+        title_font={"color": "#000000"},
         xaxis_title="Fecha",
         yaxis_title="Engagement (%)",
         hovermode="x unified",
         template="plotly_white",
         height=400,
-        xaxis=dict(
-            type="date",
-            tickformat="%d/%m/%Y",
-            tickangle=-45,
-            showgrid=True,
-            gridcolor="rgba(0,0,0,0.1)",
-        ),
+        hoverlabel={"font": {"color": "#000000"}, "bgcolor": "#FFFFFF", "bordercolor": "#003696"},
+        legend={"font": {"color": "#000000"}},
+        xaxis={
+            "type": "date",
+            "tickformat": "%d/%m/%Y",
+            "tickangle": -45,
+            "showgrid": True,
+            "gridcolor": "rgba(0,0,0,0.1)",
+            "color": "#000000",
+            "title": {"font": {"color": "#000000"}},
+            "tickfont": {"color": "#000000"},
+        },
+        yaxis={
+            "color": "#000000",
+            "gridcolor": "#E0E0E0",
+            "title": {"font": {"color": "#000000"}},
+            "tickfont": {"color": "#000000"},
+        },
     )
     
     st.plotly_chart(fig, width='stretch')
@@ -615,20 +635,32 @@ def _render_platform_distribution(data: pd.DataFrame, color: str = "#1f77b4"):
             text=platform_data["seguidores"],
             texttemplate='%{text:,.0f}',
             textposition='outside',
+            textfont={"color": "#000000"},
         )
     ])
     
     fig.update_layout(
-        font={"color": "black"},
-        
+        font={"color": "#000000"},
         title="Seguidores por Plataforma",
+        title_font={"color": "#000000"},
         xaxis_title="Plataforma",
         yaxis_title="Seguidores",
         template="plotly_white",
-        xaxis={"color": "black", "gridcolor": "#E0E0E0"},
-        yaxis={"color": "black", "gridcolor": "#E0E0E0"},
         height=300,
         showlegend=False,
+        hoverlabel={"font": {"color": "#000000"}, "bgcolor": "#FFFFFF", "bordercolor": "#003696"},
+        xaxis={
+            "color": "#000000",
+            "gridcolor": "#E0E0E0",
+            "title": {"font": {"color": "#000000"}},
+            "tickfont": {"color": "#000000"},
+        },
+        yaxis={
+            "color": "#000000",
+            "gridcolor": "#E0E0E0",
+            "title": {"font": {"color": "#000000"}},
+            "tickfont": {"color": "#000000"},
+        },
     )
     
     st.plotly_chart(fig, width='stretch')

@@ -1326,25 +1326,25 @@ def aplicar_estilo_personalizado():
         "font": {
             "family": "Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
             "size": 14,  # Tamaño mínimo legible
-            "color": "#1A1A1A"  # Alto contraste
+            "color": "#000000"
         },
         "title": {
-            "font": {"size": 18, "color": "#003696", "family": "Inter"},
+            "font": {"size": 18, "color": "#000000", "family": "Inter"},
             "x": 0.5,
             "xanchor": "center"
         },
         "xaxis": {
-            "title": {"font": {"size": 14, "color": "#4A5568"}},
-            "tickfont": {"size": 12, "color": "#1A1A1A"},
+            "title": {"font": {"size": 14, "color": "#000000"}},
+            "tickfont": {"size": 12, "color": "#000000"},
             "gridcolor": "rgba(0, 0, 0, 0.08)"
         },
         "yaxis": {
-            "title": {"font": {"size": 14, "color": "#4A5568"}},
-            "tickfont": {"size": 12, "color": "#1A1A1A"},
+            "title": {"font": {"size": 14, "color": "#000000"}},
+            "tickfont": {"size": 12, "color": "#000000"},
             "gridcolor": "rgba(0, 0, 0, 0.08)"
         },
         "legend": {
-            "font": {"size": 13, "color": "#1A1A1A"},
+            "font": {"size": 13, "color": "#000000"},
             "bgcolor": "rgba(255, 255, 255, 0.9)",
             "bordercolor": "rgba(0, 0, 0, 0.1)",
             "borderwidth": 1
@@ -1354,7 +1354,7 @@ def aplicar_estilo_personalizado():
         "margin": {"l": 50, "r": 30, "t": 60, "b": 50},
         "hoverlabel": {
             "bgcolor": "#FFFFFF",
-            "font": {"size": 13, "color": "#1A1A1A"},
+            "font": {"size": 13, "color": "#000000"},
             "bordercolor": "#003696"
         }
     }
@@ -1371,25 +1371,25 @@ def configure_plotly_theme():
         "font": {
             "family": "Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
             "size": 14,  # Tamaño mínimo legible
-            "color": "#1A1A1A"  # Alto contraste
+            "color": "#000000"
         },
         "title": {
-            "font": {"size": 18, "color": "#003696", "family": "Inter"},
+            "font": {"size": 18, "color": "#000000", "family": "Inter"},
             "x": 0.5,
             "xanchor": "center"
         },
         "xaxis": {
-            "title": {"font": {"size": 14, "color": "#4A5568"}},
-            "tickfont": {"size": 12, "color": "#1A1A1A"},
+            "title": {"font": {"size": 14, "color": "#000000"}},
+            "tickfont": {"size": 12, "color": "#000000"},
             "gridcolor": "rgba(0, 0, 0, 0.08)"
         },
         "yaxis": {
-            "title": {"font": {"size": 14, "color": "#4A5568"}},
-            "tickfont": {"size": 12, "color": "#1A1A1A"},
+            "title": {"font": {"size": 14, "color": "#000000"}},
+            "tickfont": {"size": 12, "color": "#000000"},
             "gridcolor": "rgba(0, 0, 0, 0.08)"
         },
         "legend": {
-            "font": {"size": 13, "color": "#1A1A1A"},
+            "font": {"size": 13, "color": "#000000"},
             "bgcolor": "rgba(255, 255, 255, 0.9)",
             "bordercolor": "rgba(0, 0, 0, 0.1)",
             "borderwidth": 1
@@ -1399,7 +1399,7 @@ def configure_plotly_theme():
         "margin": {"l": 50, "r": 30, "t": 60, "b": 50},
         "hoverlabel": {
             "bgcolor": "#FFFFFF",
-            "font": {"size": 13, "color": "#1A1A1A"},
+            "font": {"size": 13, "color": "#000000"},
             "bordercolor": "#003696"
         }
     }
@@ -1422,12 +1422,13 @@ PLOTLY_CONFIG = {
 }
 
 PLOTLY_LAYOUT_DEFAULTS = {
-    "font": {"size": 10, "color": "black"},
+    "font": {"size": 10, "color": "#000000"},
     "margin": {"l": 20, "r": 20, "t": 40, "b": 20},
     "showlegend": True,
     "legend": {"orientation": "h", "y": -0.2},
     "paper_bgcolor": "white",
     "plot_bgcolor": "white",
-    "xaxis": {"color": "black", "gridcolor": "#E0E0E0"},
-    "yaxis": {"color": "black", "gridcolor": "#E0E0E0"},
+    "xaxis": {"color": "#000000", "gridcolor": "#E0E0E0"},
+    "yaxis": {"color": "#000000", "gridcolor": "#E0E0E0"},
+    "hoverlabel": {"bgcolor": "#FFFFFF", "font": {"color": "#000000"}, "bordercolor": "#003696"},
 }

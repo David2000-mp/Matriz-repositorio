@@ -750,12 +750,24 @@ def render(df=None):
                 fig_platform.update_layout(
                     xaxis_title="",
                     yaxis_title="Seguidores",
-                    font={"size": 10, "color": "black"},
+                    font={"size": 10, "color": "#000000"},
+                    title_font={"color": "#000000"},
                     margin={"l": 20, "r": 20, "t": 40, "b": 20},
                     paper_bgcolor="white",
                     plot_bgcolor="white",
-                        xaxis={"color": "black", "gridcolor": "#E0E0E0"},
-                        yaxis={"color": "black", "gridcolor": "#E0E0E0"}
+                    hoverlabel={"font": {"color": "#000000"}, "bgcolor": "#FFFFFF", "bordercolor": "#003696"},
+                    xaxis={
+                        "color": "#000000",
+                        "gridcolor": "#E0E0E0",
+                        "title": {"font": {"color": "#000000"}},
+                        "tickfont": {"color": "#000000"},
+                    },
+                    yaxis={
+                        "color": "#000000",
+                        "gridcolor": "#E0E0E0",
+                        "title": {"font": {"color": "#000000"}},
+                        "tickfont": {"color": "#000000"},
+                    },
                 )
 
                 # Limpiar skeleton y mostrar gráfico real
@@ -824,8 +836,22 @@ def render(df=None):
                             autosize=True,
                             paper_bgcolor="white",
                             plot_bgcolor="white",
-                        xaxis={"color": "black", "gridcolor": "#E0E0E0"},
-                        yaxis={"color": "black", "gridcolor": "#E0E0E0"}
+                            font={"color": "#000000"},
+                            title_font={"color": "#000000"},
+                            legend={"font": {"color": "#000000"}},
+                            hoverlabel={"font": {"color": "#000000"}, "bgcolor": "#FFFFFF", "bordercolor": "#003696"},
+                            xaxis={
+                                "color": "#000000",
+                                "gridcolor": "#E0E0E0",
+                                "title": {"font": {"color": "#000000"}},
+                                "tickfont": {"color": "#000000"},
+                            },
+                            yaxis={
+                                "color": "#000000",
+                                "gridcolor": "#E0E0E0",
+                                "title": {"font": {"color": "#000000"}},
+                                "tickfont": {"color": "#000000"},
+                            },
                         )
                         fig_area.update_xaxes(type="date")
                         
@@ -932,8 +958,22 @@ def render(df=None):
                             autosize=True,
                             paper_bgcolor="white",
                             plot_bgcolor="white",
-                        xaxis={"color": "black", "gridcolor": "#E0E0E0"},
-                        yaxis={"color": "black", "gridcolor": "#E0E0E0"}
+                            font={"color": "#000000"},
+                            title_font={"color": "#000000"},
+                            legend={"font": {"color": "#000000"}},
+                            hoverlabel={"font": {"color": "#000000"}, "bgcolor": "#FFFFFF", "bordercolor": "#003696"},
+                            xaxis={
+                                "color": "#000000",
+                                "gridcolor": "#E0E0E0",
+                                "title": {"font": {"color": "#000000"}},
+                                "tickfont": {"color": "#000000"},
+                            },
+                            yaxis={
+                                "color": "#000000",
+                                "gridcolor": "#E0E0E0",
+                                "title": {"font": {"color": "#000000"}},
+                                "tickfont": {"color": "#000000"},
+                            },
                         )
                         interactions_placeholder.empty()  # Remover skeleton
                         st.plotly_chart(
@@ -991,8 +1031,22 @@ def render(df=None):
                             autosize=True,
                             paper_bgcolor="white",
                             plot_bgcolor="white",
-                        xaxis={"color": "black", "gridcolor": "#E0E0E0"},
-                        yaxis={"color": "black", "gridcolor": "#E0E0E0"}
+                            font={"color": "#000000"},
+                            title_font={"color": "#000000"},
+                            legend={"font": {"color": "#000000"}},
+                            hoverlabel={"font": {"color": "#000000"}, "bgcolor": "#FFFFFF", "bordercolor": "#003696"},
+                            xaxis={
+                                "color": "#000000",
+                                "gridcolor": "#E0E0E0",
+                                "title": {"font": {"color": "#000000"}},
+                                "tickfont": {"color": "#000000"},
+                            },
+                            yaxis={
+                                "color": "#000000",
+                                "gridcolor": "#E0E0E0",
+                                "title": {"font": {"color": "#000000"}},
+                                "tickfont": {"color": "#000000"},
+                            },
                         )
                         ranking_placeholder.empty()  # Remover skeleton
                         st.plotly_chart(
@@ -1039,9 +1093,24 @@ def render(df=None):
                 fig_health.update_traces(line=dict(color="#0056B3", width=3))  # Azul info WCAG AA
                 fig_health.update_layout(
                     autosize=True,
-                    yaxis=dict(range=[0,100]),
+                    font={"color": "#000000"},
+                    title_font={"color": "#000000"},
                     paper_bgcolor="white",
-                    plot_bgcolor="white"
+                    plot_bgcolor="white",
+                    hoverlabel={"font": {"color": "#000000"}, "bgcolor": "#FFFFFF", "bordercolor": "#003696"},
+                    xaxis={
+                        "color": "#000000",
+                        "gridcolor": "#E0E0E0",
+                        "title": {"font": {"color": "#000000"}},
+                        "tickfont": {"color": "#000000"},
+                    },
+                    yaxis={
+                        "range": [0, 100],
+                        "color": "#000000",
+                        "gridcolor": "#E0E0E0",
+                        "title": {"font": {"color": "#000000"}},
+                        "tickfont": {"color": "#000000"},
+                    },
                 )
                 health_placeholder.empty()  # Remover skeleton
                 st.plotly_chart(fig_health, width='stretch', config=PLOTLY_CONFIG)
