@@ -751,7 +751,9 @@ def render(df=None):
                     xaxis_title="",
                     yaxis_title="Seguidores",
                     font={"size": 10},
-                    margin={"l": 20, "r": 20, "t": 40, "b": 20}
+                    margin={"l": 20, "r": 20, "t": 40, "b": 20},
+                    paper_bgcolor="white",
+                    plot_bgcolor="white"
                 )
 
                 # Limpiar skeleton y mostrar gráfico real
@@ -816,7 +818,11 @@ def render(df=None):
                             title="Tendencia de Seguidores por Plataforma",
                             markers=True,
                         )
-                        fig_area.update_layout(autosize=True)
+                        fig_area.update_layout(
+                            autosize=True,
+                            paper_bgcolor="white",
+                            plot_bgcolor="white"
+                        )
                         fig_area.update_xaxes(type="date")
                         
                         # DEBUG: Verificar traces de Plotly
@@ -918,7 +924,11 @@ def render(df=None):
                                     )
                                 )
                         
-                        fig_int.update_layout(autosize=True)
+                        fig_int.update_layout(
+                            autosize=True,
+                            paper_bgcolor="white",
+                            plot_bgcolor="white"
+                        )
                         interactions_placeholder.empty()  # Remover skeleton
                         st.plotly_chart(
                             fig_int,
@@ -971,7 +981,11 @@ def render(df=None):
                             barmode="group",
                         )
                         fig_bar.update_traces(textposition="outside")
-                        fig_bar.update_layout(autosize=True)
+                        fig_bar.update_layout(
+                            autosize=True,
+                            paper_bgcolor="white",
+                            plot_bgcolor="white"
+                        )
                         ranking_placeholder.empty()  # Remover skeleton
                         st.plotly_chart(
                             fig_bar,
@@ -1015,7 +1029,12 @@ def render(df=None):
             else:
                 fig_health = px.line(x=labels, y=health_points, markers=True, labels={"x": "Mes", "y": "Salud"}, title="Evolución de la Salud Digital (últimos 6 meses)")
                 fig_health.update_traces(line=dict(color="#0056B3", width=3))  # Azul info WCAG AA
-                fig_health.update_layout(autosize=True, yaxis=dict(range=[0,100]))
+                fig_health.update_layout(
+                    autosize=True,
+                    yaxis=dict(range=[0,100]),
+                    paper_bgcolor="white",
+                    plot_bgcolor="white"
+                )
                 health_placeholder.empty()  # Remover skeleton
                 st.plotly_chart(fig_health, width='stretch', config=PLOTLY_CONFIG)
     except Exception as e:

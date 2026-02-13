@@ -1426,4 +1426,6 @@ PLOTLY_LAYOUT_DEFAULTS = {
     "margin": {"l": 20, "r": 20, "t": 40, "b": 20},  # M�rgenes reducidos
     "showlegend": True,
     "legend": {"orientation": "h", "y": -0.2},  # Leyenda horizontal abajo
+    "paper_bgcolor": "white",  # Fondo blanco del gráfico
+    "plot_bgcolor": "white",   # Fondo blanco del área de ploteo
 }
