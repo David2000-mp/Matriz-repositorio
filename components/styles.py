@@ -1422,10 +1422,12 @@ PLOTLY_CONFIG = {
 }
 
 PLOTLY_LAYOUT_DEFAULTS = {
-    "font": {"size": 10},      # Fuente m�s peque�a para mejor rendimiento
-    "margin": {"l": 20, "r": 20, "t": 40, "b": 20},  # M�rgenes reducidos
+    "font": {"size": 10, "color": "black"},
+    "margin": {"l": 20, "r": 20, "t": 40, "b": 20},
     "showlegend": True,
-    "legend": {"orientation": "h", "y": -0.2},  # Leyenda horizontal abajo
-    "paper_bgcolor": "white",  # Fondo blanco del gráfico
-    "plot_bgcolor": "white",   # Fondo blanco del área de ploteo
+    "legend": {"orientation": "h", "y": -0.2},
+    "paper_bgcolor": "white",
+    "plot_bgcolor": "white",
+    "xaxis": {"color": "black", "gridcolor": "#E0E0E0"},
+    "yaxis": {"color": "black", "gridcolor": "#E0E0E0"},
 }

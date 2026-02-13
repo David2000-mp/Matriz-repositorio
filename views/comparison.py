@@ -497,11 +497,15 @@ def _render_followers_evolution_comparison(
     
     # Layout con formato de fechas en eje X
     fig.update_layout(
+        font={"color": "black"},
+        
         title="Evolución de Seguidores",
         xaxis_title="Fecha",
         yaxis_title="Seguidores",
         hovermode="x unified",
         template="plotly_white",
+        xaxis={"color": "black", "gridcolor": "#E0E0E0"},
+        yaxis={"color": "black", "gridcolor": "#E0E0E0"},
         height=400,
         xaxis=dict(
             type="date",
@@ -565,6 +569,8 @@ def _render_engagement_evolution_comparison(
     
     # Layout con formato de fechas en eje X
     fig.update_layout(
+        font={"color": "black"},
+        
         title="Evolución de Engagement (%)",
         xaxis_title="Fecha",
         yaxis_title="Engagement (%)",
@@ -613,10 +619,14 @@ def _render_platform_distribution(data: pd.DataFrame, color: str = "#1f77b4"):
     ])
     
     fig.update_layout(
+        font={"color": "black"},
+        
         title="Seguidores por Plataforma",
         xaxis_title="Plataforma",
         yaxis_title="Seguidores",
         template="plotly_white",
+        xaxis={"color": "black", "gridcolor": "#E0E0E0"},
+        yaxis={"color": "black", "gridcolor": "#E0E0E0"},
         height=300,
         showlegend=False,
     )

@@ -750,10 +750,12 @@ def render(df=None):
                 fig_platform.update_layout(
                     xaxis_title="",
                     yaxis_title="Seguidores",
-                    font={"size": 10},
+                    font={"size": 10, "color": "black"},
                     margin={"l": 20, "r": 20, "t": 40, "b": 20},
                     paper_bgcolor="white",
-                    plot_bgcolor="white"
+                    plot_bgcolor="white",
+                        xaxis={"color": "black", "gridcolor": "#E0E0E0"},
+                        yaxis={"color": "black", "gridcolor": "#E0E0E0"}
                 )
 
                 # Limpiar skeleton y mostrar gráfico real
@@ -821,7 +823,9 @@ def render(df=None):
                         fig_area.update_layout(
                             autosize=True,
                             paper_bgcolor="white",
-                            plot_bgcolor="white"
+                            plot_bgcolor="white",
+                        xaxis={"color": "black", "gridcolor": "#E0E0E0"},
+                        yaxis={"color": "black", "gridcolor": "#E0E0E0"}
                         )
                         fig_area.update_xaxes(type="date")
                         
@@ -927,7 +931,9 @@ def render(df=None):
                         fig_int.update_layout(
                             autosize=True,
                             paper_bgcolor="white",
-                            plot_bgcolor="white"
+                            plot_bgcolor="white",
+                        xaxis={"color": "black", "gridcolor": "#E0E0E0"},
+                        yaxis={"color": "black", "gridcolor": "#E0E0E0"}
                         )
                         interactions_placeholder.empty()  # Remover skeleton
                         st.plotly_chart(
@@ -984,7 +990,9 @@ def render(df=None):
                         fig_bar.update_layout(
                             autosize=True,
                             paper_bgcolor="white",
-                            plot_bgcolor="white"
+                            plot_bgcolor="white",
+                        xaxis={"color": "black", "gridcolor": "#E0E0E0"},
+                        yaxis={"color": "black", "gridcolor": "#E0E0E0"}
                         )
                         ranking_placeholder.empty()  # Remover skeleton
                         st.plotly_chart(

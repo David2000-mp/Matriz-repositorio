@@ -116,11 +116,7 @@ def render(df=None):
                     st.error("Plotly no está disponible. Instala `plotly` para ver gráficos.")
                 else:
                     fig2 = px.bar(df_ent, x="seguidores", y="entidad", orientation="h", text="seguidores")
-                    fig2.update_layout(
-                        margin=dict(t=30, b=10),
-                        paper_bgcolor="white",
-                        plot_bgcolor="white"
-                    )
+                    fig2.update_layout(margin=dict(t=30, b=10), paper_bgcolor="white", plot_bgcolor="white", xaxis={"color": "black", "gridcolor": "#E0E0E0"}, yaxis={"color": "black", "gridcolor": "#E0E0E0"})
                     bar_placeholder.empty()  # Remover skeleton
                     st.plotly_chart(fig2, width='stretch', config=PLOTLY_CONFIG)
 
