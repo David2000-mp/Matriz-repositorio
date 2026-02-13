@@ -383,7 +383,7 @@ def cargar_respuestas_forms() -> pd.DataFrame:
         
         # Engagement rate especial (tiene %)
         if 'engagement_rate' in df.columns:
-            df['engagement_rate'] = pd.to_numeric(df['engagement_rate'].astype(str).str.rstrip('%').str.replace(',', '.', regex=False), errors='coerce').fillna(0)
+            df['engagement_rate'] = pd.to_numeric(df['engagement_rate'].astype(str).str.replace('%', '').str.replace(',', '.').str.strip(), errors='coerce').fillna(0)
         
         # CORRECCIÓN DE ENGAGEMENT RATE: Calcular valores realistas
         if 'engagement_rate' in df.columns and 'seguidores' in df.columns and 'interacciones' in df.columns:
