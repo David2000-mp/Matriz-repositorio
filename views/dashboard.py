@@ -400,14 +400,32 @@ def render(df=None):
     seg_prev_total = 0
 
     try:
-        # CÁLCULO DE ENGAGEMENT GLOBAL (Promedio Ponderado Real)
-        # kpi_engagement = (df_filtered['interacciones'].sum() / df_filtered['seguidores'].sum()) * 100
+        # CÁLCULO DE ENGAGEMENT GLOBAL (Promedio de los valores de engagement_rate por plataforma)
+        # Normalizar engagement_rate a numérico
+        df_unique_calc = df_unique.copy()
+        df_unique_calc['engagement_rate'] = pd.to_numeric(
+            df_unique_calc['engagement_rate'].astype(str).str.replace(',', '.', regex=False),
+            errors='coerce'
+        ).fillna(0)
+        
+        # Agrupar por plataforma y promediar los engagement_rate del formulario
+        platform_er = df_unique_calc.groupby('plataforma').agg({
+            'engagement_rate': 'mean'
+        }).reset_index()
+        
+        # Filtrar valores infinitos y extremos
+        platform_er['engagement_rate'] = platform_er['engagement_rate'].replace([float('inf'), -float('inf')], 0)
+        platform_er.loc[platform_er['engagement_rate'] > 100, 'engagement_rate'] = 100
+        
+        # Promedio simple de los ER por plataforma (del formulario)
+        er_global = platform_er['engagement_rate'].mean() if len(platform_er) > 0 else 0.0
+        
         tot_int = df_unique['interacciones'].sum() if 'interacciones' in df_unique.columns else 0
-        tot_seg_for_er = df_unique['seguidores'].sum() if 'seguidores' in df_unique.columns else 0
-        er_global = (tot_int / tot_seg_for_er * 100.0) if tot_seg_for_er > 0 else 0.0
-    except Exception:
+    except Exception as e:
+        logging.warning(f"Error en cálculo de engagement: {e}")
         tot_int = df_unique['interacciones'].sum() if 'interacciones' in df_unique.columns else 0
-        er_global = (tot_int / tot_seg * 100.0) if tot_seg > 0 else 0.0
+        tot_seg_for_calc = df_unique['seguidores'].sum() if 'seguidores' in df_unique.columns else 0
+        er_global = (tot_int / tot_seg_for_calc * 100.0) if tot_seg_for_calc > 0 else 0.0
 
     # Calcular promedio de interacciones
     avg_int = df_unique['interacciones'].mean() if not df_unique.empty and 'interacciones' in df_unique.columns else 0
@@ -420,11 +438,37 @@ def render(df=None):
     if mes_anterior:
         df_prev = df_full[df_full["fecha"].dt.strftime("%Y-%m") == mes_anterior]  # type: ignore
         df_prev_unique = df_prev.drop_duplicates(subset=['entidad', 'plataforma'], keep='last')
-        # usar suma total para comparar
+        
+        # Calcular engagement del mes anterior usando el mismo método que el mes actual
+        try:
+            # Normalizar engagement_rate a numérico
+            df_prev_calc = df_prev_unique.copy()
+            df_prev_calc['engagement_rate'] = pd.to_numeric(
+                df_prev_calc['engagement_rate'].astype(str).str.replace(',', '.', regex=False),
+                errors='coerce'
+            ).fillna(0)
+            
+            # Agrupar por plataforma y promediar los engagement_rate del formulario
+            platform_er_prev = df_prev_calc.groupby('plataforma').agg({
+                'engagement_rate': 'mean'
+            }).reset_index()
+            
+            # Filtrar valores infinitos y extremos
+            platform_er_prev['engagement_rate'] = platform_er_prev['engagement_rate'].replace([float('inf'), -float('inf')], 0)
+            platform_er_prev.loc[platform_er_prev['engagement_rate'] > 100, 'engagement_rate'] = 100
+            
+            # Promedio simple de los ER por plataforma (del formulario)
+            er_prev = platform_er_prev['engagement_rate'].mean() if len(platform_er_prev) > 0 else 0.0
+        except Exception as e:
+            logging.warning(f"Error en cálculo de engagement anterior: {e}")
+            int_prev = df_prev_unique['interacciones'].sum()
+            seg_prev_calc = df_prev_unique['seguidores'].sum()
+            er_prev = (int_prev / seg_prev_calc * 100.0) if seg_prev_calc > 0 else 0.0
+        
+        # usar suma total para comparar seguidores e interacciones
         seg_prev = df_prev_unique['seguidores'].sum()
         int_prev = df_prev_unique['interacciones'].sum()
         seg_prev_total = seg_prev
-        er_prev = (int_prev / seg_prev * 100.0) if seg_prev > 0 else 0.0
         delta_seg = ((tot_seg - seg_prev) / seg_prev * 100.0) if seg_prev > 0 else 0.0
         delta_int = ((tot_int - int_prev) / int_prev * 100.0) if int_prev > 0 else 0.0
         delta_er = er_global - er_prev
@@ -467,7 +511,7 @@ def render(df=None):
     anomalia_interacciones = df_unique.get("anomalia_interacciones", pd.Series(False)).any()
 
     # Calcular estado del engagement global
-    status_global = get_engagement_status(tot_int, tot_seg_for_er, engagement_rate=er_global)
+    status_global = get_engagement_status(tot_int, tot_seg, engagement_rate=er_global)
 
     # Limpiar skeleton y mostrar KPIs reales
     kpi_placeholder.empty()
@@ -531,19 +575,21 @@ def render(df=None):
     # Desglose por Red Social
     st.subheader("Desglose por Red Social")
     
-    # CRÍTICO: Asegurar que engagement_rate esté NUMÉRICO en df_unique ANTES de agrupar
-    df_unique = df_unique.copy()
-    df_unique['engagement_rate'] = pd.to_numeric(
-        df_unique['engagement_rate'].astype(str).str.replace(',', '.', regex=False), 
+    # Normalizar engagement_rate a numérico
+    df_unique_display = df_unique.copy()
+    df_unique_display['engagement_rate'] = pd.to_numeric(
+        df_unique_display['engagement_rate'].astype(str).str.replace(',', '.', regex=False),
         errors='coerce'
     ).fillna(0)
     
-    # Agrupar por plataforma (respetando los valores que tú ingresaste en Sheets)
-    platform_summary = df_unique.groupby('plataforma').agg({
+    # Agrupar por plataforma usando valores del formulario
+    platform_summary = df_unique_display.groupby('plataforma').agg({
         'seguidores': 'sum',
         'interacciones': 'sum',
-        'engagement_rate': 'mean'  # Promedio de tus valores ingresados
+        'engagement_rate': 'mean'  # Promedio de valores del formulario
     }).reset_index()
+    
+    # Usar engagement_rate del formulario
     platform_summary['engagement_promedio'] = platform_summary['engagement_rate']
     
     for _, row in platform_summary.iterrows():
@@ -986,9 +1032,6 @@ def render(df=None):
             logging.error(f"Error al generar gráfica de interacciones: {e}")
             st.error(f"Error en gráfica de interacciones: {str(e)}")
 
-    with st.status("¡Listo!"):
-        pass
-
     with tab_rank:
         # Skeleton loader para ranking
         ranking_placeholder = st.empty()
@@ -1054,6 +1097,91 @@ def render(df=None):
                             width='stretch',
                             config=PLOTLY_CONFIG,
                         )
+                
+                # Nueva gráfica: Ranking de Engagement por Institución y Red Social
+                st.markdown("---")
+                st.subheader("📊 Ranking de Engagement por Institución")
+                
+                engagement_placeholder = st.empty()
+                with engagement_placeholder.container():
+                    show_chart_skeleton(height=450)
+                
+                try:
+                    # Preparar datos: asegurar que engagement_rate sea numérico
+                    df_engagement = df_unique.copy()
+                    
+                    # Debug: verificar si existe la columna engagement_rate
+                    if 'engagement_rate' not in df_engagement.columns:
+                        engagement_placeholder.empty()
+                        st.warning("⚠️ La columna 'engagement_rate' no existe en los datos. Ingresa valores de engagement en Google Sheets.")
+                    else:
+                        df_engagement['engagement_rate'] = pd.to_numeric(
+                            df_engagement['engagement_rate'].astype(str).str.replace(',', '.', regex=False),
+                            errors='coerce'
+                        ).fillna(0)
+                        
+                        # Agrupar por institución y plataforma
+                        resumen_engagement = df_engagement.groupby(['entidad', 'plataforma']).agg({
+                            'engagement_rate': 'mean'  # Promedio de engagement por institución-plataforma
+                        }).reset_index()
+                        
+                        # Ordenar por engagement descendente
+                        resumen_engagement = resumen_engagement.sort_values('engagement_rate', ascending=False)
+                        
+                        if resumen_engagement.empty or resumen_engagement['engagement_rate'].sum() == 0:
+                            engagement_placeholder.empty()
+                            st.info("ℹ️ No hay datos de engagement disponibles para el ranking.")
+                        else:
+                            # Crear gráfica de barras horizontales
+                            fig_engagement = px.bar(
+                                resumen_engagement,
+                                x='engagement_rate',
+                                y='entidad',
+                                color='plataforma',
+                                orientation='h',
+                                color_discrete_map=COLOR_MAP,
+                                title=f"Ranking de Engagement Rate ({periodo_label})",
+                                barmode='group',
+                                labels={'engagement_rate': 'Engagement Rate (%)', 'entidad': 'Institución'},
+                            )
+                            
+                            fig_engagement.update_traces(
+                                texttemplate='%{x:.2f}%',
+                                textposition='outside'
+                            )
+                            
+                            fig_engagement.update_layout(
+                                autosize=True,
+                                paper_bgcolor='white',
+                                plot_bgcolor='white',
+                                font={'color': '#000000'},
+                                title_font={'color': '#000000'},
+                                legend={'font': {'color': '#000000'}},
+                                hoverlabel={'font': {'color': '#000000'}, 'bgcolor': '#FFFFFF', 'bordercolor': '#003696'},
+                                xaxis={
+                                    'color': '#000000',
+                                    'gridcolor': '#E0E0E0',
+                                    'title': {'font': {'color': '#000000'}},
+                                    'tickfont': {'color': '#000000'},
+                                },
+                                yaxis={
+                                    'color': '#000000',
+                                    'gridcolor': '#E0E0E0',
+                                    'title': {'font': {'color': '#000000'}},
+                                    'tickfont': {'color': '#000000'},
+                                },
+                            )
+                            
+                            engagement_placeholder.empty()
+                            st.plotly_chart(
+                                fig_engagement,
+                                width='stretch',
+                                config=PLOTLY_CONFIG,
+                            )
+                except Exception as e:
+                    engagement_placeholder.empty()
+                    logging.error(f"Error al generar gráfica de engagement: {e}")
+                    st.error(f"Error en gráfica de engagement: {str(e)}")
         except Exception as e:
             ranking_placeholder.empty()
             logging.error(f"Error al generar gráfica de ranking: {e}")

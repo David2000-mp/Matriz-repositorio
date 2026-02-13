@@ -352,9 +352,11 @@ def _render_entity_kpis(data: pd.DataFrame, color: str = "#1f77b4"):
         total_interactions = 0
         avg_interactions = 0
     
-    # Calcular engagement promedio directamente de los datos
-    if "engagement_rate" in data.columns and not data.empty:
-        weighted_engagement = data["engagement_rate"].mean()
+    # Calcular engagement promedio agrupando por plataforma primero
+    # (consistente con Dashboard Global para evitar sesgo por conteo desigual de registros)
+    if "engagement_rate" in data.columns and "plataforma" in data.columns and not data.empty:
+        platform_er = data.groupby('plataforma')['engagement_rate'].mean()
+        weighted_engagement = platform_er.mean() if not platform_er.empty else 0
     else:
         weighted_engagement = 0
     
@@ -368,20 +370,12 @@ def _render_entity_kpis(data: pd.DataFrame, color: str = "#1f77b4"):
         delta=None,
     )
     
-    # Engagement metric: manejar insuficiencia de datos
-    if status:
-        # Datos insuficientes: mostrar mensaje en lugar de métricas
-        st.metric(
-            "Engagement Promedio",
-            "Datos insuficientes",
-            delta=None,
-        )
-        st.caption(f"💡 Nota sobre Engagement: {status}")
-    else:
-        # Datos suficientes: calcular y mostrar engagement ponderado
+    # Engagement metric: mostrar valor si existe, con nota si hay datos insuficientes
+    has_engagement = "engagement_rate" in data.columns and not data.empty
+    if has_engagement:
         # Determinar estado de engagement (usar primera plataforma si hay datos)
         engagement_status = ""
-        if not data.empty and "plataforma" in data.columns and weighted_engagement > 0:
+        if "plataforma" in data.columns:
             first_platform = data["plataforma"].iloc[0]
             status_health, emoji = _get_engagement_health(first_platform, weighted_engagement)
             engagement_status = f"{emoji} {status_health}"
@@ -391,6 +385,16 @@ def _render_entity_kpis(data: pd.DataFrame, color: str = "#1f77b4"):
             f"{weighted_engagement:.2f}%",
             delta=engagement_status if engagement_status else None,
         )
+        if status:
+            st.caption(f"💡 Nota sobre Engagement: {status}")
+    else:
+        st.metric(
+            "Engagement Promedio",
+            "Datos insuficientes",
+            delta=None,
+        )
+        if status:
+            st.caption(f"💡 Nota sobre Engagement: {status}")
     
     st.metric(
         "Promedio Interacciones",
@@ -435,13 +439,11 @@ def _render_entity_kpis(data: pd.DataFrame, color: str = "#1f77b4"):
                     st.metric("Seguidores", f"{platform_followers:,.0f}")
                 
                 with col2:
+                    # Mostrar engagement aunque haya estado de advertencia
+                    health_status, emoji = _get_engagement_health(platform_name, platform_engagement_weighted)
+                    st.metric("Engagement", f"{platform_engagement_weighted:.2f}%", delta=f"{emoji} {health_status}")
                     if platform_status:
-                        st.metric("Engagement", "Datos insuficientes")
                         st.caption(f"💡 {platform_status}")
-                    else:
-                        # Determinar estado de salud
-                        health_status, emoji = _get_engagement_health(platform_name, platform_engagement_weighted)
-                        st.metric("Engagement", f"{platform_engagement_weighted:.2f}%", delta=f"{emoji} {health_status}")
                 
                 with col3:
                     st.metric("Interacciones Promedio", f"{platform_interactions/platform_followers if platform_followers > 0 else 0:,.1f}")
@@ -504,6 +506,8 @@ def _render_followers_evolution_comparison(
         yaxis_title="Seguidores",
         hovermode="x unified",
         template="plotly_white",
+        paper_bgcolor="#FFFFFF",
+        plot_bgcolor="#FFFFFF",
         height=400,
         hoverlabel={"font": {"color": "#000000"}, "bgcolor": "#FFFFFF", "bordercolor": "#003696"},
         legend={"font": {"color": "#000000"}},
@@ -524,6 +528,7 @@ def _render_followers_evolution_comparison(
             "tickfont": {"color": "#000000"},
         },
     )
+    fig.update_traces(hoverlabel={"bgcolor": "#FFFFFF", "font": {"color": "#000000"}, "bordercolor": "#003696"})
     
     st.plotly_chart(fig, width='stretch')
 
@@ -546,10 +551,15 @@ def _render_engagement_evolution_comparison(
     
     fig = go.Figure()
     
-    # Línea para entidad A - agrupar por fecha
+    # Línea para entidad A - agrupar por plataforma y fecha, luego promediar
     if not data_a.empty and "fecha" in data_a.columns and "engagement_rate" in data_a.columns:
-        # Agrupar por fecha y promediar engagement (todas las plataformas)
-        data_a_grouped = data_a.groupby("fecha")["engagement_rate"].mean().reset_index()
+        # Primero agrupar por fecha y plataforma, luego promediar entre plataformas
+        # (consistente con Dashboard Global)
+        if "plataforma" in data_a.columns:
+            data_a_temp = data_a.groupby(["fecha", "plataforma"])["engagement_rate"].mean().reset_index()
+            data_a_grouped = data_a_temp.groupby("fecha")["engagement_rate"].mean().reset_index()
+        else:
+            data_a_grouped = data_a.groupby("fecha")["engagement_rate"].mean().reset_index()
         data_a_grouped = data_a_grouped.sort_values("fecha")
         
         fig.add_trace(go.Scatter(
@@ -561,10 +571,15 @@ def _render_engagement_evolution_comparison(
             marker=dict(size=8),
         ))
     
-    # Línea para entidad B - agrupar por fecha
+    # Línea para entidad B - agrupar por plataforma y fecha, luego promediar
     if not data_b.empty and "fecha" in data_b.columns and "engagement_rate" in data_b.columns:
-        # Agrupar por fecha y promediar engagement (todas las plataformas)
-        data_b_grouped = data_b.groupby("fecha")["engagement_rate"].mean().reset_index()
+        # Primero agrupar por fecha y plataforma, luego promediar entre plataformas
+        # (consistente con Dashboard Global)
+        if "plataforma" in data_b.columns:
+            data_b_temp = data_b.groupby(["fecha", "plataforma"])["engagement_rate"].mean().reset_index()
+            data_b_grouped = data_b_temp.groupby("fecha")["engagement_rate"].mean().reset_index()
+        else:
+            data_b_grouped = data_b.groupby("fecha")["engagement_rate"].mean().reset_index()
         data_b_grouped = data_b_grouped.sort_values("fecha")
         
         fig.add_trace(go.Scatter(
@@ -585,6 +600,8 @@ def _render_engagement_evolution_comparison(
         yaxis_title="Engagement (%)",
         hovermode="x unified",
         template="plotly_white",
+        paper_bgcolor="#FFFFFF",
+        plot_bgcolor="#FFFFFF",
         height=400,
         hoverlabel={"font": {"color": "#000000"}, "bgcolor": "#FFFFFF", "bordercolor": "#003696"},
         legend={"font": {"color": "#000000"}},
@@ -605,6 +622,7 @@ def _render_engagement_evolution_comparison(
             "tickfont": {"color": "#000000"},
         },
     )
+    fig.update_traces(hoverlabel={"bgcolor": "#FFFFFF", "font": {"color": "#000000"}, "bordercolor": "#003696"})
     
     st.plotly_chart(fig, width='stretch')
 
@@ -646,6 +664,8 @@ def _render_platform_distribution(data: pd.DataFrame, color: str = "#1f77b4"):
         xaxis_title="Plataforma",
         yaxis_title="Seguidores",
         template="plotly_white",
+        paper_bgcolor="#FFFFFF",
+        plot_bgcolor="#FFFFFF",
         height=300,
         showlegend=False,
         hoverlabel={"font": {"color": "#000000"}, "bgcolor": "#FFFFFF", "bordercolor": "#003696"},
@@ -662,6 +682,7 @@ def _render_platform_distribution(data: pd.DataFrame, color: str = "#1f77b4"):
             "tickfont": {"color": "#000000"},
         },
     )
+    fig.update_traces(hoverlabel={"bgcolor": "#FFFFFF", "font": {"color": "#000000"}, "bordercolor": "#003696"})
     
     st.plotly_chart(fig, width='stretch')
 
