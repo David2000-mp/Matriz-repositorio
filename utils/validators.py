@@ -260,6 +260,70 @@ def validate_form(
     return len(errors) == 0, errors
 
 
+def check_missing_data_per_institution(df, date_range):
+    """
+    Valida datos faltantes por institución.
+    
+    Args:
+        df: DataFrame con datos
+        date_range: Tupla (start_date, end_date)
+    
+    Returns:
+        List[dict]: Lista de problemas encontrados
+    """
+    issues = []
+    start_date, end_date = date_range
+    
+    # Filtrar por rango de fechas
+    df_filtered = df[(df['fecha'] >= start_date) & (df['fecha'] <= end_date)]
+    
+    institutions = df['entidad'].unique()
+    platforms = ["Facebook", "Instagram", "TikTok", "Twitter"]
+    
+    for institution in institutions:
+        df_inst = df_filtered[df_filtered['entidad'] == institution]
+        
+        # Verificar si institución tiene datos
+        if df_inst.empty:
+            issues.append({
+                'institution': institution,
+                'platform': 'Todas',
+                'issue_type': 'Sin datos en el período'
+            })
+            continue
+        
+        # Verificar plataformas
+        for platform in platforms:
+            df_plat = df_inst[df_inst['plataforma'] == platform]
+            if df_plat.empty:
+                issues.append({
+                    'institution': institution,
+                    'platform': platform,
+                    'issue_type': 'Sin datos de plataforma'
+                })
+        
+        # Verificar engagement
+        if 'engagement_rate' in df_inst.columns:
+            engagement_missing = df_inst['engagement_rate'].isna() | (df_inst['engagement_rate'] == 0)
+            if engagement_missing.any():
+                issues.append({
+                    'institution': institution,
+                    'platform': 'Varias',
+                    'issue_type': 'Engagement faltante o cero'
+                })
+            
+            # Verificar engagement fuera de rango
+            engagement_invalid = (df_inst['engagement_rate'] < 0) | (df_inst['engagement_rate'] > 100)
+            if engagement_invalid.any():
+                issues.append({
+                    'institution': institution,
+                    'platform': 'Varias',
+                    'issue_type': 'Engagement fuera de rango (0-100%)'
+                })
+    
+    return issues
+
+
 # ============================================
 # HELPERS PARA UI
 # ============================================

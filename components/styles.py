@@ -1409,16 +1409,16 @@ def configure_plotly_theme():
 # CONFIGURACI�N PLOTLY GLOBAL
 # ===========================
 
-# Configuraci�n optimizada para gr�ficos Plotly (rendimiento en la nube)
+# Configuración optimizada para gráficos Plotly (rendimiento en la nube)
 PLOTLY_CONFIG = {
-    "displayModeBar": False,  # Ocultar barra de herramientas
+    "displayModeBar": True,   # Mostrar barra de herramientas para mejor interactividad
     "responsive": True,       # Responsive
     "displaylogo": False,     # Ocultar logo Plotly
     "modeBarButtonsToRemove": [
         "pan2d", "select2d", "lasso2d", "autoScale2d", "resetScale2d",
-        "zoom2d", "zoomIn2d", "zoomOut2d", "toImage"
-    ],  # Remover botones innecesarios
-    "staticPlot": False,      # Mantener interactividad m�nima
+        "zoomIn2d", "zoomOut2d"
+    ],  # Remover solo botones problemáticos, mantener zoom2d y toImage
+    "staticPlot": False,      # Mantener interactividad
 }
 
 PLOTLY_LAYOUT_DEFAULTS = {

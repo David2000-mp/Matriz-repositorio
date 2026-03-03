@@ -7,8 +7,10 @@ import streamlit as st
 import pandas as pd
 try:
     import plotly.express as px
+    import plotly.graph_objects as go
 except Exception:
     px = None
+    go = None
 from utils.data_provider import data_provider
 from components import COLOR_MAP, PLOTLY_CONFIG
 from components.skeleton_loaders import show_chart_skeleton
@@ -62,7 +64,7 @@ def render(df=None):
         st.warning("⚠️ Todos los registros fueron eliminados al limpiar datos vacíos. Intenta con otros filtros.")
         return
 
-    tab_dist, tab_perf, tab_cuenta = st.tabs(["Distribución", "Rendimiento", "Vista por Cuenta"])
+    tab_dist, tab_perf, tab_cuenta, tab_avanzadas = st.tabs(["Distribución", "Rendimiento", "Vista por Cuenta", "Visualizaciones Avanzadas"])
 
     with tab_dist:
         st.subheader("Distribución de Seguidores por Plataforma")
@@ -80,27 +82,53 @@ def render(df=None):
                 with pie_placeholder.container():
                     show_chart_skeleton(height=400)
                 
-                if px is None:
+                try:
+                    if px is None:
+                        pie_placeholder.empty()
+                        st.error("Plotly no está disponible. Instala `plotly` para ver gráficos.")
+                    else:
+                        fig = px.pie(df_plat, names="plataforma", values="seguidores", color="plataforma", color_discrete_map=COLOR_MAP)
+                        fig.update_traces(
+                            textposition="inside",
+                            textinfo="percent+label",
+                            textfont={"color": "#000000"},
+                        )
+                        fig.update_layout(
+                            margin=dict(t=30, b=10),
+                            paper_bgcolor="white",
+                            plot_bgcolor="white",
+                            font={"color": "#000000"},
+                            title_font={"color": "#000000"},
+                            legend={"font": {"color": "#000000"}},
+                            hoverlabel={"font": {"color": "#000000"}, "bgcolor": "#FFFFFF", "bordercolor": "#003696"},
+                        )
+                        pie_placeholder.empty()  # Remover skeleton
+                        st.plotly_chart(fig, width='stretch', config=PLOTLY_CONFIG)
+                        
+                        # Botones de exportación
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            st.download_button(
+                                "📊 Exportar Gráfico (PNG)",
+                                data=fig.to_image(format="png"),
+                                file_name="distribucion_plataformas.png",
+                                mime="image/png",
+                                help="Descarga el gráfico de distribución como imagen PNG"
+                            )
+                        with col2:
+                            csv_data = df_plat.to_csv(index=False)
+                            st.download_button(
+                                "📋 Exportar Datos (CSV)",
+                                data=csv_data,
+                                file_name="distribucion_plataformas.csv",
+                                mime="text/csv",
+                                help="Descarga los datos de distribución como archivo CSV"
+                            )
+                except Exception as e:
                     pie_placeholder.empty()
-                    st.error("Plotly no está disponible. Instala `plotly` para ver gráficos.")
-                else:
-                    fig = px.pie(df_plat, names="plataforma", values="seguidores", color="plataforma", color_discrete_map=COLOR_MAP)
-                    fig.update_traces(
-                        textposition="inside",
-                        textinfo="percent+label",
-                        textfont={"color": "#000000"},
-                    )
-                    fig.update_layout(
-                        margin=dict(t=30, b=10),
-                        paper_bgcolor="white",
-                        plot_bgcolor="white",
-                        font={"color": "#000000"},
-                        title_font={"color": "#000000"},
-                        legend={"font": {"color": "#000000"}},
-                        hoverlabel={"font": {"color": "#000000"}, "bgcolor": "#FFFFFF", "bordercolor": "#003696"},
-                    )
-                    pie_placeholder.empty()  # Remover skeleton
-                    st.plotly_chart(fig, width='stretch', config=PLOTLY_CONFIG)
+                    st.error(f"Error al generar el gráfico de distribución: {e}")
+                    st.info("Datos disponibles para debug:")
+                    st.dataframe(df_plat)
 
     with tab_perf:
         st.subheader("Rendimiento por Institución (Seguidores)")
@@ -119,35 +147,61 @@ def render(df=None):
                 with bar_placeholder.container():
                     show_chart_skeleton(height=450)
                 
-                if px is None:
+                try:
+                    if px is None:
+                        bar_placeholder.empty()
+                        st.error("Plotly no está disponible. Instala `plotly` para ver gráficos.")
+                    else:
+                        fig2 = px.bar(df_ent, x="seguidores", y="entidad", orientation="h", text="seguidores")
+                        fig2.update_traces(textfont={"color": "#000000"})
+                        fig2.update_layout(
+                            margin=dict(t=30, b=10),
+                            paper_bgcolor="white",
+                            plot_bgcolor="white",
+                            font={"color": "#000000"},
+                            title_font={"color": "#000000"},
+                            legend={"font": {"color": "#000000"}},
+                            hoverlabel={"font": {"color": "#000000"}, "bgcolor": "#FFFFFF", "bordercolor": "#003696"},
+                            xaxis={
+                                "color": "#000000",
+                                "gridcolor": "#E0E0E0",
+                                "title": {"font": {"color": "#000000"}},
+                                "tickfont": {"color": "#000000"},
+                            },
+                            yaxis={
+                                "color": "#000000",
+                                "gridcolor": "#E0E0E0",
+                                "title": {"font": {"color": "#000000"}},
+                                "tickfont": {"color": "#000000"},
+                            },
+                        )
+                        bar_placeholder.empty()  # Remover skeleton
+                        st.plotly_chart(fig2, width='stretch', config=PLOTLY_CONFIG)
+                        
+                        # Botones de exportación
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            st.download_button(
+                                "📊 Exportar Gráfico (PNG)",
+                                data=fig2.to_image(format="png"),
+                                file_name="rendimiento_instituciones.png",
+                                mime="image/png",
+                                help="Descarga el gráfico de rendimiento como imagen PNG"
+                            )
+                        with col2:
+                            csv_data = df_ent.to_csv(index=False)
+                            st.download_button(
+                                "📋 Exportar Datos (CSV)",
+                                data=csv_data,
+                                file_name="rendimiento_instituciones.csv",
+                                mime="text/csv",
+                                help="Descarga los datos de rendimiento como archivo CSV"
+                            )
+                except Exception as e:
                     bar_placeholder.empty()
-                    st.error("Plotly no está disponible. Instala `plotly` para ver gráficos.")
-                else:
-                    fig2 = px.bar(df_ent, x="seguidores", y="entidad", orientation="h", text="seguidores")
-                    fig2.update_traces(textfont={"color": "#000000"})
-                    fig2.update_layout(
-                        margin=dict(t=30, b=10),
-                        paper_bgcolor="white",
-                        plot_bgcolor="white",
-                        font={"color": "#000000"},
-                        title_font={"color": "#000000"},
-                        legend={"font": {"color": "#000000"}},
-                        hoverlabel={"font": {"color": "#000000"}, "bgcolor": "#FFFFFF", "bordercolor": "#003696"},
-                        xaxis={
-                            "color": "#000000",
-                            "gridcolor": "#E0E0E0",
-                            "title": {"font": {"color": "#000000"}},
-                            "tickfont": {"color": "#000000"},
-                        },
-                        yaxis={
-                            "color": "#000000",
-                            "gridcolor": "#E0E0E0",
-                            "title": {"font": {"color": "#000000"}},
-                            "tickfont": {"color": "#000000"},
-                        },
-                    )
-                    bar_placeholder.empty()  # Remover skeleton
-                    st.plotly_chart(fig2, width='stretch', config=PLOTLY_CONFIG)
+                    st.error(f"Error al generar el gráfico de rendimiento: {e}")
+                    st.info("Datos disponibles para debug:")
+                    st.dataframe(df_ent.head(10))
 
     with tab_cuenta:
         st.subheader("Vista por Cuenta - Análisis Comparativo")
@@ -203,6 +257,18 @@ def render(df=None):
             # Extraer el usuario real de la selección
             cuenta_seleccionada = cuenta_seleccionada_display.split(" (")[0] if cuenta_seleccionada_display else None
 
+            # Selector de segunda cuenta para comparación (solo si hay más de una cuenta disponible)
+            if len(opciones_cuentas) > 1:
+                opciones_cuentas_sin_primera = [opt for opt in opciones_cuentas if opt != cuenta_seleccionada_display]
+                segunda_cuenta_display = st.selectbox(
+                    "Seleccionar segunda cuenta para comparar:",
+                    options=opciones_cuentas_sin_primera,
+                    help="Elige otra cuenta de la institución para comparar métricas directamente"
+                )
+                segunda_cuenta = segunda_cuenta_display.split(" (")[0] if segunda_cuenta_display else None
+            else:
+                segunda_cuenta = None
+
             if cuenta_seleccionada:
                 # Obtener datos de la cuenta seleccionada
                 cuenta_data = df[df["usuario_red"] == cuenta_seleccionada]
@@ -210,6 +276,67 @@ def render(df=None):
                     cuenta_row = cuenta_data.iloc[0]
                     cuenta_seguidores = cuenta_row["seguidores"]
                     cuenta_plataforma = cuenta_row["plataforma"]
+
+                    # Mostrar comparación lado a lado si hay segunda cuenta
+                    if segunda_cuenta:
+                        # Obtener datos de la segunda cuenta
+                        segunda_data = df[df["usuario_red"] == segunda_cuenta]
+                        if not segunda_data.empty:
+                            segunda_row = segunda_data.iloc[0]
+                            segunda_seguidores = segunda_row["seguidores"]
+                            segunda_plataforma = segunda_row["plataforma"]
+                            
+                            st.markdown("### 🔄 Comparación Directa entre Cuentas")
+                            
+                            # Tabla de comparación side-by-side
+                            metrics = ["Seguidores"]
+                            cuenta1_vals = [cuenta_seguidores]
+                            cuenta2_vals = [segunda_seguidores]
+                            diff_abs = [cuenta_seguidores - segunda_seguidores]
+                            diff_pct = [(diff_abs[0] / segunda_seguidores * 100) if segunda_seguidores != 0 else 0]
+                            
+                            comp_df = pd.DataFrame({
+                                "Métrica": metrics,
+                                f"{cuenta_seleccionada} ({cuenta_plataforma})": cuenta1_vals,
+                                f"{segunda_cuenta} ({segunda_plataforma})": cuenta2_vals,
+                                "Diferencia Absoluta": diff_abs,
+                                "Diferencia %": [f"{pct:.1f}%" for pct in diff_pct]
+                            })
+                            
+                            st.table(comp_df)
+                            
+                            # Visualización gráfica de las diferencias
+                            if px is not None:
+                                # Preparar datos para gráfico
+                                plot_df = pd.DataFrame({
+                                    "Cuenta": [f"{cuenta_seleccionada} ({cuenta_plataforma})", f"{segunda_cuenta} ({segunda_plataforma})"],
+                                    "Seguidores": [cuenta_seguidores, segunda_seguidores]
+                                })
+                                
+                                fig_comp = px.bar(
+                                    plot_df,
+                                    x="Cuenta",
+                                    y="Seguidores",
+                                    color="Cuenta",
+                                    text="Seguidores",
+                                    title="Comparación de Seguidores"
+                                )
+                                fig_comp.update_traces(texttemplate='%{text:.0f}', textposition='outside')
+                                fig_comp.update_layout(
+                                    margin=dict(t=30, b=10),
+                                    paper_bgcolor="white",
+                                    plot_bgcolor="white",
+                                    font={"color": "#000000"},
+                                    title_font={"color": "#000000"},
+                                    xaxis={"color": "#000000", "tickfont": {"color": "#000000"}},
+                                    yaxis={"color": "#000000", "gridcolor": "#E0E0E0", "title": {"font": {"color": "#000000"}}, "tickfont": {"color": "#000000"}},
+                                    showlegend=False
+                                )
+                                st.plotly_chart(fig_comp, width='stretch', config=PLOTLY_CONFIG)
+                            else:
+                                st.error("Plotly no está disponible. Instala `plotly` para ver gráficos.")
+                            
+                            st.divider()
 
                     # Mostrar información enriquecida de la cuenta
                     st.markdown("### 📊 Información de la Cuenta")
@@ -290,6 +417,64 @@ def render(df=None):
                         st.warning(f"📉 **{cuenta_seleccionada}** está por debajo del promedio de {cuenta_plataforma} en {abs(delta_porcentual_actual):.1f}%")
                     else:
                         st.info(f"⚖️ **{cuenta_seleccionada}** está exactamente en el promedio de {cuenta_plataforma}")
+
+    with tab_avanzadas:
+        st.subheader("Visualizaciones Avanzadas")
+        
+        # Scatter Plot: Engagement vs Seguidores
+        if 'engagement_rate' in df.columns and 'seguidores' in df.columns:
+            st.markdown("### 📊 Scatter Plot: Engagement vs Seguidores")
+            fig_scatter = px.scatter(df, x='seguidores', y='engagement_rate', color='plataforma', hover_data=['entidad', 'usuario_red'])
+            st.plotly_chart(fig_scatter, config=PLOTLY_CONFIG)
+        else:
+            st.warning("Datos insuficientes para scatter plot.")
+        
+        # Heatmap de correlación
+        numeric_cols = ['seguidores', 'engagement_rate', 'alcance', 'interacciones', 'likes_promedio']
+        available_cols = [col for col in numeric_cols if col in df.columns]
+        if len(available_cols) > 1:
+            st.markdown("### 🔥 Heatmap: Matriz de Correlación")
+            corr_matrix = df[available_cols].corr()
+            fig_heatmap = px.imshow(corr_matrix, text_auto=True, aspect="auto")
+            st.plotly_chart(fig_heatmap, config=PLOTLY_CONFIG)
+        else:
+            st.warning("Datos insuficientes para heatmap.")
+        
+        # Radar Chart: Promedios por Plataforma
+        st.markdown("### 🕸️ Radar Chart: Promedios por Plataforma")
+        if go is not None and not df.empty:
+            # Calcular promedios por plataforma para métricas disponibles
+            radar_data = {}
+            for col in available_cols:
+                platform_avg = df.groupby('plataforma')[col].mean()
+                radar_data[col] = platform_avg
+            
+            # Crear radar chart
+            fig_radar = go.Figure()
+            for platform in df['plataforma'].unique():
+                values = []
+                for col in available_cols:
+                    if platform in radar_data[col].index:
+                        values.append(radar_data[col][platform])
+                    else:
+                        values.append(0)
+                
+                fig_radar.add_trace(go.Scatterpolar(
+                    r=values,
+                    theta=available_cols,
+                    fill='toself',
+                    name=platform
+                ))
+            
+            fig_radar.update_layout(
+                polar=dict(
+                    radialaxis=dict(visible=True, range=[0, None])
+                ),
+                showlegend=True
+            )
+            st.plotly_chart(fig_radar, config=PLOTLY_CONFIG)
+        else:
+            st.warning("Datos insuficientes para radar chart.")
 
     st.markdown("---")
     st.info("Usa los filtros globales en la barra lateral para ajustar institución y periodo.")

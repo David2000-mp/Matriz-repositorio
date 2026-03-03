@@ -18,6 +18,7 @@ from utils import (
     COLEGIOS_MARISTAS,
 )
 from utils.data_provider import data_provider
+from utils.visualizations import plot_engagement_evolution
 from utils.data_manager import load_configs
 from components import COLOR_MAP, inject_custom_css, configure_plotly_theme
 from utils.analytics import (
@@ -38,7 +39,7 @@ from components.toast_notifications import (
 )
 
 # Importar configuración Plotly centralizada
-from components import PLOTLY_CONFIG, PLOTLY_LAYOUT_DEFAULTS, show_kpi_skeleton, show_chart_skeleton
+from components import PLOTLY_CONFIG, PLOTLY_LAYOUT_DEFAULTS, show_kpi_skeleton, show_chart_skeleton, COLOR_MAP
 
 
 def get_traffic_light_indicator(metric, value):
@@ -110,14 +111,12 @@ def _get_engagement_health(plataforma: str, engagement_rate: float) -> Tuple[str
         return "Excelente", "🟢"
 
 
-def get_engagement_status(interacciones, seguidores, engagement_rate=None):
+def get_engagement_status(engagement_rate=None):
     """
     Determina el estado del engagement basado en datos disponibles.
     Retorna un mensaje explicativo si no se puede calcular o es de referencia.
     
     Args:
-        interacciones: Número de interacciones (puede ser 0 si se calcula desde engagement_rate)
-        seguidores: Número de seguidores
         engagement_rate: Tasa de engagement (opcional) para validar si hay datos reales
     
     Returns:
@@ -126,17 +125,8 @@ def get_engagement_status(interacciones, seguidores, engagement_rate=None):
     # Si hay un engagement_rate válido (>0), considerar que tenemos datos suficientes
     has_engagement = engagement_rate is not None and engagement_rate > 0
     
-    if seguidores == 0:
-        if interacciones == 0 and not has_engagement:
-            return "No hay datos registrados (seguidores e interacciones ausentes). Este es un dato de referencia provisional."
-        elif not has_engagement:
-            return "No hay seguidores registrados para calcular engagement. Este es un dato de referencia provisional."
-    
-    if interacciones == 0 and not has_engagement:
-        return "No hay interacciones registradas en este período. Este es un dato de referencia provisional."
-    
-    if seguidores < 10 and not has_engagement:  # Umbral mínimo para "datos insuficientes"
-        return "Datos insuficientes: audiencia muy pequeña para referencia precisa. Este es un dato de referencia provisional."
+    if not has_engagement:
+        return "No hay datos de engagement registrados. Este es un dato de referencia provisional."
     
     return None  # Datos suficientes
 
@@ -219,13 +209,8 @@ def render(df=None):
     # Selector temporal rápido
     col_time, col_space = st.columns([2, 3])
     with col_time:
-        periodo_seleccionado = st.radio(
-            "Periodo de análisis:",
-            ["Último mes", "Últimos 3 meses", "Histórico"],
-            index=2,
-            horizontal=True,
-            help="Selecciona el periodo para el análisis de datos"
-        )
+        # Periodo fijo: Histórico completo
+        periodo_seleccionado = "Histórico"
 
     # Micro-interacción: status mientras procesamos/normalizamos el DataFrame
     # OCULTO: Solo visible como pop-up en depuración
@@ -253,11 +238,9 @@ def render(df=None):
             # Consolidar: mantener solo último registro por cuenta y mes para evitar doble conteo
             df_full = normalize_monthly_latest(df_full)
 
-        # Aplicar suavizado (promedio móvil 3M) sobre seguidores e interacciones
+        # Aplicar suavizado (promedio móvil 3M) sobre seguidores
         try:
             df_full = apply_moving_average(df_full, col="seguidores")
-            if "interacciones" in df_full.columns:
-                df_full = apply_moving_average(df_full, col="interacciones")
         except Exception as e:
             logging.warning(f"No se pudo aplicar moving average: {e}")
 
@@ -285,7 +268,7 @@ def render(df=None):
                 df_full[logical] = "Unknown"
 
         # Asegurar que las columnas numéricas estén en formato correcto para evitar errores
-        for _col in ("seguidores", "interacciones", "engagement_rate"):
+        for _col in ("seguidores", "engagement_rate"):
             if _col in df_full.columns:
                 df_full[_col] = pd.to_numeric(df_full[_col], errors="coerce").fillna(0)
 
@@ -337,12 +320,12 @@ def render(df=None):
     data_quality_issues = []
     if 'seguidores' in df_m_month.columns and (df_m_month['seguidores'] < 0).any():
         data_quality_issues.append("Valores negativos detectados en seguidores")
-    if 'interacciones' in df_m_month.columns and (df_m_month['interacciones'] < 0).any():
-        data_quality_issues.append("Valores negativos detectados en interacciones")
     if 'seguidores' in df_m_month.columns and df_m_month['seguidores'].isna().any():
         data_quality_issues.append("Datos faltantes en seguidores")
-    if 'interacciones' in df_m_month.columns and df_m_month['interacciones'].isna().any():
-        data_quality_issues.append("Datos faltantes en interacciones")
+    if 'engagement_rate' in df_m_month.columns and (df_m_month['engagement_rate'] < 0).any():
+        data_quality_issues.append("Valores negativos detectados en engagement")
+    if 'engagement_rate' in df_m_month.columns and df_m_month['engagement_rate'].isna().any():
+        data_quality_issues.append("Datos faltantes en engagement")
     if 'fecha' in df_m_month.columns and df_m_month['fecha'].isna().any():
         data_quality_issues.append("Fechas inválidas o faltantes")
 
@@ -367,8 +350,7 @@ def render(df=None):
 
     # Verificar anomalías en el mes actual
     anomalias_mes = df_unique[
-        (df_unique.get("anomalia_seguidores", False)) | 
-        (df_unique.get("anomalia_interacciones", False))
+        (df_unique.get("anomalia_seguidores", False))
     ]
     plataformas_anomalas = anomalias_mes["plataforma"].unique() if not anomalias_mes.empty else []
 
@@ -419,18 +401,10 @@ def render(df=None):
         
         # Promedio simple de los ER por plataforma (del formulario)
         er_global = platform_er['engagement_rate'].mean() if len(platform_er) > 0 else 0.0
-        
-        tot_int = df_unique['interacciones'].sum() if 'interacciones' in df_unique.columns else 0
     except Exception as e:
         logging.warning(f"Error en cálculo de engagement: {e}")
-        tot_int = df_unique['interacciones'].sum() if 'interacciones' in df_unique.columns else 0
         tot_seg_for_calc = df_unique['seguidores'].sum() if 'seguidores' in df_unique.columns else 0
-        er_global = (tot_int / tot_seg_for_calc * 100.0) if tot_seg_for_calc > 0 else 0.0
-
-    # Calcular promedio de interacciones
-    avg_int = df_unique['interacciones'].mean() if not df_unique.empty and 'interacciones' in df_unique.columns else 0
-
-    # Mes anterior para MoM
+        er_global = df_unique['engagement_rate'].mean() if not df_unique.empty else 0.0
     meses_disponibles = sorted(df_full["fecha"].dropna().dt.strftime("%Y-%m").unique(), reverse=True)  # type: ignore
     mes_anterior = meses_disponibles[1] if len(meses_disponibles) > 1 else None
 
@@ -461,16 +435,13 @@ def render(df=None):
             er_prev = platform_er_prev['engagement_rate'].mean() if len(platform_er_prev) > 0 else 0.0
         except Exception as e:
             logging.warning(f"Error en cálculo de engagement anterior: {e}")
-            int_prev = df_prev_unique['interacciones'].sum()
             seg_prev_calc = df_prev_unique['seguidores'].sum()
-            er_prev = (int_prev / seg_prev_calc * 100.0) if seg_prev_calc > 0 else 0.0
+            er_prev = df_prev_unique['engagement_rate'].mean() if not df_prev_unique.empty else 0.0
         
-        # usar suma total para comparar seguidores e interacciones
+        # usar suma total para comparar seguidores
         seg_prev = df_prev_unique['seguidores'].sum()
-        int_prev = df_prev_unique['interacciones'].sum()
         seg_prev_total = seg_prev
         delta_seg = ((tot_seg - seg_prev) / seg_prev * 100.0) if seg_prev > 0 else 0.0
-        delta_int = ((tot_int - int_prev) / int_prev * 100.0) if int_prev > 0 else 0.0
         delta_er = er_global - er_prev
         # Detector de anomalías: alerta si el delta de seguidores es > +/-20%
         try:
@@ -508,13 +479,44 @@ def render(df=None):
 
     # Verificar si hay anomalías en el mes actual para badges
     anomalia_seguidores = df_unique.get("anomalia_seguidores", pd.Series(False)).any()
-    anomalia_interacciones = df_unique.get("anomalia_interacciones", pd.Series(False)).any()
 
     # Calcular estado del engagement global
-    status_global = get_engagement_status(tot_int, tot_seg, engagement_rate=er_global)
+    status_global = get_engagement_status(engagement_rate=er_global)
 
     # Limpiar skeleton y mostrar KPIs reales
     kpi_placeholder.empty()
+    
+    # CSS para cards de KPIs
+    st.markdown("""
+    <style>
+    .kpi-card {
+        background: #F8F9FA;
+        border: 1px solid #E9ECEF;
+        border-radius: 8px;
+        padding: 16px;
+        margin: 4px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        text-align: center;
+    }
+    .kpi-card h4 {
+        margin: 0 0 8px 0;
+        font-size: 14px;
+        color: #495057;
+        font-weight: 600;
+    }
+    .kpi-value {
+        font-size: 24px;
+        font-weight: 700;
+        color: #212529;
+        margin: 8px 0;
+    }
+    .kpi-delta {
+        font-size: 12px;
+        margin: 4px 0;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
     k1, k2, k3, k4 = st.columns(4)
     # Mostrar MoM y YoY juntos cuando estén disponibles
     if mes_anterior:
@@ -526,51 +528,68 @@ def render(df=None):
         delta_display = "-"
 
     with k1:
-        st.metric(
-            label=f"Seguidores {get_traffic_light_indicator('growth', delta_seg)}",
-            value=f"{tot_seg:,.0f}",
-            delta=delta_display,
-        )
+        with st.container():
+            st.markdown(f"""
+            <div class="kpi-card">
+                <h4>Seguidores {get_traffic_light_indicator('growth', delta_seg)}</h4>
+                <div class="kpi-value">{tot_seg:,.0f}</div>
+                <div class="kpi-delta">{delta_display}</div>
+            </div>
+            """, unsafe_allow_html=True)
         if anomalia_seguidores:
             st.markdown("⚠️ **Anomalía detectada**", help="Variación >20% vs promedio móvil o mes anterior")
 
     with k2:
-        st.metric(
-            label=f"Interacciones Promedio {get_traffic_light_indicator('growth', delta_int)}",
-            value=f"{avg_int:.1f}",
-            delta=f"{delta_int:+.1f}%" if mes_anterior else "-",
+        with st.container():
+            st.markdown(f"""
+            <div class="kpi-card">
+                <h4>Engagement Promedio {get_traffic_light_indicator('engagement', er_global)}</h4>
+                <div class="kpi-value">{er_global:.2f}%</div>
+                <div class="kpi-delta">{f"{delta_er:+.2f} pp" if mes_anterior else "-"}</div>
+            </div>
+            """, unsafe_allow_html=True)
+        if status_global:
+            st.caption(f"💡 Nota sobre Engagement: {status_global}")
+    
+    # Coverage KPI (assuming k3 is for coverage)
+    with k3:
+        # Calculate coverage - number of institutions with data
+        instituciones_con_datos = df_unique['entidad'].nunique()
+        total_instituciones = len(COLEGIOS_MARISTAS)
+        coverage_pct = (instituciones_con_datos / total_instituciones * 100) if total_instituciones > 0 else 0
+        
+        with st.container():
+            st.markdown(f"""
+            <div class="kpi-card">
+                <h4>Cobertura Institucional</h4>
+                <div class="kpi-value">{instituciones_con_datos}/{total_instituciones}</div>
+                <div class="kpi-delta">{coverage_pct:.1f}%</div>
+            </div>
+            """, unsafe_allow_html=True)
+    
+    # Health score KPI (k4)
+    with k4:
+        score_label = f"{health_score:.0f}"
+        if health_score > 80:
+            color = "#1E7E34"  # Verde oscuro
+        elif health_score > 60:
+            color = "#CC7000"  # Naranja oscuro
+        else:
+            color = "#C82333"  # Rojo oscuro
+        
+        tooltip = (
+            "Salud Digital: Score que mide la salud general de tus redes sociales. Se calcula promediando Engagement (50%), Crecimiento Anual (30%) y Consistencia (20%). Un score alto indica cuentas saludables con buen engagement y crecimiento sostenido. "
+            f"Indicador de confiabilidad: {get_traffic_light_indicator('health', health_score)} (🟢 >80 óptimo, 🟡 >60 aceptable, 🔴 ≤60 requiere atención)"
         )
-        if anomalia_interacciones:
-            st.markdown("⚠️ **Anomalía detectada**", help="Variación >20% vs promedio móvil o mes anterior")
-    k3.metric(
-        f"Engagement Promedio {get_traffic_light_indicator('engagement', er_global)}",
-        f"{er_global:.2f}%",
-        delta=f"{delta_er:+.2f} pp" if mes_anterior else "-",
-        help=f"Porcentaje de engagement promedio. {'Nota: ' + status_global if status_global else ''}"
-    )
-    if status_global:
-        st.caption(f"💡 Nota sobre Engagement: {status_global}")
-    # Salud Digital: mostrar número y color (WCAG AA)
-    score_label = f"{health_score:.0f}"
-    if health_score > 80:
-        color = "#1E7E34"  # Verde oscuro - 5.32:1 ✓
-    elif health_score > 60:
-        color = "#CC7000"  # Naranja oscuro - 4.89:1 ✓
-    else:
-        color = "#C82333"  # Rojo oscuro - 5.94:1 ✓
-    # Badge Pro: tarjeta con borde dinámico y tooltip explicativo
-    tooltip = (
-        "Salud Digital: Score que mide la salud general de tus redes sociales. Se calcula promediando Engagement (50%), Crecimiento Anual (30%) y Consistencia (20%). Un score alto indica cuentas saludables con buen engagement y crecimiento sostenido. "
-        f"Indicador de confiabilidad: {get_traffic_light_indicator('health', health_score)} (🟢 >80 óptimo, 🟡 >60 aceptable, 🔴 ≤60 requiere atención)"
-    )
-    k4.markdown(
-        f"<div title='{tooltip}' style='padding:12px;border-radius:8px;border:2px solid {color};background:#ffffff;text-align:center;'>"
-        f"<div style='font-size:14px;color:#4A5568;margin-bottom:8px;font-weight:600;'>Salud Digital {get_traffic_light_indicator('health', health_score)}</div>"
-        f"<div style='font-size:28px;font-weight:800;color:{color};'>{score_label}</div>"
-        f"<div style='font-size:14px;color:#1A1A1A;margin-top:8px;'>Score (0-100)</div>"
-        f"</div>",
-        unsafe_allow_html=True,
-    )
+        
+        with st.container():
+            st.markdown(f"""
+            <div class="kpi-card" title="{tooltip}">
+                <h4>Salud Digital {get_traffic_light_indicator('health', health_score)}</h4>
+                <div class="kpi-value" style="color: {color};">{score_label}</div>
+                <div class="kpi-delta">Score (0-100)</div>
+            </div>
+            """, unsafe_allow_html=True)
 
     # Desglose por Red Social
     st.subheader("Desglose por Red Social")
@@ -585,7 +604,6 @@ def render(df=None):
     # Agrupar por plataforma usando valores del formulario
     platform_summary = df_unique_display.groupby('plataforma').agg({
         'seguidores': 'sum',
-        'interacciones': 'sum',
         'engagement_rate': 'mean'  # Promedio de valores del formulario
     }).reset_index()
     
@@ -593,10 +611,9 @@ def render(df=None):
     platform_summary['engagement_promedio'] = platform_summary['engagement_rate']
     
     for _, row in platform_summary.iterrows():
-        status = get_engagement_status(row['interacciones'], row['seguidores'], engagement_rate=row['engagement_promedio'])
+        status = get_engagement_status(engagement_rate=row['engagement_promedio'])
         engagement_display = status if status else f"{row['engagement_promedio']:.2f}%"
-        total_interactions = row['interacciones']
-        st.write(f"**{row['plataforma']}**: Seguidores totales: {row['seguidores']:,.0f}, Interacciones totales: {total_interactions:,.0f}, Engagement promedio: {engagement_display}")
+        st.write(f"**{row['plataforma']}**: Seguidores totales: {row['seguidores']:,.0f}, Engagement promedio: {engagement_display}")
 
     # Desglose detallado por plataforma
     st.markdown("### 📱 Desglose Detallado por Plataforma")
@@ -604,26 +621,22 @@ def render(df=None):
     for _, row in platform_summary.iterrows():
         platform_name = row['plataforma']
         platform_followers = row['seguidores']
-        platform_interactions = row['interacciones']
         platform_engagement = row['engagement_promedio']
         
         with st.expander(f"📱 {platform_name}", expanded=False):
-            col1, col2, col3 = st.columns(3)
+            col1, col2 = st.columns(2)
             
             with col1:
                 st.metric("Seguidores Totales", f"{platform_followers:,.0f}")
             
             with col2:
-                status = get_engagement_status(platform_interactions, platform_followers, engagement_rate=platform_engagement)
+                status = get_engagement_status(engagement_rate=platform_engagement)
                 if status:
                     st.metric("Engagement Promedio", "Datos insuficientes")
                     st.caption(f"💡 {status}")
                 else:
                     health_status, emoji = _get_engagement_health(platform_name, platform_engagement)
                     st.metric("Engagement Promedio", f"{platform_engagement:.2f}%", delta=f"{emoji} {health_status}")
-            
-            with col3:
-                st.metric("Interacciones Totales", f"{platform_interactions:,.0f}")
 
     # Métricas de cobertura usando la tabla de cuentas
     st.markdown("### 📊 Cobertura de Plataformas")
@@ -682,7 +695,6 @@ def render(df=None):
     period = st.session_state.get('filtro_mes', periodo_label)
     kpis = {
         'seguidores': {'valor': tot_seg, 'delta': delta_display},
-        'interacciones': {'valor': tot_int, 'delta': f"{delta_int:+.1f}%" if mes_anterior else "-"},
         'engagement': {'valor': f"{er_global:.2f}%", 'delta': f"{delta_er:+.2f} pp" if mes_anterior else "-"}
     }
     anomalies_list = []
@@ -690,8 +702,6 @@ def render(df=None):
         for _, row in anomalias_mes.iterrows():
             if row.get('anomalia_seguidores', False):
                 anomalies_list.append(f"Anomalía en seguidores de {row['plataforma']}")
-            if row.get('anomalia_interacciones', False):
-                anomalies_list.append(f"Anomalía en interacciones de {row['plataforma']}")
 
     # Preparar nombre de archivo seguro
     safe_school = str(school_name).replace(' ', '_').replace('/', '_')
@@ -941,96 +951,14 @@ def render(df=None):
             logging.error(f"Error al generar gráfica de evolución: {e}")
             st.error(f"Error al gráfica de evolución: {str(e)}")
 
-        # Línea adicional: interacciones con tendencia suavizada
-        fig_int = None
-        interactions_placeholder = st.empty()
-        
-        try:
-            if "interacciones" in df_full.columns:
-                df_int = (
-                    df_full.groupby(["fecha", "plataforma"])["interacciones"].sum().reset_index()
-                )
-                
-                # Asegurar que fecha sea datetime para Plotly
-                df_int["fecha"] = pd.to_datetime(df_int["fecha"], errors="coerce")
-                df_int = df_int.dropna(subset=["fecha"]).sort_values(["plataforma", "fecha"])
-                
-                if df_int.empty:
-                    interactions_placeholder.empty()
-                    st.warning("No hay datos de interacciones disponibles.")
-                else:
-                    with interactions_placeholder.container():
-                        show_chart_skeleton(height=350)
-                    
-                    if px is None:
-                        interactions_placeholder.empty()
-                        st.error("Plotly no está disponible. Instala `plotly` para ver gráficos.")
-                    else:
-                        fig_int = px.line(
-                            df_int,
-                            x="fecha",
-                            y="interacciones",
-                            color="plataforma",
-                            color_discrete_map=COLOR_MAP,
-                            title="Evolución de Interacciones (Real vs Tendencia)",
-                            markers=True,
-                        )
-                        fig_int.update_xaxes(type="date")
-                        
-                        if "interacciones_ma3" in df_full.columns:
-                            df_int_tr = (
-                                df_full.groupby(["fecha", "plataforma"])["interacciones_ma3"].sum().reset_index()
-                            )
-                            # Asegurar que fecha sea datetime
-                            df_int_tr["fecha"] = pd.to_datetime(df_int_tr["fecha"], errors="coerce")
-                            df_int_tr = df_int_tr.dropna(subset=["fecha"]).sort_values(["plataforma", "fecha"])
-                            
-                            import plotly.graph_objects as go
-
-                            for plat in df_int_tr["plataforma"].unique():
-                                dfp = df_int_tr[df_int_tr["plataforma"] == plat].sort_values("fecha")
-                                fig_int.add_trace(
-                                    go.Scatter(
-                                        x=dfp["fecha"],
-                                        y=dfp["interacciones_ma3"],
-                                        mode="lines",
-                                        name=f"{plat} - Tendencia Suavizada",
-                                        line=dict(width=2, dash="dash"),
-                                        hoverinfo="skip",
-                                    )
-                                )
-                        
-                        fig_int.update_layout(
-                            autosize=True,
-                            paper_bgcolor="white",
-                            plot_bgcolor="white",
-                            font={"color": "#000000"},
-                            title_font={"color": "#000000"},
-                            legend={"font": {"color": "#000000"}},
-                            hoverlabel={"font": {"color": "#000000"}, "bgcolor": "#FFFFFF", "bordercolor": "#003696"},
-                            xaxis={
-                                "color": "#000000",
-                                "gridcolor": "#E0E0E0",
-                                "title": {"font": {"color": "#000000"}},
-                                "tickfont": {"color": "#000000"},
-                            },
-                            yaxis={
-                                "color": "#000000",
-                                "gridcolor": "#E0E0E0",
-                                "title": {"font": {"color": "#000000"}},
-                                "tickfont": {"color": "#000000"},
-                            },
-                        )
-                        interactions_placeholder.empty()  # Remover skeleton
-                        st.plotly_chart(
-                            fig_int,
-                            width='stretch',
-                            config=PLOTLY_CONFIG,
-                        )
-        except Exception as e:
-            interactions_placeholder.empty()
-            logging.error(f"Error al generar gráfica de interacciones: {e}")
-            st.error(f"Error en gráfica de interacciones: {str(e)}")
+        # Gráfica de evolución de engagement
+        st.markdown("### 📈 Evolución de Engagement por Red Social")
+        platform_filter = st.selectbox(
+            "Filtrar por red social:",
+            ["Todas", "Facebook", "Instagram", "TikTok", "Twitter"],
+            key="engagement_platform_filter"
+        )
+        plot_engagement_evolution(df_full, platform_filter)
 
     with tab_rank:
         # Skeleton loader para ranking
@@ -1186,6 +1114,134 @@ def render(df=None):
             ranking_placeholder.empty()
             logging.error(f"Error al generar gráfica de ranking: {e}")
             st.error(f"Error en gráfica de ranking: {str(e)}")
+
+    # --- Ranking de Crecimiento de Seguidores ---
+    st.markdown("### � Top 15: Crecimiento de Seguidores por Institución")
+    st.markdown("*Comparación entre las últimas 2 mediciones disponibles*")
+
+    try:
+        # Calcular crecimiento entre las dos últimas mediciones por institución y plataforma
+        growth_data = []
+        
+        for (entidad, plataforma), group in df_full.groupby(['entidad', 'plataforma']):
+            # Ordenar por fecha descendente para obtener las mediciones más recientes
+            group_sorted = group.sort_values('fecha', ascending=False)
+            
+            if len(group_sorted) >= 2:
+                # Tomar las dos mediciones más recientes
+                latest = group_sorted.iloc[0]  # Más reciente
+                previous = group_sorted.iloc[1]  # Anterior
+                
+                crecimiento = latest['seguidores'] - previous['seguidores']
+                
+                if crecimiento > 0:  # Solo incluir crecimiento positivo
+                    growth_data.append({
+                        'entidad': entidad,
+                        'plataforma': plataforma,
+                        'fecha_mas_reciente': latest['fecha'],
+                        'seguidores_mas_reciente': latest['seguidores'],
+                        'fecha_anterior': previous['fecha'],
+                        'seguidores_anterior': previous['seguidores'],
+                        'crecimiento': crecimiento
+                    })
+        
+        growth_df = pd.DataFrame(growth_data)
+        
+        # Ordenar por crecimiento descendente y tomar top 15
+        if not growth_df.empty:
+            growth_df = growth_df.sort_values('crecimiento', ascending=False).head(15)
+
+        if not growth_df.empty:
+            # Crear gráfica bonita de crecimiento
+            if px is not None:
+                # Crear gráfica de barras verticales más visual
+                fig_growth = px.bar(
+                    growth_df,
+                    x='entidad',
+                    y='crecimiento',
+                    color='plataforma',
+                    title='🚀 Crecimiento de Seguidores por Institución<br><sup style="font-size:12px;">Entre las últimas 2 mediciones disponibles</sup>',
+                    labels={
+                        'crecimiento': '📈 Crecimiento de Seguidores',
+                        'entidad': '🏫 Institución',
+                        'plataforma': '📱 Plataforma'
+                    },
+                    color_discrete_map=COLOR_MAP,
+                    text='crecimiento'
+                )
+
+                # Personalizar la gráfica para que sea más bonita
+                fig_growth.update_layout(
+                    height=600,
+                    xaxis_title="",
+                    yaxis_title="Crecimiento de Seguidores",
+                    legend_title="Plataforma Social",
+                    showlegend=True,
+                    plot_bgcolor='rgba(0,0,0,0)',
+                    paper_bgcolor='rgba(0,0,0,0)',
+                    font=dict(size=12, color='#2c3e50'),
+                    title_font=dict(size=20, color='#2c3e50', family='Arial Black'),
+                    title_x=0.5,
+                    title_y=0.95
+                )
+
+                # Mejorar las barras
+                fig_growth.update_traces(
+                    texttemplate='<b>%{text:,}</b>',
+                    textposition='outside',
+                    textfont_size=11,
+                    textfont_color='#2c3e50',
+                    marker_line_width=1,
+                    marker_line_color='rgba(0,0,0,0.3)',
+                    hovertemplate='<b>%{x}</b><br>' +
+                                 '📱 %{fullData.name}<br>' +
+                                 '📈 Crecimiento: <b>%{y:,}</b> seguidores<br>' +
+                                 '<extra></extra>'
+                )
+
+                # Mejorar ejes
+                fig_growth.update_xaxes(
+                    tickangle=45,
+                    tickfont=dict(size=10, color='#34495e'),
+                    showgrid=False
+                )
+
+                fig_growth.update_yaxes(
+                    tickfont=dict(size=10, color='#34495e'),
+                    showgrid=True,
+                    gridcolor='rgba(0,0,0,0.1)'
+                )
+
+                st.plotly_chart(
+                    fig_growth,
+                    use_container_width=True,
+                    config=PLOTLY_CONFIG,
+                )
+
+                # Agregar información adicional debajo de la gráfica
+                st.markdown("---")
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric("🏆 Mayor Crecimiento", 
+                             f"{growth_df.iloc[0]['entidad'][:20]}...", 
+                             f"+{growth_df.iloc[0]['crecimiento']:,}")
+                with col2:
+                    st.metric("📱 Plataforma Líder", 
+                             growth_df.groupby('plataforma')['crecimiento'].sum().idxmax(),
+                             f"{growth_df.groupby('plataforma')['crecimiento'].sum().max():,}")
+                with col3:
+                    st.metric("📊 Total Crecimiento", 
+                             f"{growth_df['crecimiento'].sum():,}",
+                             f"{len(growth_df)} instituciones")
+
+            else:
+                st.warning("Plotly no disponible - no se puede mostrar la gráfica")
+        else:
+            st.info("No hay datos de crecimiento de seguidores disponibles.")
+
+    except Exception as e:
+        st.error(f"Error al calcular ranking de crecimiento: {str(e)}")
+        logging.error(f"Error en ranking de crecimiento: {e}")
 
     # --- Evolución de la Salud Digital (últimos 6 meses) ---
     health_placeholder = st.empty()

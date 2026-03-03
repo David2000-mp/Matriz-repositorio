@@ -21,6 +21,7 @@ BASE_DIR = Path(__file__).parent.parent
 DATA_DIR = BASE_DIR / "data"
 CUENTAS_CSV = DATA_DIR / "cuentas.csv"
 METRICAS_CSV = DATA_DIR / "metricas.csv"
+SAMPLE_UPLOAD_FULL_CSV = DATA_DIR / "sample_upload_full.csv"
 
 COLS_CUENTAS = ["id_cuenta", "entidad", "plataforma", "usuario_red"]
 COLS_METRICAS = ["id_cuenta", "fecha", "seguidores", "alcance", "interacciones", "likes_promedio", "engagement_rate"]
@@ -159,6 +160,40 @@ def _load_data_impl() -> Tuple[pd.DataFrame, pd.DataFrame]:
                 metricas_df = validate_and_fill_columns(metricas_df, COLS_METRICAS)
             except Exception as e:
                 logger.warning(f"Error cargando metricas.csv: {e}")
+
+    # COMBINAR CON DATOS DE MUESTRA (sample_upload_full.csv)
+    # Esto asegura que las instituciones de muestra estén siempre disponibles
+    if SAMPLE_UPLOAD_FULL_CSV.exists():
+        try:
+            sample_df = pd.read_csv(SAMPLE_UPLOAD_FULL_CSV, dtype={"id_cuenta": str}).fillna('')
+            
+            # Si tenemos datos de Sheets, combinarlos con sample
+            if not cuentas_df.empty:
+                # Crear IDs únicos para sample data para evitar conflictos
+                # Usar un contador simple basado en el índice
+                base_id = len(cuentas_df)
+                
+                # Agregar prefijo 'sample_' a los IDs de muestra
+                sample_df['id_cuenta'] = 'sample_' + (sample_df.index + base_id + 1).astype(str)
+                
+                # Combinar cuentas
+                cuentas_df = pd.concat([cuentas_df, sample_df[COLS_CUENTAS]], ignore_index=True)
+                logger.info(f"Agregadas {len(sample_df)} cuentas de muestra")
+            
+            # Para métricas de muestra, combinarlas con las existentes
+            if all(col in sample_df.columns for col in COLS_METRICAS):
+                sample_metricas = sample_df[COLS_METRICAS].copy()
+                sample_metricas['id_cuenta'] = 'sample_' + (sample_metricas.index + base_id + 1).astype(str)
+                
+                if metricas_df.empty:
+                    metricas_df = sample_metricas
+                else:
+                    metricas_df = pd.concat([metricas_df, sample_metricas], ignore_index=True)
+                
+                logger.info(f"Agregadas {len(sample_metricas)} métricas de muestra")
+                
+        except Exception as e:
+            logger.warning(f"Error cargando sample_upload_full.csv: {e}")
 
     return cuentas_df, metricas_df
 

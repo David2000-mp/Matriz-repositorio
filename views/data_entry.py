@@ -25,6 +25,7 @@ from utils.validators import (
     validate_engagement,
     validate_form,
     get_validation_icon,
+    check_missing_data_per_institution,
 )
 from utils.app_state import get_app_state
 from components.toast_notifications import (
@@ -93,6 +94,36 @@ def render(df=None):
     st.title("📝 Captura de Datos")
     st.caption("Registro de Métricas por Cuenta")
     st.markdown("---")
+
+    # Calcular datos faltantes
+    try:
+        df_full = data_provider.get_merged_data(force_reload=True)
+        if not df_full.empty:
+            # Usar el mes actual para el rango
+            current_date = pd.Timestamp.now()
+            date_range = (current_date.replace(day=1), current_date + pd.offsets.MonthEnd(1))
+            missing_issues = check_missing_data_per_institution(df_full, date_range)
+            institutions_with_issues = len(set(issue['institution'] for issue in missing_issues))
+            
+            if institutions_with_issues > 0:
+                st.metric("Instituciones con datos incompletos", f"{institutions_with_issues}")
+                
+                # Alerts por institución
+                if missing_issues:
+                    st.markdown("### ⚠️ Datos Faltantes por Institución")
+                    issues_by_institution = {}
+                    for issue in missing_issues:
+                        inst = issue['institution']
+                        if inst not in issues_by_institution:
+                            issues_by_institution[inst] = []
+                        issues_by_institution[inst].append(f"{issue['platform']}: {issue['issue_type']}")
+                    
+                    for institution, issues in issues_by_institution.items():
+                        with st.expander(f"⚠️ {institution}", expanded=False):
+                            for issue in issues:
+                                st.warning(issue)
+    except Exception as e:
+        logging.warning(f"Error calculando datos faltantes: {e}")
 
     # Obtener estado global
     state = get_app_state()

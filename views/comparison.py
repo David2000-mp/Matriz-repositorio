@@ -14,7 +14,7 @@ Integración:
 
 import streamlit as st
 import pandas as pd
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Dict, Optional, Tuple
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
@@ -209,37 +209,14 @@ def _render_entity_comparison(state):
         st.warning("⚠️ Selecciona entidades diferentes para comparar.")
         return
     
-    # Rango de fechas común
-    st.markdown("### 📅 Rango de Fechas")
-    date_col1, date_col2 = st.columns(2)
-    
-    with date_col1:
-        start_date = st.date_input(
-            "Fecha Inicio:",
-            value=datetime.now() - timedelta(days=30),
-            key="comparison_start_date",
-        )
-    
-    with date_col2:
-        end_date = st.date_input(
-            "Fecha Fin:",
-            value=datetime.now(),
-            key="comparison_end_date",
-        )
-    
-    # Validar rango de fechas
-    if start_date >= end_date:
-        st.error("❌ La fecha de inicio debe ser anterior a la fecha fin.")
-        return
-    
     toast_filter_applied(f"Comparando {entity_a} vs {entity_b}")
     
     st.divider()
     
-    # Obtener datos filtrados para cada entidad
+    # Obtener datos para cada entidad (sin filtro de fechas)
     with st.spinner("Cargando datos de comparación..."):
-        data_a = _get_entity_data(entity_a, start_date, end_date)
-        data_b = _get_entity_data(entity_b, start_date, end_date)
+        data_a = _get_entity_data(entity_a)
+        data_b = _get_entity_data(entity_b)
     
     # Validar datos
     if data_a.empty and data_b.empty:
@@ -640,51 +617,62 @@ def _render_platform_distribution(data: pd.DataFrame, color: str = "#1f77b4"):
         st.info("Datos insuficientes para distribución por plataforma")
         return
     
-    # Agrupar por plataforma
-    platform_data = data.groupby("plataforma")["seguidores"].max().reset_index()
-    platform_data = platform_data.sort_values("seguidores", ascending=False)
-    
-    # Gráfica de barras
-    fig = go.Figure(data=[
-        go.Bar(
-            x=platform_data["plataforma"],
-            y=platform_data["seguidores"],
-            marker_color=color,
-            text=platform_data["seguidores"],
-            texttemplate='%{text:,.0f}',
-            textposition='outside',
-            textfont={"color": "#000000"},
+    try:
+        # Agrupar por plataforma
+        platform_data = data.groupby("plataforma")["seguidores"].max().reset_index()
+        platform_data = platform_data.sort_values("seguidores", ascending=False)
+        
+        if platform_data.empty:
+            st.info("No hay datos suficientes para generar la gráfica")
+            return
+        
+        # Gráfica de barras
+        fig = go.Figure(data=[
+            go.Bar(
+                x=platform_data["plataforma"],
+                y=platform_data["seguidores"],
+                marker_color=color,
+                text=platform_data["seguidores"],
+                texttemplate='%{text:,.0f}',
+                textposition='outside',
+                textfont={"color": "#000000"},
+            )
+        ])
+        
+        fig.update_layout(
+            font={"color": "#000000"},
+            title="Seguidores por Plataforma",
+            title_font={"color": "#000000"},
+            xaxis_title="Plataforma",
+            yaxis_title="Seguidores",
+            template="plotly_white",
+            paper_bgcolor="#FFFFFF",
+            plot_bgcolor="#FFFFFF",
+            height=300,
+            showlegend=False,
+            hoverlabel={"font": {"color": "#000000"}, "bgcolor": "#FFFFFF", "bordercolor": "#003696"},
+            xaxis={
+                "color": "#000000",
+                "gridcolor": "#E0E0E0",
+                "title": {"font": {"color": "#000000"}},
+                "tickfont": {"color": "#000000"},
+            },
+            yaxis={
+                "color": "#000000",
+                "gridcolor": "#E0E0E0",
+                "title": {"font": {"color": "#000000"}},
+                "tickfont": {"color": "#000000"},
+            },
         )
-    ])
-    
-    fig.update_layout(
-        font={"color": "#000000"},
-        title="Seguidores por Plataforma",
-        title_font={"color": "#000000"},
-        xaxis_title="Plataforma",
-        yaxis_title="Seguidores",
-        template="plotly_white",
-        paper_bgcolor="#FFFFFF",
-        plot_bgcolor="#FFFFFF",
-        height=300,
-        showlegend=False,
-        hoverlabel={"font": {"color": "#000000"}, "bgcolor": "#FFFFFF", "bordercolor": "#003696"},
-        xaxis={
-            "color": "#000000",
-            "gridcolor": "#E0E0E0",
-            "title": {"font": {"color": "#000000"}},
-            "tickfont": {"color": "#000000"},
-        },
-        yaxis={
-            "color": "#000000",
-            "gridcolor": "#E0E0E0",
-            "title": {"font": {"color": "#000000"}},
-            "tickfont": {"color": "#000000"},
-        },
-    )
-    fig.update_traces(hoverlabel={"bgcolor": "#FFFFFF", "font": {"color": "#000000"}, "bordercolor": "#003696"})
-    
-    st.plotly_chart(fig, width='stretch')
+        fig.update_traces(hoverlabel={"bgcolor": "#FFFFFF", "font": {"color": "#000000"}, "bordercolor": "#003696"})
+        
+        st.plotly_chart(fig, width='stretch')
+        
+    except Exception as e:
+        st.error(f"Error al generar la gráfica de distribución: {e}")
+        st.info("Datos disponibles para debug:")
+        if "plataforma" in data.columns and "seguidores" in data.columns:
+            st.dataframe(data[["plataforma", "seguidores"]].head())
 
 
 # ============================================
@@ -757,19 +745,15 @@ def _get_available_entities() -> list:
 
 def _get_entity_data(
     entity: str,
-    start_date: datetime,
-    end_date: datetime,
 ) -> pd.DataFrame:
     """
-    Obtiene datos filtrados para una entidad en un rango de fechas.
+    Obtiene datos para una entidad (sin filtro de fechas).
     
     Args:
         entity: Nombre de la entidad
-        start_date: Fecha de inicio
-        end_date: Fecha de fin
     
     Returns:
-        DataFrame con datos filtrados
+        DataFrame con datos de la entidad
     """
     try:
         from utils.sheets_connector import cargar_respuestas_forms
@@ -783,9 +767,6 @@ def _get_entity_data(
         
         # Filtrar por entidad
         data = filtrar_por_entidad(all_data, entity)
-        
-        # Filtrar por rango de fechas
-        data = filtrar_por_rango_fechas(data, start_date, end_date)
         
         # CORRECCIÓN: Eliminar duplicados manteniendo último registro por cuenta
         if not data.empty and 'fecha' in data.columns:

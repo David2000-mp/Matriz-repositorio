@@ -99,6 +99,48 @@ COLEGIOS_MARISTAS: Dict[str, Dict[str, str]] = {
         "Instagram": "https://www.instagram.com/maristas_mexicocentral/",
         "Twitter": "https://twitter.com/MaristasCentral",
         "TikTok": "https://www.tiktok.com/@maristascentral"
+    },
+    "Maristas México Occidental": {
+        "Facebook": "",
+        "Instagram": "",
+        "Twitter": "",
+        "TikTok": ""
+    },
+    "Pastoral Juvenil México Central": {
+        "Facebook": "",
+        "Instagram": "",
+        "Twitter": "",
+        "TikTok": ""
+    },
+    "Juventudes Maristas": {
+        "Facebook": "",
+        "Instagram": "",
+        "Twitter": "",
+        "TikTok": ""
+    },
+    "Convocatoria Marista": {
+        "Facebook": "",
+        "Instagram": "",
+        "Twitter": "",
+        "TikTok": ""
+    },
+    "Laicado Marista": {
+        "Facebook": "",
+        "Instagram": "",
+        "Twitter": "",
+        "TikTok": ""
+    },
+    "Colegio Montejo": {
+        "Facebook": "",
+        "Instagram": "",
+        "Twitter": "",
+        "TikTok": ""
+    },
+    "Universidad Marista de Guadalajara": {
+        "Facebook": "",
+        "Instagram": "",
+        "Twitter": "",
+        "TikTok": ""
     }
 }
 

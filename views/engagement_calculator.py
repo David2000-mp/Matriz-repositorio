@@ -12,41 +12,20 @@ import logging
 def calculate_facebook_engagement():
     """
     Calcula métricas de engagement para Facebook.
-    Utiliza datos del formulario en st.session_state.
+    Utiliza datos manuales del formulario en st.session_state.
     """
     # Obtener valores principales
     followers = st.session_state.get("fb_followers", 0)
-    days = st.session_state.get("fb_days", 0)
-    reach = st.session_state.get("fb_reach", None)
+    engagement_rate = st.session_state.get("fb_engagement_rate", 0)
     
-    if not followers or not days:
+    if not followers or engagement_rate <= 0:
         return None
     
-    # Calcular interacciones totales desde los 15 posts
-    total_interactions = 0
-    total_reactions = 0
-    total_comments = 0
-    total_shares = 0
-    
-    for i in range(1, 16):
-        reactions = st.session_state.get(f"fb_post_{i}_reactions", 0) or 0
-        comments = st.session_state.get(f"fb_post_{i}_comments", 0) or 0
-        shares = st.session_state.get(f"fb_post_{i}_shares", 0) or 0
-        
-        total_reactions += int(reactions)
-        total_comments += int(comments)
-        total_shares += int(shares)
-        total_interactions += int(reactions) + int(comments) + int(shares)
-    
-    if total_interactions == 0:
-        return None
-    
-    # Cálculos principales
-    posts = 15
-    engagement_percentage = (total_interactions / followers) * 100
-    engagement_per_post_percentage = ((total_interactions / posts) / followers) * 100
-    engagement_per_post = total_interactions / posts
-    posts_per_week = posts / (days / 7)
+    # Usar engagement manual
+    engagement_percentage = engagement_rate
+    posts = st.session_state.get("fb_posts", 15)
+    days = st.session_state.get("fb_days", 30)
+    posts_per_week = posts / (days / 7) if days > 0 else 0
     
     # Análisis de benchmarks
     if engagement_percentage >= 5:
@@ -67,17 +46,9 @@ def calculate_facebook_engagement():
         engagement_desc = "Necesitas revisar tu estrategia de contenido urgentemente."
     
     return {
-        "total_interactions": total_interactions,
-        "total_reactions": total_reactions,
-        "total_comments": total_comments,
-        "total_shares": total_shares,
         "followers": followers,
-        "days": days,
         "posts": posts,
-        "reach": reach,
         "engagement_percentage": engagement_percentage,
-        "engagement_per_post_percentage": engagement_per_post_percentage,
-        "engagement_per_post": engagement_per_post,
         "posts_per_week": posts_per_week,
         "engagement_status": engagement_status,
         "engagement_color": engagement_color,
@@ -88,83 +59,47 @@ def calculate_facebook_engagement():
 def calculate_tiktok_engagement():
     """
     Calcula métricas de engagement para TikTok.
-    Utiliza datos del formulario en st.session_state.
+    Utiliza datos manuales del formulario en st.session_state.
     """
     # Obtener valores principales
     followers = st.session_state.get("tk_followers", 0)
-    days = st.session_state.get("tk_days", 0)
+    engagement_rate = st.session_state.get("tk_engagement_rate", 0)
     
-    if not followers or not days:
+    if not followers or engagement_rate <= 0:
         return None
     
-    # Calcular interacciones totales desde los 15 videos
-    total_views = 0
-    total_likes = 0
-    total_comments = 0
-    total_shares = 0
-    total_saves = 0
+    # Usar engagement manual
+    engagement_percentage = engagement_rate
+    videos = st.session_state.get("tk_videos", 15)
+    days = st.session_state.get("tk_days", 30)
+    videos_per_week = videos / (days / 7) if days > 0 else 0
     
-    for i in range(1, 16):
-        views = st.session_state.get(f"tk_video_{i}_views", 0) or 0
-        likes = st.session_state.get(f"tk_video_{i}_likes", 0) or 0
-        comments = st.session_state.get(f"tk_video_{i}_comments", 0) or 0
-        shares = st.session_state.get(f"tk_video_{i}_shares", 0) or 0
-        saves = st.session_state.get(f"tk_video_{i}_saves", 0) or 0
-        
-        total_views += int(views)
-        total_likes += int(likes)
-        total_comments += int(comments)
-        total_shares += int(shares)
-        total_saves += int(saves)
-    
-    total_interactions = total_likes + total_comments + total_shares + total_saves
-    
-    if total_interactions == 0 or total_views == 0:
-        return None
-    
-    # Cálculos principales para TikTok
-    videos = 15
-    engagement_views = (total_interactions / total_views) * 100
-    engagement_followers = (total_interactions / followers) * 100
-    
-    # Engagement ponderado (Likes×1 + Comments×2 + Saves×3 + Shares×4)
-    weighted_score = (total_likes * 1) + (total_comments * 2) + (total_saves * 3) + (total_shares * 4)
-    engagement_weighted = (weighted_score / total_views) * 100
-    
-    # Análisis de benchmarks por vistas (métrica principal)
-    if engagement_views < 3:
-        views_status = "❌ BAJO"
-        views_color = "#B42318"
-        views_desc = "El contenido no está reteniendo a la audiencia. Revisa el hook inicial de tus videos."
-    elif engagement_views < 6:
-        views_status = "⚠️ PROMEDIO"
-        views_color = "#CC7000"
-        views_desc = "Aceptable para cuentas en crecimiento. Hay margen de mejora."
-    elif engagement_views < 12:
-        views_status = "✅ ALTO"
-        views_color = "#0A7D35"
-        views_desc = "El contenido está conectando muy bien. ¡Que buen trabajo!"
+    # Análisis de benchmarks
+    if engagement_percentage < 3:
+        engagement_status = "❌ BAJO"
+        engagement_color = "#B42318"
+        engagement_desc = "El contenido no está reteniendo a la audiencia. Revisa el hook inicial de tus videos."
+    elif engagement_percentage < 6:
+        engagement_status = "⚠️ PROMEDIO"
+        engagement_color = "#CC7000"
+        engagement_desc = "Aceptable para cuentas en crecimiento. Hay margen de mejora."
+    elif engagement_percentage < 12:
+        engagement_status = "✅ ALTO"
+        engagement_color = "#0A7D35"
+        engagement_desc = "El contenido está conectando muy bien. ¡Que buen trabajo!"
     else:
-        views_status = "✅ VIRAL/EXCELENTE"
-        views_color = "#0A7D35"
-        views_desc = "Típico de tendencias fuertes. Tu contenido es muy atractivo."
+        engagement_status = "✅ VIRAL/EXCELENTE"
+        engagement_color = "#0A7D35"
+        engagement_desc = "Típico de tendencias fuertes. Tu contenido es muy atractivo."
     
     return {
-        "total_views": total_views,
-        "total_likes": total_likes,
-        "total_comments": total_comments,
-        "total_shares": total_shares,
-        "total_saves": total_saves,
-        "total_interactions": total_interactions,
         "followers": followers,
-        "days": days,
         "videos": videos,
-        "engagement_views": engagement_views,
-        "engagement_followers": engagement_followers,
-        "engagement_weighted": engagement_weighted,
-        "views_status": views_status,
-        "views_color": views_color,
-        "views_desc": views_desc,
+        "engagement_percentage": engagement_percentage,
+        "videos_per_week": videos_per_week,
+        "engagement_status": engagement_status,
+        "engagement_color": engagement_color,
+        "engagement_desc": engagement_desc,
     }
 
 
