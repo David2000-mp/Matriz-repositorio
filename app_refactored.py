@@ -4,10 +4,17 @@ Provee enrutamiento limpio a las vistas y asegura inyección de estilos.
 """
 import streamlit as st
 import pandas as pd
-from components import inject_custom_css, render_custom_header
+from components import (
+    inject_custom_css,
+    inject_layout_compact_css,
+    scroll_to_top_on_nav_change,
+    render_custom_header,
+)
 from utils.helpers import load_image
-from utils.logger import set_production_mode
+from utils.logger import set_production_mode, get_logger
 from utils.sheets_connector import cargar_respuestas_forms
+
+logger = get_logger(__name__)
 
 
 def main():
@@ -38,6 +45,7 @@ def main():
     # Aplicar estilos CSS globales
     try:
         inject_custom_css()
+        inject_layout_compact_css(hide_streamlit_header=False)
     except Exception as e:
         try:
             st.warning(f"No se pudo aplicar CSS personalizado: {e}")
@@ -85,6 +93,7 @@ def main():
         
         selected = display_to_canonical.get(selected_display, "Inicio")
         st.session_state["page_selection"] = selected
+        scroll_to_top_on_nav_change("page_selection")
 
         st.markdown("---")
         st.subheader("Filtros Globales")

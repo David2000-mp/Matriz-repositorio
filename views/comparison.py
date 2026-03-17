@@ -118,46 +118,82 @@ def get_engagement_status(interacciones, seguidores):
 def render_comparison_view():
     """
     Renderiza vista de comparación lado a lado.
-    
+
     Permite comparar:
     - Entidad A vs Entidad B
-    - Plataforma A vs Plataforma B
-    - Período A vs Período B
+    - Cuenta vs Promedio Red Marista (benchmark interno)
+    - Plataforma A vs Plataforma B (próximamente)
+    - Período A vs Período B (próximamente)
     """
-    
+
     # Header
     st.title("📊 Comparación Lado a Lado")
     st.markdown("""
-    Compara métricas, rendimiento y evolución entre dos entidades, plataformas o períodos.
+    Compara métricas entre dos entidades, o analiza una cuenta frente al promedio de la red Marista.
     """)
-    
+
     st.divider()
-    
+
     # Estado global
     state = get_app_state()
-    
-    # Asegurar que los datos tengan engagement_rate como numérico
-    if hasattr(state, 'data') and state.data is not None and not state.data.empty:
-        state.data = state.data.copy()
-        if 'engagement_rate' in state.data.columns:
-            state.data['engagement_rate'] = pd.to_numeric(
-                state.data['engagement_rate'].astype(str).str.replace(',', '.', regex=False), 
-                errors='coerce'
-            ).fillna(0)
-    
+
+    # Cargar datos desde data_provider (fuente canónica con caché compartido)
+    from utils.data_provider import data_provider
+    with st.spinner("Cargando datos..."):
+        df_full = data_provider.get_merged_data()
+
+    if df_full is None or df_full.empty:
+        st.warning("⚠️ No hay datos disponibles. Verifica la conexión a Google Sheets.")
+        return
+
+    # Aplicar filtro de mes del sidebar
+    filtro_mes = st.session_state.get("filtro_mes", "Todos")
+    if filtro_mes != "Todos" and "fecha" in df_full.columns:
+        df_full = df_full.copy()
+        df_full["fecha"] = pd.to_datetime(df_full["fecha"], errors="coerce")
+        df_full = df_full[df_full["fecha"].dt.strftime("%Y-%m") == filtro_mes]
+        if df_full.empty:
+            st.warning(f"⚠️ No hay datos para el período {filtro_mes}. Cambia el filtro en el sidebar.")
+            return
+
+    # Selector global de red social para toda la vista de comparativas
+    platform_options = ["Todas"]
+    if "plataforma" in df_full.columns:
+        platform_options += sorted([
+            str(p)
+            for p in df_full["plataforma"].dropna().unique()
+            if str(p).strip() and str(p) != "nan"
+        ])
+
+    selected_platform = st.selectbox(
+        "Red social:",
+        options=platform_options,
+        key="comparison_global_platform",
+        help="Aplica a todos los modos de comparación",
+    )
+
+    df_for_comparison = df_full
+    if selected_platform != "Todas":
+        df_for_comparison = filtrar_por_plataforma(df_full, selected_platform)
+        if df_for_comparison.empty:
+            st.warning(f"⚠️ No hay datos para la red social {selected_platform} en el período seleccionado.")
+            return
+
     # Selector de tipo de comparación
     comparison_type = st.radio(
         "Tipo de Comparación:",
-        options=["Entidades", "Plataformas", "Períodos"],
+        options=["Entidades", "Cuenta vs Promedio Red", "Plataformas", "Períodos"],
         horizontal=True,
         help="Selecciona qué deseas comparar",
     )
-    
+
     st.divider()
-    
+
     # Renderizar comparación según tipo seleccionado
     if comparison_type == "Entidades":
-        _render_entity_comparison(state)
+        _render_entity_comparison(state, df_for_comparison, selected_platform)
+    elif comparison_type == "Cuenta vs Promedio Red":
+        _render_benchmark_comparison(state, df_for_comparison, selected_platform)
     elif comparison_type == "Plataformas":
         _render_platform_comparison(state)
     else:  # Períodos
@@ -168,61 +204,65 @@ def render_comparison_view():
 # COMPARACIÓN DE ENTIDADES
 # ============================================
 
-def _render_entity_comparison(state):
+def _render_entity_comparison(state, df: pd.DataFrame, selected_platform: str = "Todas"):
     """
     Comparación lado a lado de dos entidades.
-    
+
     Args:
         state: AppState global
+        df: DataFrame pre-filtrado con datos de la red
     """
-    
+
+    entities = _get_available_entities(df)
+
+    if not entities:
+        st.warning("⚠️ No hay entidades disponibles en los datos actuales.")
+        return
+
     # Selectores en dos columnas
     col_a, col_b = st.columns(2)
-    
+
     with col_a:
         st.subheader("🔵 Entidad A")
-        # Obtener lista de entidades disponibles
-        entities = _get_available_entities()
-        
         entity_a = st.selectbox(
             "Selecciona Entidad A:",
             options=entities,
-            index=0 if entities else 0,
+            index=0,
             key="comparison_entity_a",
         )
-    
+
     with col_b:
         st.subheader("🟠 Entidad B")
         entity_b = st.selectbox(
             "Selecciona Entidad B:",
             options=entities,
-            index=min(1, len(entities) - 1) if entities else 0,
+            index=min(1, len(entities) - 1),
             key="comparison_entity_b",
         )
-    
+
     # Validar selección
     if not entity_a or not entity_b:
         st.warning("⚠️ Selecciona dos entidades para comparar.")
         return
-    
+
     if entity_a == entity_b:
         st.warning("⚠️ Selecciona entidades diferentes para comparar.")
         return
-    
-    toast_filter_applied(f"Comparando {entity_a} vs {entity_b}")
-    
+
+    platform_label = f" en {selected_platform}" if selected_platform != "Todas" else ""
+    toast_filter_applied(f"Comparando {entity_a} vs {entity_b}{platform_label}")
+
     st.divider()
-    
-    # Obtener datos para cada entidad (sin filtro de fechas)
-    with st.spinner("Cargando datos de comparación..."):
-        data_a = _get_entity_data(entity_a)
-        data_b = _get_entity_data(entity_b)
-    
+
+    # Filtrar directamente desde el DataFrame pre-cargado (sin llamadas extra a Sheets)
+    data_a = _get_entity_data(entity_a, df)
+    data_b = _get_entity_data(entity_b, df)
+
     # Validar datos
     if data_a.empty and data_b.empty:
         st.warning("⚠️ No hay datos disponibles para el período seleccionado.")
         return
-    
+
     # Renderizar comparación
     _render_entity_comparison_charts(entity_a, data_a, entity_b, data_b)
 
@@ -293,6 +333,9 @@ def _render_entity_comparison_charts(
             _render_platform_distribution(data_b, "#ff7f0e")
         else:
             st.info("Sin datos")
+
+    st.divider()
+    _render_export_comparison_button(data_a, data_b)
 
 
 def _render_entity_kpis(data: pd.DataFrame, color: str = "#1f77b4"):
@@ -715,68 +758,395 @@ def _render_period_comparison(state):
 # HELPERS DE DATOS
 # ============================================
 
-def _get_available_entities() -> list:
+def _get_available_entities(df: pd.DataFrame = None) -> list:
     """
     Obtiene lista de entidades disponibles en los datos.
-    
+
+    Args:
+        df: DataFrame con datos (preferido). Si es None, usa data_provider.
+
     Returns:
         Lista de nombres de entidades
     """
-    state = get_app_state()
-    entities = state.get_available_entities()
-    
-    if entities:
-        return sorted(entities)
-    
-    # Fallback: obtener directamente del formulario
+    if df is not None and not df.empty and "entidad" in df.columns:
+        return sorted([str(e) for e in df["entidad"].dropna().unique() if str(e).strip() and str(e) != "nan"])
+
+    # Fallback: data_provider (caché compartido, NO llama a Sheets directamente)
     try:
-        from utils.sheets_connector import cargar_respuestas_forms
-        
-        all_data = cargar_respuestas_forms()
-        
-        if all_data is not None and not all_data.empty and "entidad" in all_data.columns:
-            return sorted(all_data["entidad"].unique().tolist())
+        from utils.data_provider import data_provider
+        df_fallback = data_provider.get_merged_data()
+        if df_fallback is not None and not df_fallback.empty and "entidad" in df_fallback.columns:
+            return sorted([str(e) for e in df_fallback["entidad"].dropna().unique() if str(e).strip() and str(e) != "nan"])
     except Exception as e:
         logger.error(f"Error al obtener entidades: {e}")
         toast_warning("No se pudieron cargar las entidades disponibles")
-    
+
     return []
 
 
 def _get_entity_data(
     entity: str,
+    df: pd.DataFrame = None,
 ) -> pd.DataFrame:
     """
-    Obtiene datos para una entidad (sin filtro de fechas).
-    
+    Obtiene historial completo de datos para una entidad.
+
     Args:
         entity: Nombre de la entidad
-    
+        df: DataFrame pre-cargado (preferido). Si es None, usa data_provider.
+            No se eliminan duplicados — normalize_monthly_latest en data_provider
+            ya garantiza 1 registro por (cuenta, mes), preservando el historial.
+
     Returns:
-        DataFrame con datos de la entidad
+        DataFrame con historial completo de la entidad
     """
     try:
-        from utils.sheets_connector import cargar_respuestas_forms
-        
-        # Cargar datos directamente del formulario (no usar merge que puede fallar)
-        all_data = cargar_respuestas_forms()
-        
+        if df is not None and not df.empty:
+            return filtrar_por_entidad(df, entity)
+
+        # Fallback: data_provider (caché compartido)
+        from utils.data_provider import data_provider
+        all_data = data_provider.get_merged_data()
+
         if all_data is None or all_data.empty:
-            logger.warning("No hay datos disponibles en el formulario")
+            logger.warning("No hay datos disponibles")
             return pd.DataFrame()
-        
-        # Filtrar por entidad
-        data = filtrar_por_entidad(all_data, entity)
-        
-        # CORRECCIÓN: Eliminar duplicados manteniendo último registro por cuenta
-        if not data.empty and 'fecha' in data.columns:
-            data = data.drop_duplicates(subset=['entidad', 'plataforma'], keep='last')
-        
-        return data
-    
+
+        return filtrar_por_entidad(all_data, entity)
+
     except Exception as e:
         logger.error(f"Error al obtener datos de {entity}: {e}")
         return pd.DataFrame()
+
+
+# ============================================
+# BENCHMARK: CUENTA VS PROMEDIO RED
+# ============================================
+
+def _calculate_network_benchmark(df: pd.DataFrame, plataforma: str = None) -> pd.DataFrame:
+    """
+    Calcula el promedio de la red Marista agrupado por (fecha, plataforma).
+
+    Args:
+        df: DataFrame completo de la red
+        plataforma: Si se especifica, filtra solo esa plataforma antes de calcular.
+
+    Returns:
+        DataFrame con columnas [fecha, plataforma, seguidores_avg,
+        engagement_rate_avg, interacciones_avg]
+    """
+    if df is None or df.empty or "fecha" not in df.columns:
+        return pd.DataFrame()
+
+    work = df.copy()
+    work["fecha"] = pd.to_datetime(work["fecha"], errors="coerce")
+    work = work.dropna(subset=["fecha"])
+
+    if plataforma and plataforma != "Todas" and "plataforma" in work.columns:
+        work = work[work["plataforma"] == plataforma]
+
+    if work.empty:
+        return pd.DataFrame()
+
+    group_cols = ["fecha", "plataforma"] if "plataforma" in work.columns else ["fecha"]
+
+    agg_dict = {}
+    if "seguidores" in work.columns:
+        agg_dict["seguidores"] = "mean"
+    if "engagement_rate" in work.columns:
+        agg_dict["engagement_rate"] = "mean"
+    if "interacciones" in work.columns:
+        agg_dict["interacciones"] = "mean"
+
+    if not agg_dict:
+        return pd.DataFrame()
+
+    benchmark = work.groupby(group_cols).agg(agg_dict).reset_index()
+    benchmark = benchmark.rename(columns={
+        "seguidores": "seguidores_avg",
+        "engagement_rate": "engagement_rate_avg",
+        "interacciones": "interacciones_avg",
+    })
+    benchmark = benchmark.sort_values("fecha")
+    return benchmark
+
+
+def _render_benchmark_comparison(state, df: pd.DataFrame, selected_platform: str = "Todas"):
+    """
+    Modo: Cuenta vs Promedio Red.
+    Muestra una institución frente al benchmark interno de toda la red Marista.
+    """
+    st.markdown("#### Selecciona la cuenta a analizar")
+
+    entities = _get_available_entities(df)
+    if not entities:
+        st.warning("⚠️ No hay entidades disponibles.")
+        return
+
+    entity = st.selectbox(
+        "Institución:",
+        options=entities,
+        key="benchmark_entity",
+    )
+
+    if not entity:
+        return
+
+    st.divider()
+
+    # Datos de la entidad seleccionada
+    data_entity = filtrar_por_entidad(df, entity)
+    plataforma_sel = selected_platform
+
+    # Benchmark de la red
+    benchmark = _calculate_network_benchmark(
+        df,
+        plataforma=plataforma_sel if plataforma_sel != "Todas" else None,
+    )
+
+    if data_entity.empty:
+        plat_msg = f" en {plataforma_sel}" if plataforma_sel != "Todas" else ""
+        st.warning(f"⚠️ No hay datos para {entity}{plat_msg}.")
+        return
+
+    if benchmark.empty:
+        st.warning("⚠️ No se pudo calcular el benchmark de la red.")
+        return
+
+    plat_label = f" ({plataforma_sel})" if plataforma_sel != "Todas" else ""
+    toast_filter_applied(f"{entity} vs Promedio Red{plat_label}")
+
+    # ---- KPIs comparativos ----
+    st.markdown("### 📈 Métricas Clave vs Promedio Red")
+
+    # Valores actuales de la entidad
+    entity_followers = data_entity["seguidores"].max() if "seguidores" in data_entity.columns else 0
+
+    if "plataforma" in data_entity.columns and "engagement_rate" in data_entity.columns and not data_entity.empty:
+        per_plat_er = data_entity.groupby("plataforma")["engagement_rate"].mean()
+        entity_engagement = per_plat_er.mean() if not per_plat_er.empty else 0.0
+    elif "engagement_rate" in data_entity.columns:
+        entity_engagement = float(data_entity["engagement_rate"].mean())
+    else:
+        entity_engagement = 0.0
+
+    entity_interactions = float(data_entity["interacciones"].mean()) if "interacciones" in data_entity.columns else 0.0
+
+    # Promedios de la red
+    net_followers = float(benchmark["seguidores_avg"].iloc[-1]) if "seguidores_avg" in benchmark.columns and not benchmark.empty else 0.0
+    net_engagement = float(benchmark["engagement_rate_avg"].mean()) if "engagement_rate_avg" in benchmark.columns and not benchmark.empty else 0.0
+    net_interactions = float(benchmark["interacciones_avg"].mean()) if "interacciones_avg" in benchmark.columns and not benchmark.empty else 0.0
+
+    kpi_col1, kpi_col2, kpi_col3 = st.columns(3)
+
+    with kpi_col1:
+        delta_pct_followers = ((entity_followers - net_followers) / net_followers * 100) if net_followers > 0 else 0.0
+        sign = "+" if delta_pct_followers >= 0 else ""
+        st.metric(
+            "Seguidores",
+            f"{entity_followers:,.0f}",
+            delta=f"{sign}{delta_pct_followers:.1f}% vs red ({net_followers:,.0f})",
+        )
+
+    with kpi_col2:
+        delta_eng = entity_engagement - net_engagement
+        sign = "+" if delta_eng >= 0 else ""
+        st.metric(
+            "Engagement",
+            f"{entity_engagement:.2f}%",
+            delta=f"{sign}{delta_eng:.2f}pp vs red ({net_engagement:.2f}%)",
+        )
+
+    with kpi_col3:
+        delta_int = entity_interactions - net_interactions
+        sign = "+" if delta_int >= 0 else ""
+        st.metric(
+            "Interacciones (prom.)",
+            f"{entity_interactions:,.1f}",
+            delta=f"{sign}{delta_int:,.1f} vs red ({net_interactions:,.1f})",
+        )
+
+    st.divider()
+
+    # ---- Gráfica de líneas doble ----
+    st.markdown("### 📊 Evolución Temporal: Entidad vs Promedio Red")
+
+    tab_seg, tab_eng = st.tabs(["Seguidores", "Engagement"])
+
+    with tab_seg:
+        _render_benchmark_chart(
+            entity=entity,
+            data_entity=data_entity,
+            benchmark=benchmark,
+            metric_entity="seguidores",
+            metric_bench="seguidores_avg",
+            ylabel="Seguidores",
+            plataforma_sel=plataforma_sel,
+        )
+
+    with tab_eng:
+        _render_benchmark_chart(
+            entity=entity,
+            data_entity=data_entity,
+            benchmark=benchmark,
+            metric_entity="engagement_rate",
+            metric_bench="engagement_rate_avg",
+            ylabel="Engagement (%)",
+            plataforma_sel=plataforma_sel,
+        )
+
+    st.divider()
+
+    # ---- Tabla de variación ----
+    st.markdown("### 📋 Tabla de Variación vs Promedio Red")
+    _render_delta_table(entity, data_entity, benchmark, plataforma_sel)
+
+
+def _render_benchmark_chart(
+    entity: str,
+    data_entity: pd.DataFrame,
+    benchmark: pd.DataFrame,
+    metric_entity: str,
+    metric_bench: str,
+    ylabel: str,
+    plataforma_sel: str = "Todas",
+):
+    """Gráfica de doble línea: entidad (sólida azul) vs promedio red (punteada gris)."""
+
+    if metric_entity not in data_entity.columns and metric_bench not in benchmark.columns:
+        st.info(f"No hay datos de {ylabel} disponibles.")
+        return
+
+    fig = go.Figure()
+
+    # Línea entidad
+    if not data_entity.empty and "fecha" in data_entity.columns and metric_entity in data_entity.columns:
+        if "plataforma" in data_entity.columns and plataforma_sel == "Todas":
+            grp = data_entity.groupby(["fecha", "plataforma"])[metric_entity].mean().reset_index()
+            entity_series = grp.groupby("fecha")[metric_entity].mean().reset_index()
+        else:
+            entity_series = data_entity.groupby("fecha")[metric_entity].mean().reset_index()
+        entity_series = entity_series.sort_values("fecha")
+
+        fig.add_trace(go.Scatter(
+            x=entity_series["fecha"],
+            y=entity_series[metric_entity],
+            mode="lines+markers",
+            name=entity,
+            line=dict(color="#1f77b4", width=3),
+            marker=dict(size=8),
+        ))
+
+    # Línea benchmark (punteada gris)
+    if not benchmark.empty and "fecha" in benchmark.columns and metric_bench in benchmark.columns:
+        if "plataforma" in benchmark.columns and plataforma_sel == "Todas":
+            bench_series = benchmark.groupby("fecha")[metric_bench].mean().reset_index()
+        else:
+            bench_series = benchmark[["fecha", metric_bench]].copy()
+        bench_series = bench_series.sort_values("fecha")
+
+        fig.add_trace(go.Scatter(
+            x=bench_series["fecha"],
+            y=bench_series[metric_bench],
+            mode="lines+markers",
+            name="Promedio Red Marista",
+            line=dict(color="#888888", width=2, dash="dash"),
+            marker=dict(size=6, symbol="diamond"),
+        ))
+
+    fig.update_layout(
+        font={"color": "#000000"},
+        title=f"{ylabel}: {entity} vs Promedio Red",
+        title_font={"color": "#000000"},
+        xaxis_title="Fecha",
+        yaxis_title=ylabel,
+        hovermode="x unified",
+        template="plotly_white",
+        paper_bgcolor="#FFFFFF",
+        plot_bgcolor="#FFFFFF",
+        height=400,
+        hoverlabel={"font": {"color": "#000000"}, "bgcolor": "#FFFFFF", "bordercolor": "#003696"},
+        legend={"font": {"color": "#000000"}},
+        xaxis={
+            "type": "date",
+            "tickformat": "%d/%m/%Y",
+            "tickangle": -45,
+            "showgrid": True,
+            "gridcolor": "rgba(0,0,0,0.1)",
+            "color": "#000000",
+            "title": {"font": {"color": "#000000"}},
+            "tickfont": {"color": "#000000"},
+        },
+        yaxis={
+            "color": "#000000",
+            "gridcolor": "#E0E0E0",
+            "title": {"font": {"color": "#000000"}},
+            "tickfont": {"color": "#000000"},
+        },
+    )
+    fig.update_traces(hoverlabel={"bgcolor": "#FFFFFF", "font": {"color": "#000000"}, "bordercolor": "#003696"})
+    st.plotly_chart(fig, width='stretch')
+
+
+def _render_delta_table(
+    entity: str,
+    data_entity: pd.DataFrame,
+    benchmark: pd.DataFrame,
+    plataforma_sel: str = "Todas",
+):
+    """Tabla: Métrica | Valor Cuenta | Promedio Red | Δ% (verde si por encima, rojo si por debajo)."""
+
+    rows = []
+
+    # Seguidores
+    if "seguidores" in data_entity.columns and "seguidores_avg" in benchmark.columns:
+        val_cuenta = float(data_entity["seguidores"].max())
+        val_red = float(benchmark["seguidores_avg"].mean())
+        diff_pct = ((val_cuenta - val_red) / val_red * 100) if val_red > 0 else 0.0
+        rows.append({"Métrica": "Seguidores", "Valor Cuenta": f"{val_cuenta:,.0f}", "Promedio Red": f"{val_red:,.0f}", "_delta": diff_pct})
+
+    # Engagement
+    if "engagement_rate" in data_entity.columns and "engagement_rate_avg" in benchmark.columns:
+        if "plataforma" in data_entity.columns:
+            per_plat = data_entity.groupby("plataforma")["engagement_rate"].mean()
+            val_cuenta = float(per_plat.mean()) if not per_plat.empty else 0.0
+        else:
+            val_cuenta = float(data_entity["engagement_rate"].mean())
+        val_red = float(benchmark["engagement_rate_avg"].mean())
+        diff_pct = ((val_cuenta - val_red) / val_red * 100) if val_red > 0 else 0.0
+        rows.append({"Métrica": "Engagement (%)", "Valor Cuenta": f"{val_cuenta:.2f}%", "Promedio Red": f"{val_red:.2f}%", "_delta": diff_pct})
+
+    # Interacciones
+    if "interacciones" in data_entity.columns and "interacciones_avg" in benchmark.columns:
+        val_cuenta = float(data_entity["interacciones"].mean())
+        val_red = float(benchmark["interacciones_avg"].mean())
+        diff_pct = ((val_cuenta - val_red) / val_red * 100) if val_red > 0 else 0.0
+        rows.append({"Métrica": "Interacciones (prom.)", "Valor Cuenta": f"{val_cuenta:,.1f}", "Promedio Red": f"{val_red:,.1f}", "_delta": diff_pct})
+
+    if not rows:
+        st.info("No hay suficientes datos para calcular la tabla de variación.")
+        return
+
+    # Construir HTML con colores
+    header = "<tr><th>Métrica</th><th>Valor Cuenta</th><th>Promedio Red</th><th>Δ%</th></tr>"
+    body_rows = []
+    for r in rows:
+        d = r["_delta"]
+        sign = "+" if d >= 0 else ""
+        color = "#27ae60" if d >= 0 else "#e74c3c"
+        delta_html = f'<span style="color:{color};font-weight:bold">{sign}{d:.1f}%</span>'
+        body_rows.append(f"<tr><td>{r['Métrica']}</td><td>{r['Valor Cuenta']}</td><td>{r['Promedio Red']}</td><td>{delta_html}</td></tr>")
+
+    table_html = f"""
+    <style>
+    .cmp-delta-tbl {{width:100%;border-collapse:collapse;font-size:0.95rem;margin-bottom:1rem;}}
+    .cmp-delta-tbl th {{background-color:#003696;color:white;padding:8px 12px;text-align:left;}}
+    .cmp-delta-tbl td {{padding:8px 12px;border-bottom:1px solid #e0e0e0;color:#111111;}}
+    .cmp-delta-tbl tr:hover td {{background-color:#f5f8ff;}}
+    </style>
+    <table class="cmp-delta-tbl"><thead>{header}</thead><tbody>{''.join(body_rows)}</tbody></table>
+    """
+    st.markdown(table_html, unsafe_allow_html=True)
 
 
 # ============================================

@@ -4,6 +4,8 @@ Paquete de componentes UI para CHAMPILYTICS.
 
 from .styles import (
     inject_custom_css,
+    inject_layout_compact_css,
+    scroll_to_top_on_nav_change,
     configure_plotly_theme,
     aplicar_estilo_personalizado,
     COLOR_PRIMARY,
@@ -33,6 +35,8 @@ except ImportError:
 
 __all__ = [
     "inject_custom_css",
+    "inject_layout_compact_css",
+    "scroll_to_top_on_nav_change",
     "configure_plotly_theme",
     "aplicar_estilo_personalizado",
     "render_custom_header",

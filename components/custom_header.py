@@ -31,85 +31,34 @@ def render_custom_header():
             display: none !important;
         }
         
-        /* Mantener SOLO el botón de toggle sidebar */
+        /* Header RECTANGULAR - deja que styles.py maneje el fondo */
         header[data-testid="stHeader"] {
-            background: linear-gradient(135deg, #002366 0%, #001840 100%) !important;
+            background: transparent !important;
             height: 70px !important;
-            padding: 0 2rem !important;
-            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15) !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            border: none !important;
+            width: 100% !important;
         }
         
-        /* Contenedor del header personalizado */
-        .custom-header-container {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            height: 70px;
-            padding: 0 2rem;
-            background: transparent;
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            z-index: 999998;
-            pointer-events: none;
-        }
-        
-        /* Título CHAMPILEAKS */
-        .custom-header-title {
-            color: #FFFFFF;
-            font-size: 1.75rem;
-            font-weight: 700;
-            letter-spacing: 3px;
-            text-transform: uppercase;
-            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
-            margin: 0;
-            padding: 0;
-            font-family: 'Inter', sans-serif;
-            pointer-events: auto;
-        }
-        
-        /* Ajustar posición del botón nativo de sidebar */
+        /* Botón de toggle sidebar - visible y encima */
         button[data-testid="stExpandSidebarButton"] {
             color: #FFFFFF !important;
-            background: rgba(255, 255, 255, 0.1) !important;
+            background: rgba(255, 255, 255, 0.15) !important;
+            border: 1px solid rgba(255, 255, 255, 0.3) !important;
             border-radius: 8px !important;
-            padding: 8px !important;
+            padding: 8px 12px !important;
             transition: all 0.2s ease !important;
-        }
-        
-        button[data-testid="stExpandSidebarButton"]:hover {
-            background: rgba(255, 255, 255, 0.2) !important;
-            transform: scale(1.05) !important;
-        }
-        
-        /* Icono del botón sidebar en blanco */
-        button[data-testid="stExpandSidebarButton"] span {
-            color: #FFFFFF !important;
-        }
-        
-        /* Ocultar completamente el span del icono Material */
-        button[data-testid="stExpandSidebarButton"] span[data-testid="stIconMaterial"] {
-            visibility: hidden !important;
+            z-index: 99999 !important;
             position: relative !important;
-            width: 24px !important;
-            height: 24px !important;
-            display: inline-block !important;
+        }
+
+        button[data-testid="stExpandSidebarButton"]:hover {
+            background: rgba(255, 255, 255, 0.25) !important;
+            border-color: rgba(255, 255, 255, 0.5) !important;
         }
         
-        /* Reemplazar con icono hamburguesa usando ::after */
-        button[data-testid="stExpandSidebarButton"] span[data-testid="stIconMaterial"]::after {
-            content: "☰" !important;
-            visibility: visible !important;
-            position: absolute !important;
-            top: 0 !important;
-            left: 0 !important;
-            font-size: 20px !important;
-            color: #FFFFFF !important;
-            line-height: 24px !important;
-        }
-        
-        /* Ajustar padding del contenido principal */
+        /* Ajustar padding del contenido principal - espacio para barra fija */
         .main .block-container {
             padding-top: 5rem !important;
         }

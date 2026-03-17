@@ -5,6 +5,7 @@ Define constantes de colores institucionales y función de inyección de CSS glo
 """
 
 import streamlit as st
+import streamlit.components.v1 as components
 
 # ===========================
 # CONSTANTES DE COLOR INSTITUCIONALES
@@ -75,6 +76,98 @@ COLOR_MAP = {
     "LinkedIn": CHAMPI_THEME["linkedin"],
     "YouTube": CHAMPI_THEME["youtube"],
 }
+
+
+def inject_layout_compact_css(hide_streamlit_header: bool = False):
+    """Inyecta ajustes de layout y conserva barra superior fija.
+
+    Args:
+        hide_streamlit_header: Si True, oculta header/toolbar nativo.
+    """
+    header_rules = """
+    header[data-testid="stHeader"] { display: none !important; }
+    div[data-testid="stToolbar"] { display: none !important; }
+    div[data-testid="stDecoration"] { display: none !important; }
+    """ if hide_streamlit_header else """
+    /* Barra superior fija azul institucional - RECTANGULAR */
+    header[data-testid="stHeader"] {
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        height: 70px !important;
+        z-index: 99996 !important;
+        background: linear-gradient(135deg, #002366 0%, #001840 100%) !important;
+        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15) !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        border: none !important;
+    }
+
+    div[data-testid="stToolbar"] {
+        top: 8px !important;
+        right: 12px !important;
+        z-index: 99998 !important;
+    }
+
+    /* Sidebar encima de la barra superior */
+    section[data-testid="stSidebar"] {
+        z-index: 99999 !important;
+        top: 0 !important;
+    }
+
+    section[data-testid="stSidebar"] > div {
+        margin-top: 0 !important;
+    }
+    """
+
+    st.markdown(
+        f"""
+        <style>
+        .main .block-container {{
+            padding-top: 4.2rem !important;
+            margin-top: 0 !important;
+        }}
+
+        section[data-testid="stMain"] > div {{
+            padding-top: 0 !important;
+            margin-top: 0 !important;
+        }}
+
+        {header_rules}
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def scroll_to_top_on_nav_change(nav_state_key: str = "page_selection", tracker_key: str = "_scroll_nav_prev"):
+    """Hace scroll al inicio cuando cambia la navegación principal."""
+    current = st.session_state.get(nav_state_key, "")
+    previous = st.session_state.get(tracker_key)
+
+    changed = previous is None or current != previous
+    st.session_state[tracker_key] = current
+
+    if changed:
+        components.html(
+            """
+            <script>
+            const moveTop = () => {
+              window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+              const main = parent.document.querySelector('section[data-testid="stMain"]');
+              if (main) main.scrollTop = 0;
+            };
+            moveTop();
+            setTimeout(moveTop, 40);
+            setTimeout(moveTop, 120);
+            </script>
+            """,
+            height=0,
+            width=0,
+        )
 
 
 def inject_custom_css():
