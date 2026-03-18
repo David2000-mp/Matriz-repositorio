@@ -7,7 +7,11 @@ Sprint 1 - Week 2: Reducir errores de captura manual con feedback instantáneo
 
 import re
 from typing import Tuple, Optional
+import unicodedata
 from urllib.parse import urlparse
+import pandas as pd
+
+from utils.catalog import COLEGIOS_MARISTAS
 
 
 # ============================================
@@ -322,6 +326,183 @@ def check_missing_data_per_institution(df, date_range):
                 })
     
     return issues
+
+
+def normalize_report_date_to_month_start(report_date) -> pd.Timestamp:
+    """
+    Normaliza una fecha al primer día del mes.
+
+    Args:
+        report_date: Fecha en formato date/datetime/string
+
+    Returns:
+        pd.Timestamp: Fecha normalizada (día 1)
+    """
+    ts = pd.to_datetime(report_date, errors="coerce")
+    if pd.isna(ts):
+        raise ValueError("Fecha de reporte inválida")
+    return ts.to_period("M").to_timestamp()
+
+
+def _canonical_institution_name(value: str) -> str:
+    """Canoniza nombre de institución para matching robusto."""
+    if value is None:
+        return ""
+    text = str(value).strip()
+    if not text:
+        return ""
+    normalized = unicodedata.normalize("NFKD", text)
+    without_accents = "".join(ch for ch in normalized if not unicodedata.combining(ch))
+    return " ".join(without_accents.lower().split())
+
+
+def get_monthly_pending_institutions(
+    df,
+    min_platforms: int = 2,
+    target_month=None,
+    universe_institutions: Optional[list[str]] = None,
+) -> dict:
+    """
+    Genera reporte de instituciones pendientes por cobertura mensual.
+
+    Reglas:
+    - Mes objetivo: último mes con datos, salvo que se envíe target_month.
+    - Institución completa: plataformas únicas >= min_platforms.
+    - Duplicados: institución+plataforma+mes cuentan una sola vez (último registro).
+
+    Args:
+        df: DataFrame con columnas entidad, plataforma, fecha
+        min_platforms: Umbral mínimo de plataformas para completar
+        target_month: Mes objetivo opcional (str YYYY-MM, datetime o Period)
+        universe_institutions: Universo opcional de instituciones activas
+
+    Returns:
+        dict con target_month, summary y pending_rows
+    """
+    if min_platforms < 1:
+        raise ValueError("min_platforms debe ser >= 1")
+
+    universe = universe_institutions or list(COLEGIOS_MARISTAS.keys())
+    universe = [inst for inst in universe if inst]
+    canonical_to_display = {
+        _canonical_institution_name(inst): inst for inst in universe
+    }
+    universe_keys = set(canonical_to_display.keys())
+
+    if df is None or getattr(df, "empty", True):
+        pending_rows = [
+            {
+                "institucion": canonical_to_display[key],
+                "plataformas_actuales": 0,
+                "estado": "Crítico",
+            }
+            for key in sorted(universe_keys)
+        ]
+        return {
+            "target_month": None,
+            "summary": {
+                "total_activas": len(universe_keys),
+                "completas": 0,
+                "pendientes": len(pending_rows),
+                "min_platforms": min_platforms,
+            },
+            "pending_rows": pending_rows,
+        }
+
+    required_cols = {"entidad", "plataforma", "fecha"}
+    if not required_cols.issubset(set(df.columns)):
+        pending_rows = [
+            {
+                "institucion": canonical_to_display[key],
+                "plataformas_actuales": 0,
+                "estado": "Crítico",
+            }
+            for key in sorted(universe_keys)
+        ]
+        return {
+            "target_month": None,
+            "summary": {
+                "total_activas": len(universe_keys),
+                "completas": 0,
+                "pendientes": len(pending_rows),
+                "min_platforms": min_platforms,
+            },
+            "pending_rows": pending_rows,
+        }
+
+    dfx = df.copy()
+    dfx["fecha"] = pd.to_datetime(dfx["fecha"], errors="coerce")
+    dfx = dfx.dropna(subset=["fecha"])
+
+    if dfx.empty:
+        pending_rows = [
+            {
+                "institucion": canonical_to_display[key],
+                "plataformas_actuales": 0,
+                "estado": "Crítico",
+            }
+            for key in sorted(universe_keys)
+        ]
+        return {
+            "target_month": None,
+            "summary": {
+                "total_activas": len(universe_keys),
+                "completas": 0,
+                "pendientes": len(pending_rows),
+                "min_platforms": min_platforms,
+            },
+            "pending_rows": pending_rows,
+        }
+
+    dfx["periodo"] = dfx["fecha"].dt.to_period("M")
+
+    if target_month is None:
+        target_period = dfx["periodo"].max()
+    else:
+        target_period = pd.to_datetime(target_month).to_period("M")
+
+    df_month = dfx[dfx["periodo"] == target_period].copy()
+    df_month["entidad_key"] = df_month["entidad"].apply(_canonical_institution_name)
+    df_month = df_month[df_month["entidad_key"].isin(universe_keys)]
+
+    # Deduplicar por institución+plataforma+mes usando el último registro temporal
+    df_month = df_month.sort_values("fecha")
+    df_month = df_month.drop_duplicates(
+        subset=["entidad_key", "plataforma", "periodo"],
+        keep="last",
+    )
+
+    counts = (
+        df_month.groupby("entidad_key")["plataforma"]
+        .nunique()
+        .to_dict()
+    )
+
+    complete_keys = {k for k, v in counts.items() if v >= min_platforms}
+    pending_keys = sorted(universe_keys - complete_keys)
+
+    pending_rows = []
+    for key in pending_keys:
+        current = int(counts.get(key, 0))
+        status = "Crítico" if current == 0 else "Advertencia"
+        pending_rows.append(
+            {
+                "institucion": canonical_to_display[key],
+                "plataformas_actuales": current,
+                "estado": status,
+            }
+        )
+
+    return {
+        "target_month": str(target_period),
+        "summary": {
+            "total_activas": len(universe_keys),
+            "completas": len(complete_keys),
+            "pendientes": len(pending_rows),
+            "min_platforms": min_platforms,
+        },
+        "pending_rows": pending_rows,
+    }
 
 
 # ============================================

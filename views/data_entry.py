@@ -26,6 +26,8 @@ from utils.validators import (
     validate_form,
     get_validation_icon,
     check_missing_data_per_institution,
+    get_monthly_pending_institutions,
+    normalize_report_date_to_month_start,
 )
 from utils.app_state import get_app_state
 from components.toast_notifications import (
@@ -83,12 +85,12 @@ def check_registro_existente(entidad: str, plataforma: str, fecha: date) -> bool
 
 def render(df=None):
     """
-    Renderiza la vista de captura de datos con pestañas para Captura Manual, Carga Masiva y Captura Anual.
+    Renderiza la vista de captura de datos priorizando Google Forms y verificación mensual.
     """
     # Configurar el sidebar
     st.sidebar.title("Opciones de Captura")
     opcion = st.sidebar.radio(
-        "Selecciona una opción:", ["Captura Manual", "Carga Masiva", "Captura Anual"]
+        "Selecciona una opción:", ["Formulario Externo", "Carga Masiva", "Captura Anual"]
     )
 
     st.title("📝 Captura de Datos")
@@ -99,31 +101,66 @@ def render(df=None):
     try:
         df_full = data_provider.get_merged_data(force_reload=True)
         if not df_full.empty:
-            # Usar el mes actual para el rango
+            pending_report = get_monthly_pending_institutions(df_full, min_platforms=2)
+            summary = pending_report.get("summary", {})
+            target_month = pending_report.get("target_month")
+            pending_rows = pending_report.get("pending_rows", [])
+
+            st.markdown("### Verificación de Captura Mensual")
+            if target_month:
+                st.caption(f"Mes objetivo de verificación: {target_month}")
+
+            c1, c2, c3 = st.columns(3)
+            c1.metric("Instituciones activas", int(summary.get("total_activas", 0)))
+            c2.metric("Instituciones completas", int(summary.get("completas", 0)))
+            c3.metric("Instituciones pendientes", int(summary.get("pendientes", 0)))
+
+            if pending_rows:
+                st.markdown("### ⚠️ Pendientes del último mes capturado")
+
+                pending_df = pd.DataFrame(pending_rows)
+                pending_df = pending_df.sort_values(["plataformas_actuales", "institucion"], ascending=[True, True])
+                st.dataframe(
+                    pending_df,
+                    width='stretch',
+                    hide_index=True,
+                    column_config={
+                        "institucion": st.column_config.TextColumn("Institución"),
+                        "plataformas_actuales": st.column_config.NumberColumn("Plataformas actuales"),
+                        "estado": st.column_config.TextColumn("Estado"),
+                    },
+                )
+            else:
+                st.success("Cobertura completa: no hay instituciones pendientes en el último mes capturado.")
+
+            st.markdown("### Formulario Externo de Captura")
+            form_url = "https://docs.google.com/forms/d/e/1FAIpQLSdyENRU-OPiD9VTEMC_AQeCusksvK450UTQQFGcnKS9tQJINA/viewform"
+            st.link_button("📝 Abrir Google Forms", form_url, width='stretch')
+            st.components.v1.iframe(form_url, width=None, height=980, scrolling=True)
+
+            # Mantener verificación histórica existente como diagnóstico secundario
             current_date = pd.Timestamp.now()
             date_range = (current_date.replace(day=1), current_date + pd.offsets.MonthEnd(1))
             missing_issues = check_missing_data_per_institution(df_full, date_range)
-            institutions_with_issues = len(set(issue['institution'] for issue in missing_issues))
-            
-            if institutions_with_issues > 0:
-                st.metric("Instituciones con datos incompletos", f"{institutions_with_issues}")
-                
-                # Alerts por institución
-                if missing_issues:
-                    st.markdown("### ⚠️ Datos Faltantes por Institución")
+            if missing_issues:
+                with st.expander("Diagnóstico detallado de campos faltantes", expanded=False):
                     issues_by_institution = {}
                     for issue in missing_issues:
                         inst = issue['institution']
                         if inst not in issues_by_institution:
                             issues_by_institution[inst] = []
                         issues_by_institution[inst].append(f"{issue['platform']}: {issue['issue_type']}")
-                    
+
                     for institution, issues in issues_by_institution.items():
-                        with st.expander(f"⚠️ {institution}", expanded=False):
-                            for issue in issues:
-                                st.warning(issue)
+                        st.markdown(f"**{institution}**")
+                        for issue in issues:
+                            st.warning(issue)
     except Exception as e:
         logging.warning(f"Error calculando datos faltantes: {e}")
+
+    # Flujo Forms-only: no mostrar la captura manual individual.
+    if opcion == "Formulario Externo":
+        return
 
     # Obtener estado global
     state = get_app_state()
@@ -400,6 +437,8 @@ def render(df=None):
                         alcance_final = int(alcance) if ('alcance' in locals() and alcance > 0) else int(
                             estimate_reach(plataforma, seguidores, engagement_rate_guardado)
                         )
+                        fecha_captura_normalizada = normalize_report_date_to_month_start(fecha_captura)
+                        fecha_captura_guardado = fecha_captura_normalizada.strftime("%Y-%m-%d")
 
                         # Construir registro SOLO con campos indispensables
                         nuevo_registro = {
@@ -407,7 +446,7 @@ def render(df=None):
                             "entidad": entidad,
                             "plataforma": plataforma,
                             "usuario_red": usuario_red,
-                            "fecha": pd.to_datetime(fecha_captura).strftime("%Y-%m-%d"),
+                            "fecha": fecha_captura_guardado,
                             "seguidores": int(seguidores),
                             "alcance": alcance_final,
                             "interacciones": int(interacciones) if interacciones > 0 else int(likes_promedio_guardado),
@@ -448,7 +487,7 @@ def render(df=None):
                             # Guardar comentarios contextuales si existen (no bloquear)
                             try:
                                 if comentarios and comentarios.strip():
-                                    mes_formato = pd.to_datetime(fecha_captura).strftime("%Y-%m")
+                                    mes_formato = fecha_captura_normalizada.strftime("%Y-%m")
                                     save_comment(entidad, mes_formato, comentarios.strip())
                             except Exception:
                                 pass
@@ -472,7 +511,7 @@ def render(df=None):
                             state.set_form_defaults({
                                 "capture_entidad_default": entidad,
                                 "capture_plataforma_default": plataforma,
-                                "capture_fecha_default": fecha_captura,
+                                "capture_fecha_default": fecha_captura_normalizada.date(),
                             })
 
                         else:

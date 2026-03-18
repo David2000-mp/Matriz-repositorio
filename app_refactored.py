@@ -251,21 +251,10 @@ def main():
         from views import engagement_calculator_v2 as engagement_calculator
         engagement_calculator.render()
     elif selected == "Captura":
-        # Nueva implementación: Captura externa vía Google Forms
-        st.header("📝 Captura de Datos Externa")
-        st.markdown("""
-        La captura de datos ahora se realiza a través de un formulario externo para mayor estabilidad y facilidad de uso.
-        Completa el formulario en Google Forms y los datos se procesarán automáticamente.
-        """)
-        
-        # Botón para ir al formulario
-        form_url = "https://docs.google.com/forms/d/e/1FAIpQLSdyENRU-OPiD9VTEMC_AQeCusksvK450UTQQFGcnKS9tQJINA/viewform"
-        st.link_button("📝 Ir al Formulario de Captura", form_url, width='stretch')
-        
-        # Opcional: Mostrar el formulario en iframe
-        st.markdown("---")
-        st.subheader("Vista Previa del Formulario")
-        st.components.v1.iframe(form_url, width=None, height=1200, scrolling=True)
+        # Captura interna con validaciones y monitor mensual de pendientes.
+        from views import data_entry
+
+        data_entry.render()
     elif selected == "Auditoría de Respuestas":
         # Nueva sección: Auditoría de Respuestas
         st.header("🔍 Auditoría de Respuestas")
