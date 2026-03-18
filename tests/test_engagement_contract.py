@@ -1,0 +1,107 @@
+from utils.report_generator import generate_engagement_report_html
+
+
+def _base_payload(expected: dict, content_stats: dict):
+    return {
+        "platform": "facebook",
+        "followers": 2500,
+        "days": 30,
+        "posts_list": [
+            {"num": 1, "type": "📸 Imagen", "total": 120},
+            {"num": 2, "type": "🎥 Video", "total": 90},
+        ],
+        "engagement_pct": 8.4,
+        "engagement_per_post": 4.2,
+        "engagement_by_views": 0.0,
+        "posts_per_week": 3.5,
+        "diagnosis": "🟡 BUENO",
+        "content_stats": content_stats,
+        "growth_scenarios": {
+            10: {"growth_pct": 5, "followers_3m": 2625},
+            20: {"growth_pct": 10, "followers_3m": 2750},
+            30: {"growth_pct": 15, "followers_3m": 2875},
+        },
+        "expected": expected,
+    }
+
+
+def test_report_html_accepts_new_expected_contract():
+    expected = {"typical": 3.5, "min": 1.5, "max": 8.0, "label": "Tipico 3.5%"}
+    content_stats = {
+        "📸 Imagen": {"posts": 1, "total_interactions": 120, "avg_engagement": 4.8},
+        "🎥 Video": {"posts": 1, "total_interactions": 90, "avg_engagement": 3.6},
+    }
+
+    html = generate_engagement_report_html(**_base_payload(expected, content_stats))
+
+    assert "Reporte de Engagement" in html
+    assert "4.80%" in html
+
+
+def test_report_html_accepts_legacy_expected_contract_without_keyerror():
+    expected = {
+        "bajo": 0.5,
+        "aceptable": 1.0,
+        "bueno": 2.0,
+        "labels": {"bueno": "1% - 2%"},
+    }
+    content_stats = {
+        "📸 Imagen": {"posts": 1, "total_interactions": 120, "avg_engagement": 4.8},
+        "🎥 Video": {"posts": 1, "total_interactions": 90, "avg_engagement": 3.6},
+    }
+
+    html = generate_engagement_report_html(**_base_payload(expected, content_stats))
+
+    assert "Reporte de Engagement" in html
+    assert "1% - 2%" in html
+
+
+def test_report_prefers_avg_engagement_when_engagement_missing():
+    expected = {"typical": 3.5, "min": 1.5, "max": 8.0, "label": "Tipico 3.5%"}
+    content_stats = {
+        "📸 Imagen": {"posts": 1, "total_interactions": 120, "avg_engagement": 4.8},
+        "🎥 Video": {"posts": 1, "total_interactions": 90, "avg_engagement": 3.6},
+    }
+
+    html = generate_engagement_report_html(**_base_payload(expected, content_stats))
+
+    assert "4.80%" in html
+    assert "3.60%" in html
+
+
+def test_report_includes_period_header_when_dates_are_provided():
+    expected = {"typical": 3.5, "min": 1.5, "max": 8.0, "label": "Tipico 3.5%"}
+    content_stats = {
+        "📸 Imagen": {"posts": 1, "total_interactions": 120, "avg_engagement": 4.8},
+        "🎥 Video": {"posts": 1, "total_interactions": 90, "avg_engagement": 3.6},
+    }
+    payload = _base_payload(expected, content_stats)
+    payload["days"] = 12
+    payload["period_start"] = "2026-03-01"
+    payload["period_end"] = "2026-03-12"
+    payload["total_posts"] = 9
+
+    html = generate_engagement_report_html(**payload)
+
+    assert "Periodo Analizado: 2026-03-01 al 2026-03-12 (12 dias) - Total: 9 posts" in html
+
+
+def test_report_marks_post_mode_for_hybrid_tiktok():
+    expected = {"typical": 3.5, "min": 1.5, "max": 8.0, "label": "Tipico 3.5%"}
+    content_stats = {
+        "🎥 Video": {"posts": 2, "total_interactions": 50, "avg_engagement": 1.0},
+    }
+    payload = _base_payload(expected, content_stats)
+    payload["platform"] = "tiktok"
+    payload["analysis_mode"] = "hybrid"
+    payload["posts_list"] = [
+        {"num": 1, "type": "🎥 Video", "categoria": "Eventos", "total": 50, "analysis_mode": "standard"},
+        {"num": 2, "type": "🎥 Video", "categoria": "Eventos", "total": 0, "analysis_mode": "views_only"},
+    ]
+
+    html = generate_engagement_report_html(**payload)
+
+    assert "Modo de análisis:</strong> Hibrido" in html
+    assert "<th>Modo</th>" in html
+    assert "Comunidad" in html
+    assert "Alcance" in html

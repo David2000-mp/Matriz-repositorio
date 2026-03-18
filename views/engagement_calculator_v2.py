@@ -9,6 +9,13 @@ from datetime import datetime
 import json
 import logging
 from utils.report_generator import generate_engagement_report_html
+from utils.rules_engine import calculate_engagement_engine
+from utils.content_analyzer import classify_school_content, identify_top_performer
+from utils.smart_diagnosis import (
+    build_recommendation_text,
+    category_effectiveness,
+    compute_volatility_guardrail,
+)
 
 
 # ============================================================================
@@ -34,6 +41,18 @@ def get_engagement_thresholds(platform: str, metric_type: str = "comunidad") -> 
                 "aceptable": "0.5% - 1% → Aceptable",
                 "bueno": "1% - 2% → Bueno",
                 "alto": "> 2% → Alto"
+            }
+        }
+    elif platform == "instagram":
+        return {
+            "bajo": 1.0,
+            "aceptable": 3.0,
+            "bueno": 6.0,
+            "labels": {
+                "bajo": "< 1% → Bajo",
+                "aceptable": "1% - 3% → Aceptable",
+                "bueno": "3% - 6% → Bueno",
+                "alto": "> 6% → Alto"
             }
         }
     elif platform == "tiktok":
@@ -175,6 +194,160 @@ def calculate_growth_potential(current_engagement: float, current_followers: int
     return scenarios
 
 
+def _build_default_posts_grid(platform: str) -> pd.DataFrame:
+    """Construye la rejilla inicial de 15 posts para captura agil."""
+    content_types = ["📸 Imagen", "🎥 Video", "📝 Texto", "🔗 Link"]
+    categories = [
+        "Admisiones",
+        "Eventos",
+        "Vida Estudiantil",
+        "Academico",
+        "Pastoral",
+        "Deportes",
+        "Institucional",
+        "Venta",
+        "Otro",
+    ]
+
+    default_type = "🎥 Video" if platform == "tiktok" else "📸 Imagen"
+    rows = []
+    for i in range(1, 16):
+        rows.append(
+            {
+                "Post #": i,
+                "Fecha Publicacion": None,
+                "Categoria": categories[0],
+                "Tipo": default_type if default_type in content_types else content_types[0],
+                "URL/Link": "",
+                "Comentario": "",
+                "Reacciones": 0,
+                "Me gusta": 0,
+                "Comentarios": 0,
+                "Compartidos": 0,
+                "Vistas": 0,
+                "Interacciones": 0,
+                "Estado": "⚪ Sin datos",
+            }
+        )
+
+    return pd.DataFrame(rows)
+
+
+def _ensure_posts_grid(platform: str) -> pd.DataFrame:
+    """Inicializa o reutiliza la rejilla en session_state segun plataforma."""
+    key = "wizard_posts_grid"
+    platform_key = "wizard_posts_grid_platform"
+
+    if key not in st.session_state or st.session_state.get(platform_key) != platform:
+        st.session_state[key] = _build_default_posts_grid(platform)
+        st.session_state[platform_key] = platform
+
+    return st.session_state[key].copy()
+
+
+def _post_total_from_row(row: pd.Series, platform: str) -> int:
+    """Calcula interacciones por fila segun plataforma."""
+    result = calculate_engagement_engine(
+        platform,
+        {
+            "Reacciones": row.get("Reacciones", 0),
+            "Me gusta": row.get("Me gusta", 0),
+            "Comentarios": row.get("Comentarios", 0),
+            "Compartidos": row.get("Compartidos", 0),
+            "Interacciones": row.get("Interacciones", 0),
+        },
+    )
+    return int(result.total_interactions)
+
+
+def _row_validation(row: pd.Series, platform: str, followers: int) -> dict:
+    """Valida el rendimiento de una fila usando reglas actuales."""
+    result = calculate_engagement_engine(
+        platform,
+        {
+            "Reacciones": row.get("Reacciones", 0),
+            "Me gusta": row.get("Me gusta", 0),
+            "Comentarios": row.get("Comentarios", 0),
+            "Compartidos": row.get("Compartidos", 0),
+            "Interacciones": row.get("Interacciones", 0),
+            "followers": followers,
+        },
+    )
+    return validate_post_engagement(result.total_interactions, 0, 0, followers)
+
+
+def _sanitize_and_score_posts_df(posts_df: pd.DataFrame, platform: str, followers: int) -> tuple[pd.DataFrame, list[dict]]:
+    """Normaliza la rejilla y calcula interacciones/estado por fila."""
+    work_df = posts_df.copy()
+
+    text_columns = ["Categoria", "Tipo", "URL/Link", "Comentario"]
+    for col in text_columns:
+        if col in work_df.columns:
+            work_df[col] = work_df[col].fillna("").astype(str)
+
+    numeric_columns = ["Reacciones", "Me gusta", "Comentarios", "Compartidos", "Vistas", "Interacciones"]
+    for col in numeric_columns:
+        if col in work_df.columns:
+            work_df[col] = pd.to_numeric(work_df[col], errors="coerce").fillna(0).astype(int)
+
+    posts_data = []
+    for idx in work_df.index:
+        row = work_df.loc[idx]
+        row_result = calculate_engagement_engine(
+            platform,
+            {
+                "Reacciones": row.get("Reacciones", 0),
+                "Me gusta": row.get("Me gusta", 0),
+                "Comentarios": row.get("Comentarios", 0),
+                "Compartidos": row.get("Compartidos", 0),
+                "Interacciones": row.get("Interacciones", 0),
+                "followers": followers,
+                "views": row.get("Vistas", 0),
+            },
+        )
+        total = int(row_result.total_interactions)
+        validation = validate_post_engagement(total, 0, 0, followers)
+        work_df.at[idx, "Interacciones"] = int(total)
+        if row_result.analysis_mode == "views_only":
+            work_df.at[idx, "Estado"] = "📺 reach"
+            status = "reach"
+        else:
+            work_df.at[idx, "Estado"] = f"{validation['icon']} {validation['status']}"
+            status = validation["status"]
+
+        posts_data.append(
+            {
+                "post_num": int(row.get("Post #", 0) or 0),
+                "type": row.get("Tipo", "📸 Imagen"),
+                "total": int(total),
+                "status": status,
+                "analysis_mode": row_result.analysis_mode,
+                "views": int(row.get("Vistas", 0) or 0),
+                "fecha": row.get("Fecha Publicacion"),
+            }
+        )
+
+    return work_df, posts_data
+
+
+def _sync_grid_to_legacy_state(posts_df: pd.DataFrame, platform: str):
+    """Mantiene compatibilidad con llaves wizard_post_* del flujo anterior."""
+    for _, row in posts_df.iterrows():
+        post_num = int(row["Post #"])
+        st.session_state[f"wizard_post_{post_num}_type"] = row.get("Tipo", "📸 Imagen")
+        st.session_state[f"wizard_post_{post_num}_interactions"] = int(row.get("Interacciones", 0) or 0)
+        st.session_state[f"wizard_post_{post_num}_comments"] = int(row.get("Comentarios", 0) or 0)
+        st.session_state[f"wizard_post_{post_num}_shares"] = int(row.get("Compartidos", 0) or 0)
+        if platform == "facebook":
+            st.session_state[f"wizard_post_{post_num}_reactions"] = int(row.get("Reacciones", 0) or 0)
+        elif platform == "instagram":
+            st.session_state[f"wizard_post_{post_num}_likes"] = int(row.get("Me gusta", 0) or 0)
+            st.session_state[f"wizard_post_{post_num}_shares"] = int(row.get("Compartidos", 0) or 0)
+        else:
+            st.session_state[f"wizard_post_{post_num}_likes"] = int(row.get("Me gusta", 0) or 0)
+            st.session_state[f"wizard_post_{post_num}_views"] = int(row.get("Vistas", 0) or 0)
+
+
 # ============================================================================
 # PASO 1: DATOS BASE
 # ============================================================================
@@ -189,8 +362,8 @@ def render_step_1_basic_data():
     col1, col2 = st.columns(2)
     
     with col1:
-        platform_options = ["facebook", "tiktok"]
-        platform_display = ["📘 Facebook", "🎵 TikTok"]
+        platform_options = ["facebook", "instagram", "tiktok"]
+        platform_display = ["📘 Facebook", "📸 Instagram", "🎵 TikTok"]
         
         platform_index = st.selectbox(
             "¿Qué plataforma analizarás?",
@@ -224,8 +397,14 @@ def render_step_1_basic_data():
     
     # Mostrar estimación de publicaciones
     expected_posts = int((st.session_state.get("wizard_posts_count", 15)))
+    platform_label_map = {
+        "facebook": "Facebook",
+        "instagram": "Instagram",
+        "tiktok": "TikTok",
+    }
+    platform_label = platform_label_map.get(platform_clean, platform_clean.title())
     st.info(
-        f"📊 **Resumen:** Analizarás **{expected_posts} publicaciones** de {{platform}} "
+        f"📊 **Resumen:** Analizarás **{expected_posts} publicaciones** de **{platform_label}** "
         f"en los últimos **{days} días** con **{followers:,} seguidores**.",
         icon="📋"
     )
@@ -240,7 +419,7 @@ def render_step_1_basic_data():
 # ============================================================================
 
 def render_step_2_posts():
-    """Paso 2 del asistente: Ingreso de publicaciones con validación visual."""
+    """Paso 2 del asistente: Captura agil en rejilla editable con dimension temporal."""
     
     st.divider()
     st.markdown("## Paso 2: Tus Publicaciones")
@@ -264,6 +443,14 @@ def render_step_2_posts():
             2. Haz clic en cada post para ver reacciones, comentarios, shares
             3. Llena los datos aquí
             """)
+        elif platform == "instagram":
+            st.markdown("""
+            **Para cada publicación de Instagram:**
+            - **Me gusta:** Número de likes
+            - **Comentarios:** Comentarios del post
+            - **Compartidos:** Opcional (si se dispone)
+            - **Tipo:** Qué tipo de contenido
+            """)
         else:  # tiktok
             st.markdown("""
             **Para cada video:**
@@ -281,142 +468,149 @@ def render_step_2_posts():
             """)
     
     content_types = ["📸 Imagen", "🎥 Video", "📝 Texto", "🔗 Link"]
-    
-    # Grid de 15 publicaciones
-    posts_data = []
-    
-    for row in range(5):
-        cols = st.columns(3, gap="medium")
-        for col_idx, col in enumerate(cols):
-            post_num = row * 3 + col_idx + 1
-            
-            with col:
-                st.markdown(f"### Post #{post_num}")
-                
-                # Tipo de contenido - Si es TikTok, pre-seleccionar Video
-                default_index = 1 if platform == "tiktok" else 0  # 🎥 Video para TikTok, 📸 Imagen para Facebook
-                
-                # Si ya existe valor en session_state, usarlo; si no, usar default
-                if f"wizard_post_{post_num}_type" not in st.session_state:
-                    st.session_state[f"wizard_post_{post_num}_type"] = content_types[default_index]
-                
-                content_type = st.selectbox(
-                    "Tipo de contenido",
-                    content_types,
-                    key=f"wizard_post_{post_num}_type",
-                    label_visibility="collapsed",
-                    help="Selecciona el tipo de contenido para este post"
-                )
-                
-                if platform == "facebook":
-                    # Facebook inputs
-                    st.markdown("**👍 Reacciones**")
-                    st.caption("Me gusta, Me encanta, Me divierte, Me asombra, Me entristece, Me enoja")
-                    reactions = st.number_input(
-                        "Reacciones",
-                        min_value=0,
-                        value=st.session_state.get(f"wizard_post_{post_num}_reactions", 0),
-                        key=f"wizard_post_{post_num}_reactions",
-                        label_visibility="collapsed"
-                    )
-                    
-                    st.markdown("**💬 Comentarios**")
-                    st.caption("Todos los comentarios en el post")
-                    comments = st.number_input(
-                        "Comentarios",
-                        min_value=0,
-                        value=st.session_state.get(f"wizard_post_{post_num}_comments", 0),
-                        key=f"wizard_post_{post_num}_comments",
-                        label_visibility="collapsed"
-                    )
-                    
-                    st.markdown("**📤 Compartidos**")
-                    st.caption("Veces que fue compartido o re-compartido")
-                    shares = st.number_input(
-                        "Compartidos",
-                        min_value=0,
-                        value=st.session_state.get(f"wizard_post_{post_num}_shares", 0),
-                        key=f"wizard_post_{post_num}_shares",
-                        label_visibility="collapsed"
-                    )
-                    
-                    total = int(reactions) + int(comments) + int(shares)
-                    
-                    # Validación visual en tiempo real
-                    validation = validate_post_engagement(int(reactions), int(comments), int(shares), followers)
-                    
-                else:  # TikTok
-                    st.markdown("**👁️ Vistas**")
-                    st.caption("Número total de veces que el video fue visto")
-                    views = st.number_input(
-                        "Vistas",
-                        min_value=0,
-                        value=st.session_state.get(f"wizard_post_{post_num}_views", 0),
-                        key=f"wizard_post_{post_num}_views",
-                        label_visibility="collapsed"
-                    )
-                    
-                    st.markdown("**👍 Me gusta**")
-                    st.caption("Número de likes que recibió el video")
-                    likes = st.number_input(
-                        "Me gusta",
-                        min_value=0,
-                        value=st.session_state.get(f"wizard_post_{post_num}_likes", 0),
-                        key=f"wizard_post_{post_num}_likes",
-                        label_visibility="collapsed"
-                    )
-                    
-                    st.markdown("**💬 Comentarios**")
-                    st.caption("Comentarios en el video")
-                    comments = st.number_input(
-                        "Comentarios",
-                        min_value=0,
-                        value=st.session_state.get(f"wizard_post_{post_num}_comments", 0),
-                        key=f"wizard_post_{post_num}_comments",
-                        label_visibility="collapsed"
-                    )
-                    
-                    st.markdown("**📤 Compartidos**")
-                    st.caption("Veces que fue compartido o enviado")
-                    shares = st.number_input(
-                        "Compartidos",
-                        min_value=0,
-                        value=st.session_state.get(f"wizard_post_{post_num}_shares", 0),
-                        key=f"wizard_post_{post_num}_shares",
-                        label_visibility="collapsed"
-                    )
-                    
-                    # Total: Solo likes + comentarios + compartidos (según reglas oficiales)
-                    total = int(likes) + int(comments) + int(shares)
-                    
-                    # Validación visual en tiempo real
-                    validation = validate_post_engagement(int(likes), int(comments), int(shares), followers)
-                
-                # Mostrar indicador visual
-                st.markdown(
-                    f"<div style='padding: 8px; border-radius: 6px; background: {validation['color']}20; "
-                    f"border-left: 4px solid {validation['color']};'>"
-                    f"<strong>{validation['icon']} {validation['message']}</strong>"
-                    f"</div>",
-                    unsafe_allow_html=True
-                )
-                
-                st.caption(f"**Total:** {total} interacciones")
-                
-                posts_data.append({
-                    "post_num": post_num,
-                    "type": content_type,
-                    "total": total,
-                    "status": validation["status"]
-                })
-    
+    categories = [
+        "Admisiones",
+        "Eventos",
+        "Vida Estudiantil",
+        "Academico",
+        "Pastoral",
+        "Deportes",
+        "Institucional",
+        "Venta",
+        "Otro",
+    ]
+
+    st.caption("Tip: Puedes navegar celda por celda con Tab y pegar datos desde Excel.")
+
+    posts_df = _ensure_posts_grid(platform)
+
+    if platform == "facebook":
+        visible_columns = [
+            "Post #",
+            "Comentarios",
+            "Compartidos",
+            "Reacciones",
+            "Interacciones",
+            "Estado",
+            "Fecha Publicacion",
+            "Categoria",
+            "Tipo",
+            "URL/Link",
+            "Comentario",
+        ]
+    elif platform == "instagram":
+        visible_columns = [
+            "Post #",
+            "Comentarios",
+            "Me gusta",
+            "Compartidos",
+            "Interacciones",
+            "Estado",
+            "Fecha Publicacion",
+            "Categoria",
+            "Tipo",
+            "URL/Link",
+            "Comentario",
+        ]
+    else:
+        visible_columns = [
+            "Post #",
+            "Comentarios",
+            "Compartidos",
+            "Me gusta",
+            "Vistas",
+            "Interacciones",
+            "Estado",
+            "Fecha Publicacion",
+            "Categoria",
+            "Tipo",
+            "URL/Link",
+            "Comentario",
+        ]
+
+    # El formulario agrupa la rejilla y el botón "Calcular".
+    # Al usar st.form, los cambios de celda NO disparan re-runs intermedios,
+    # evitando el hash-reset del data_editor que borraba los datos ingresados.
+    with st.form("wizard_posts_form", clear_on_submit=False):
+        edited_df = st.data_editor(
+            posts_df[visible_columns],
+            use_container_width=True,
+            hide_index=True,
+            height=520,
+            num_rows="fixed",
+            key="wizard_posts_grid_editor",
+            column_config={
+                "Post #": st.column_config.NumberColumn("Post #", min_value=1, step=1, disabled=True),
+                "Fecha Publicacion": st.column_config.DateColumn("Fecha Publicacion", format="YYYY-MM-DD"),
+                "Categoria": st.column_config.SelectboxColumn("Categoria", options=categories),
+                "Tipo": st.column_config.SelectboxColumn("Tipo", options=content_types),
+                "URL/Link": st.column_config.TextColumn("URL/Link", width="medium"),
+                "Comentario": st.column_config.TextColumn("Comentario", width="large"),
+                "Reacciones": st.column_config.NumberColumn("Reacciones", min_value=0, step=1),
+                "Me gusta": st.column_config.NumberColumn("Me gusta", min_value=0, step=1),
+                "Comentarios": st.column_config.NumberColumn("Comentarios", min_value=0, step=1),
+                "Compartidos": st.column_config.NumberColumn("Compartidos", min_value=0, step=1),
+                "Vistas": st.column_config.NumberColumn("Vistas", min_value=0, step=1),
+                "Interacciones": st.column_config.NumberColumn("Interacciones", min_value=0, step=1),
+                "Estado": st.column_config.TextColumn("Estado", disabled=True),
+            },
+            disabled=["Post #", "Estado"],
+        )
+        st.markdown("")
+        _, _, submit_col = st.columns([1, 1, 1])
+        with submit_col:
+            submitted = st.form_submit_button(
+                "Calcular Resultados →",
+                use_container_width=True,
+                type="primary",
+            )
+
+    if submitted:
+        posts_df.loc[:, visible_columns] = edited_df
+        posts_df, posts_data = _sanitize_and_score_posts_df(posts_df, platform, followers)
+        st.session_state["wizard_posts_grid"] = posts_df
+        _sync_grid_to_legacy_state(posts_df, platform)
+
+        if platform == "tiktok":
+            captured_posts = len(
+                [p for p in posts_data if p["total"] > 0 or (p.get("analysis_mode") == "views_only" and p.get("views", 0) > 0)]
+            )
+        else:
+            captured_posts = len([p for p in posts_data if p["total"] > 0])
+
+        valid_dates = pd.to_datetime(posts_df["Fecha Publicacion"], errors="coerce").dropna()
+        if not valid_dates.empty:
+            period_start = valid_dates.min().date()
+            period_end = valid_dates.max().date()
+            period_days = max((period_end - period_start).days + 1, 1)
+        else:
+            period_days = int(st.session_state.get("wizard_days", 30))
+            period_end = datetime.now().date()
+            period_start = period_end - pd.Timedelta(days=max(period_days - 1, 0))
+
+        st.session_state["wizard_period_start"] = str(period_start)
+        st.session_state["wizard_period_end"] = str(period_end)
+        st.session_state["wizard_days"] = int(period_days)
+        st.session_state["wizard_posts_count"] = int(captured_posts)
+
+        if captured_posts <= 0:
+            if platform == "tiktok":
+                st.warning("Captura al menos un post con interacciones o vistas antes de calcular.")
+            else:
+                st.warning("Captura al menos un post con interacciones antes de calcular.")
+        else:
+            st.session_state["wizard_step"] = 3
+            st.rerun()
+
     st.divider()
-    
-    # Resumen rápido
+
+    # Resumen basado en los datos del último guardado (session_state)
+    saved_grid = st.session_state.get("wizard_posts_grid", posts_df)
+    _, posts_data = _sanitize_and_score_posts_df(saved_grid.copy(), platform, followers)
     green_posts = len([p for p in posts_data if p["status"] == "green"])
     yellow_posts = len([p for p in posts_data if p["status"] == "yellow"])
     red_posts = len([p for p in posts_data if p["status"] == "red"])
-    
+
     summary_col1, summary_col2, summary_col3 = st.columns(3)
     with summary_col1:
         st.metric("🟢 Excelentes", green_posts)
@@ -424,18 +618,28 @@ def render_step_2_posts():
         st.metric("🟡 Normales", yellow_posts)
     with summary_col3:
         st.metric("🔴 Bajos", red_posts)
-    
-    # Navegación
-    col1, col2, col3 = st.columns([1, 1, 1])
-    with col1:
-        if st.button("← Volver al Paso 1", use_container_width=True):
-            st.session_state["wizard_step"] = 1
-            st.rerun()
-    
-    with col3:
-        if st.button("Calcular Resultados →", use_container_width=True, type="primary"):
-            st.session_state["wizard_step"] = 3
-            st.rerun()
+
+    if platform == "tiktok":
+        reach_posts = len([p for p in posts_data if p.get("analysis_mode") == "views_only"])
+        if reach_posts > 0:
+            st.caption(f"📺 {reach_posts} post(s) en modo reach (vistas sin interacciones).")
+
+    period_start_disp = st.session_state.get("wizard_period_start", str(datetime.now().date()))
+    period_end_disp = st.session_state.get("wizard_period_end", str(datetime.now().date()))
+    period_days_disp = int(st.session_state.get("wizard_days", 30))
+    captured_posts_disp = int(st.session_state.get("wizard_posts_count", 0))
+    posting_frequency_disp = (captured_posts_disp / period_days_disp) * 7 if period_days_disp > 0 else 0
+    if captured_posts_disp > 0:
+        st.info(
+            f"Periodo analizado: **{period_start_disp}** al **{period_end_disp}** "
+            f"(**{period_days_disp} dias**) - Total capturado: **{captured_posts_disp} posts** "
+            f"- Frecuencia: **{posting_frequency_disp:.2f} posts/semana**",
+            icon="📅",
+        )
+
+    if st.button("← Volver al Paso 1", use_container_width=True):
+        st.session_state["wizard_step"] = 1
+        st.rerun()
 
 
 # ============================================================================
@@ -447,69 +651,225 @@ def calculate_and_render_results():
     
     platform = st.session_state.get("wizard_platform", "facebook")
     followers = st.session_state.get("wizard_followers", 2500)
-    days = st.session_state.get("wizard_days", 30)
+    days = int(st.session_state.get("wizard_days", 30))
     
     # Recopilar datos de publicaciones
     posts_list = []
     total_interactions = 0
     total_views = 0
-    
-    for i in range(1, 16):
-        post = {
-            "num": i,
-            "type": st.session_state.get(f"wizard_post_{i}_type", "📸 Imagen"),
-        }
-        
-        if platform == "facebook":
-            reactions = st.session_state.get(f"wizard_post_{i}_reactions", 0)
-            comments = st.session_state.get(f"wizard_post_{i}_comments", 0)
-            shares = st.session_state.get(f"wizard_post_{i}_shares", 0)
-            post["reactions"] = reactions
-            post["comments"] = comments
-            post["shares"] = shares
-            post["total"] = reactions + comments + shares
+    period_start = st.session_state.get("wizard_period_start")
+    period_end = st.session_state.get("wizard_period_end")
+
+    grid_df = st.session_state.get("wizard_posts_grid")
+    if isinstance(grid_df, pd.DataFrame) and not grid_df.empty:
+        for _, row in grid_df.sort_values("Post #").iterrows():
+            post = {
+                "num": int(row.get("Post #", 0)),
+                "type": row.get("Tipo", "📸 Imagen"),
+                "fecha": str(row.get("Fecha Publicacion") or ""),
+                "categoria": row.get("Categoria", ""),
+                "url": row.get("URL/Link", ""),
+                "comentario": row.get("Comentario", ""),
+            }
+
+            comments = int(row.get("Comentarios", 0) or 0)
+            shares = int(row.get("Compartidos", 0) or 0)
+
+            if platform == "facebook":
+                reactions = int(row.get("Reacciones", 0) or 0)
+                post["reactions"] = reactions
+                post["comments"] = comments
+                post["shares"] = shares
+                post_result = calculate_engagement_engine(
+                    platform,
+                    {
+                        "Reacciones": reactions,
+                        "Comentarios": comments,
+                        "Compartidos": shares,
+                        "Interacciones": int(row.get("Interacciones", 0) or 0),
+                        "followers": followers,
+                    },
+                )
+                post["total"] = post_result.total_interactions
+                post["inconsistency"] = post_result.has_inconsistency
+            elif platform == "instagram":
+                likes = int(row.get("Me gusta", 0) or 0)
+                post["likes"] = likes
+                post["comments"] = comments
+                post["shares"] = shares
+                post_result = calculate_engagement_engine(
+                    platform,
+                    {
+                        "Me gusta": likes,
+                        "Comentarios": comments,
+                        "Compartidos": shares,
+                        "Interacciones": int(row.get("Interacciones", 0) or 0),
+                        "followers": followers,
+                    },
+                )
+                post["total"] = post_result.total_interactions
+                post["inconsistency"] = post_result.has_inconsistency
+            else:
+                views = int(row.get("Vistas", 0) or 0)
+                likes = int(row.get("Me gusta", 0) or 0)
+                post["views"] = views
+                post["likes"] = likes
+                post["comments"] = comments
+                post["shares"] = shares
+                post_result = calculate_engagement_engine(
+                    platform,
+                    {
+                        "Me gusta": likes,
+                        "Comentarios": comments,
+                        "Compartidos": shares,
+                        "Interacciones": int(row.get("Interacciones", 0) or 0),
+                        "followers": followers,
+                        "views": views,
+                    },
+                )
+                post["total"] = post_result.total_interactions
+                post["inconsistency"] = post_result.has_inconsistency
+                total_views += views
+
+            post["analysis_mode"] = post_result.analysis_mode
+            post["analysis_mode_label"] = "Alcance" if post_result.analysis_mode == "views_only" else "Comunidad"
             total_interactions += post["total"]
-            
-        else:  # TikTok
-            views = st.session_state.get(f"wizard_post_{i}_views", 0)
-            likes = st.session_state.get(f"wizard_post_{i}_likes", 0)
-            comments = st.session_state.get(f"wizard_post_{i}_comments", 0)
-            shares = st.session_state.get(f"wizard_post_{i}_shares", 0)
-            post["views"] = views
-            post["likes"] = likes
-            post["comments"] = comments
-            post["shares"] = shares
-            # Total: Solo likes + comentarios + compartidos (no guardados ni vistas)
-            post["total"] = likes + comments + shares
+            posts_list.append(post)
+    else:
+        for i in range(1, 16):
+            post = {
+                "num": i,
+                "type": st.session_state.get(f"wizard_post_{i}_type", "📸 Imagen"),
+            }
+
+            if platform == "facebook":
+                reactions = st.session_state.get(f"wizard_post_{i}_reactions", 0)
+                comments = st.session_state.get(f"wizard_post_{i}_comments", 0)
+                shares = st.session_state.get(f"wizard_post_{i}_shares", 0)
+                post["reactions"] = reactions
+                post["comments"] = comments
+                post["shares"] = shares
+                post_result = calculate_engagement_engine(
+                    platform,
+                    {
+                        "Reacciones": reactions,
+                        "Comentarios": comments,
+                        "Compartidos": shares,
+                        "Interacciones": st.session_state.get(f"wizard_post_{i}_interactions", 0),
+                        "followers": followers,
+                    },
+                )
+                post["total"] = post_result.total_interactions
+                post["inconsistency"] = post_result.has_inconsistency
+            elif platform == "instagram":
+                likes = st.session_state.get(f"wizard_post_{i}_likes", 0)
+                comments = st.session_state.get(f"wizard_post_{i}_comments", 0)
+                shares = st.session_state.get(f"wizard_post_{i}_shares", 0)
+                post["likes"] = likes
+                post["comments"] = comments
+                post["shares"] = shares
+                post_result = calculate_engagement_engine(
+                    platform,
+                    {
+                        "Me gusta": likes,
+                        "Comentarios": comments,
+                        "Compartidos": shares,
+                        "Interacciones": st.session_state.get(f"wizard_post_{i}_interactions", 0),
+                        "followers": followers,
+                    },
+                )
+                post["total"] = post_result.total_interactions
+                post["inconsistency"] = post_result.has_inconsistency
+            else:
+                views = st.session_state.get(f"wizard_post_{i}_views", 0)
+                likes = st.session_state.get(f"wizard_post_{i}_likes", 0)
+                comments = st.session_state.get(f"wizard_post_{i}_comments", 0)
+                shares = st.session_state.get(f"wizard_post_{i}_shares", 0)
+                post["views"] = views
+                post["likes"] = likes
+                post["comments"] = comments
+                post["shares"] = shares
+                post_result = calculate_engagement_engine(
+                    platform,
+                    {
+                        "Me gusta": likes,
+                        "Comentarios": comments,
+                        "Compartidos": shares,
+                        "Interacciones": st.session_state.get(f"wizard_post_{i}_interactions", 0),
+                        "followers": followers,
+                        "views": views,
+                    },
+                )
+                post["total"] = post_result.total_interactions
+                post["inconsistency"] = post_result.has_inconsistency
+                total_views += views
+
+            post["analysis_mode"] = post_result.analysis_mode
+            post["analysis_mode_label"] = "Alcance" if post_result.analysis_mode == "views_only" else "Comunidad"
             total_interactions += post["total"]
-            total_views += views
-        
-        posts_list.append(post)
-    
-    if total_interactions == 0:
-        st.error("⚠️ No hay datos para analizar. Por favor completa al menos algunos posts.")
-        if st.button("← Volver al Paso 2"):
-            st.session_state["wizard_step"] = 2
-            st.rerun()
-        return
+            posts_list.append(post)
+
+    community_posts = [p for p in posts_list if p.get("total", 0) > 0]
+    reach_posts = [
+        p
+        for p in posts_list
+        if p.get("analysis_mode") == "views_only" or (platform == "tiktok" and p.get("total", 0) == 0 and p.get("views", 0) > 0)
+    ]
+
+    if platform == "tiktok":
+        analyzed_posts = community_posts + [p for p in reach_posts if p not in community_posts]
+        if not analyzed_posts:
+            st.error("⚠️ No hay datos para analizar. En TikTok necesitas interacciones o vistas.")
+            if st.button("← Volver al Paso 2"):
+                st.session_state["wizard_step"] = 2
+                st.rerun()
+            return
+
+        if community_posts and reach_posts:
+            analysis_mode = "hybrid"
+        elif reach_posts and not community_posts:
+            analysis_mode = "views_only"
+        else:
+            analysis_mode = "standard"
+    else:
+        analyzed_posts = community_posts
+        analysis_mode = "standard"
+        if not analyzed_posts:
+            st.error("⚠️ No hay datos para analizar. Por favor completa al menos algunos posts.")
+            if st.button("← Volver al Paso 2"):
+                st.session_state["wizard_step"] = 2
+                st.rerun()
+            return
     
     # ========================================================================
     # CÁLCULOS PRINCIPALES
     # ========================================================================
     
-    # SIEMPRE son 15 posts (fijo)
-    num_posts = 15
+    # Total de posts capturados con interacciones
+    num_posts = len(analyzed_posts)
+
+    # Derivar periodo real desde fechas validas cuando existan
+    if not period_start or not period_end:
+        valid_dates = []
+        for post in analyzed_posts:
+            parsed = pd.to_datetime(post.get("fecha", None), errors="coerce")
+            if not pd.isna(parsed):
+                valid_dates.append(parsed.date())
+        if valid_dates:
+            period_start = str(min(valid_dates))
+            period_end = str(max(valid_dates))
+            days = max((max(valid_dates) - min(valid_dates)).days + 1, 1)
     
     # Engagement general de la cuenta
     engagement_pct = (total_interactions / followers) * 100
     # Engagement por post (comunidad): (Promedio interacciones / Seguidores) * 100
-    avg_interactions = total_interactions / num_posts
+    avg_interactions = total_interactions / max(num_posts, 1)
     engagement_per_post = (avg_interactions / followers) * 100
     
     # Posts por semana varía según el período de DÍAS que ingresa el usuario
     # Fórmula: (número de posts / días) * 7
     # Ej: 15 posts en 30 días = (15 / 30) * 7 = 3.5 posts/semana
-    posts_per_week = (num_posts / days) * 7
+    posts_per_week = (num_posts / max(days, 1)) * 7
     
     # Para TikTok
     if platform == "tiktok" and total_views > 0:
@@ -519,7 +879,7 @@ def calculate_and_render_results():
     
     # Segmentación por tipo de contenido (con estadísticas detalladas)
     content_stats = {}
-    for post in posts_list:
+    for post in analyzed_posts:
         ctype = post["type"]
         if ctype not in content_stats:
             content_stats[ctype] = {
@@ -541,7 +901,11 @@ def calculate_and_render_results():
     # Diagnóstico basado en thresholds fijos por plataforma
     thresholds = get_engagement_thresholds(platform, "comunidad")
     
-    if platform == "facebook":
+    if platform == "tiktok" and analysis_mode == "views_only":
+        diagnosis = "📺 SOLO ALCANCE"
+        diagnosis_color = "#CC7000"
+        diagnosis_level = "views_only"
+    elif platform in ["facebook", "instagram"]:
         if engagement_pct >= thresholds["bueno"]:
             diagnosis = "🟢 ALTO"
             diagnosis_color = "#0A7D35"
@@ -578,6 +942,30 @@ def calculate_and_render_results():
     
     # Potencial de crecimiento
     growth_scenarios = calculate_growth_potential(engagement_pct, followers, platform)
+
+    # Analizador de contenido: clasificacion y top performer
+    analysis_df = pd.DataFrame(posts_list)
+    classification = classify_school_content(analysis_df)
+    ranked = identify_top_performer(
+        classification["data"].assign(
+            **{"ER Post": classification["data"].apply(lambda r: (r.get("total", 0) / followers * 100) if followers > 0 else 0.0, axis=1)}
+        )
+    )
+    category_signal = category_effectiveness(classification["data"], followers=followers, min_samples=2)
+    post_ers = [(p.get("total", 0) / followers * 100) if followers > 0 else 0.0 for p in analyzed_posts]
+    volatility = compute_volatility_guardrail(post_ers)
+
+    best_category_name = None
+    if category_signal.get("has_signal") and category_signal.get("best_category"):
+        best_category_name = str(category_signal["best_category"].get("categoria", "")).strip() or None
+
+    narrative_recommendation = build_recommendation_text(
+        actor_name=st.session_state.get("wizard_actor_name", "David"),
+        diagnosis_level="bajo" if diagnosis_level == "views_only" else diagnosis_level,
+        posts_per_week=posts_per_week,
+        best_category=best_category_name,
+        is_volatile=bool(volatility.get("is_volatile", False)),
+    )
     
     # ========================================================================
     # RENDERIZAR RESULTADOS
@@ -585,6 +973,19 @@ def calculate_and_render_results():
     
     st.divider()
     st.markdown(f"## Paso 3: Tus Resultados")
+
+    if platform == "tiktok" and analysis_mode == "views_only":
+        st.info(
+            "📺 Modo Reach: hay alcance visual (vistas) pero baja accion de comunidad. "
+            "El analisis continua para diagnosticar conversion.",
+            icon="📺",
+        )
+    elif platform == "tiktok" and analysis_mode == "hybrid":
+        st.info(
+            "🧩 Modo Hibrido: se detectaron posts de comunidad y posts de alcance. "
+            "El reporte marca ambos modos por publicacion.",
+            icon="🧩",
+        )
     
     # Métrica principal
     col1, col2, col3 = st.columns(3)
@@ -614,6 +1015,13 @@ def calculate_and_render_results():
             <div style='color: #495057; font-size: 13px; margin-top: 8px;'>posts por semana</div>
         </div>
         """, unsafe_allow_html=True)
+
+    if volatility.get("is_volatile"):
+        st.warning(
+            f"⚠️ Volatilidad detectada: media {volatility['mean']:.2f}% vs mediana {volatility['median']:.2f}% "
+            f"(diferencia {volatility['relative_diff'] * 100:.1f}%). Un post viral puede estar maquillando el promedio.",
+            icon="🟧",
+        )
     
     # ========================================================================
     # SECCIÓN ESPECIAL: ENGAGEMENT POR VISTAS (SOLO TIKTOK)
@@ -690,8 +1098,24 @@ def calculate_and_render_results():
     if content_df:
         best_type = sorted(content_stats.items(), key=lambda x: x[1]["avg_engagement"], reverse=True)[0]
         st.success(f"✅ **{best_type[0]} es tu estrella:** {best_type[1]['avg_engagement']:.2f}% engagement promedio por post ({int(best_type[1]['pct'])}% de tus posts)")
+
+        if ranked.get("has_data") and ranked.get("top_post"):
+            top_post = ranked["top_post"]
+            st.info(
+                f"🏆 Top Performer: Post #{int(top_post.get('num', 0))} "
+                f"({top_post.get('Categoria Canonica', top_post.get('categoria', 'Sin categoria'))}) "
+                f"con ER {float(top_post.get('ER Post', 0.0)):.2f}%",
+                icon="🏫",
+            )
         
         st.dataframe(pd.DataFrame(content_df), use_container_width=True, hide_index=True)
+
+        if category_signal.get("has_signal"):
+            best_cat = category_signal["best_category"]
+            st.success(
+                f"🏫 Efectividad por categoría: **{best_cat['categoria']}** lidera con "
+                f"{float(best_cat['er_promedio']):.2f}% de ER promedio (n={int(best_cat['posts'])})."
+            )
         
         # Agregar análisis detallado
         st.markdown("#### Interpretación:")
@@ -706,6 +1130,8 @@ def calculate_and_render_results():
     # ========================================================================
     
     st.markdown("### 🎯 Diagnóstico y Acciones Recomendadas")
+
+    st.info(narrative_recommendation, icon="🧠")
     
     if diagnosis_level == "alto":
         st.markdown(f"""
@@ -753,6 +1179,22 @@ def calculate_and_render_results():
         </div>
         """, unsafe_allow_html=True)
     
+    elif diagnosis_level == "views_only":
+        st.markdown(f"""
+        <div style='background: #CC700015; padding: 20px; border-radius: 10px; border-left: 5px solid #CC7000;'>
+            <h4 style='color: #CC7000; margin-top: 0;'>📺 Alto alcance visual, baja accion comunitaria</h4>
+            <p>Tus publicaciones estan llegando a audiencia, pero no convierten en interacciones.</p>
+
+            <h5>📌 Qué hacer esta semana:</h5>
+            <ul>
+                <li><strong>Activa CTA concretos:</strong> Termina cada post con una pregunta o accion clara</li>
+                <li><strong>Optimiza primeros 3 segundos:</strong> Mejora hook visual y mensaje inicial</li>
+                <li><strong>Refuerza conversion:</strong> Invita a comentar, guardar y compartir de forma explicita</li>
+                <li><strong>Test A/B:</strong> Prueba dos versiones del mismo tema con CTA distinto</li>
+            </ul>
+        </div>
+        """, unsafe_allow_html=True)
+
     else:  # bajo
         st.markdown(f"""
         <div style='background: #B4231815; padding: 20px; border-radius: 10px; border-left: 5px solid #B42318;'>
@@ -820,32 +1262,41 @@ def calculate_and_render_results():
             st.rerun()
     
     with col3:
-        if st.button("📥 Descargar Reporte", use_container_width=True, type="primary"):
-            # Generar reporte HTML
-            thresholds_info = get_engagement_thresholds(platform, "comunidad")
-            report_html = generate_engagement_report_html(
-                platform=platform,
-                followers=followers,
-                days=days,
-                posts_list=posts_list,
-                engagement_pct=engagement_pct,
-                engagement_per_post=engagement_per_post,
-                engagement_by_views=engagement_by_views,
-                posts_per_week=posts_per_week,
-                diagnosis=diagnosis,
-                content_stats=content_stats,
-                growth_scenarios=growth_scenarios,
-                expected=thresholds_info
-            )
-            
-            # Crear descarga
-            st.download_button(
-                label="📥 Descargar como HTML",
-                data=report_html,
-                file_name=f"engagement_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html",
-                mime="text/html",
-                key="download_report"
-            )
+        expected_range = calculate_expected_engagement(followers)
+        expected_payload = {
+            **expected_range,
+            "label": f"Típico {expected_range['typical']:.1f}%",
+        }
+        report_html = generate_engagement_report_html(
+            platform=platform,
+            followers=followers,
+            days=days,
+            posts_list=posts_list,
+            analysis_mode=analysis_mode,
+            engagement_pct=engagement_pct,
+            engagement_per_post=engagement_per_post,
+            engagement_by_views=engagement_by_views,
+            posts_per_week=posts_per_week,
+            diagnosis=diagnosis,
+            content_stats=content_stats,
+            growth_scenarios=growth_scenarios,
+            expected=expected_payload,
+            period_start=period_start,
+            period_end=period_end,
+            total_posts=num_posts,
+            narrative_summary=narrative_recommendation,
+            category_effectiveness=category_signal.get("table", pd.DataFrame()).to_dict("records") if category_signal.get("has_signal") else [],
+            volatility_alert=volatility.get("message") if volatility.get("is_volatile") else "",
+        )
+
+        st.download_button(
+            label="📥 Descargar Reporte HTML",
+            data=report_html,
+            file_name=f"engagement_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html",
+            mime="text/html",
+            key="download_report",
+            use_container_width=True,
+        )
 
 
 # ============================================================================

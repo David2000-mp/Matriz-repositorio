@@ -260,7 +260,14 @@ def generate_engagement_report_html(
     diagnosis: str,
     content_stats: dict,
     growth_scenarios: dict,
-    expected: dict
+    expected: dict,
+    analysis_mode: str = "standard",
+    period_start: str | None = None,
+    period_end: str | None = None,
+    total_posts: int | None = None,
+    narrative_summary: str | None = None,
+    category_effectiveness: list | None = None,
+    volatility_alert: str | None = None,
 ) -> str:
     """
     Genera un reporte HTML profesional con toda la información del análisis.
@@ -278,12 +285,48 @@ def generate_engagement_report_html(
         content_stats: diccionario con estadísticas por tipo de contenido
         growth_scenarios: escenarios de crecimiento
         expected: benchmarks esperados
+        period_start: fecha inicial del periodo analizado (YYYY-MM-DD)
+        period_end: fecha final del periodo analizado (YYYY-MM-DD)
+        total_posts: total de publicaciones consideradas en el analisis
+        narrative_summary: resumen narrativo para direccion
+        category_effectiveness: resumen por categoria escolar
+        volatility_alert: alerta de volatilidad media vs mediana
     
     Returns:
         String HTML completo
     """
     
     timestamp = datetime.now().strftime("%d de %B de %Y a las %H:%M")
+    # Compatibilidad: soporta contrato nuevo (typical/min/max/label)
+    # y contrato legado (bajo/aceptable/bueno/labels) para evitar KeyError.
+    expected_typical = expected.get("typical", expected.get("bueno", 1.0))
+    expected_min = expected.get("min", expected.get("bajo", 0.0))
+    expected_max = expected.get("max", expected.get("bueno", expected_typical))
+    expected_label = expected.get(
+        "label",
+        expected.get("labels", {}).get("bueno", f"Típico {expected_typical:.1f}%")
+    )
+    posts_total = total_posts if total_posts is not None else len(posts_list)
+    period_start_text = period_start or "N/D"
+    period_end_text = period_end or "N/D"
+    period_header = (
+        f"Periodo Analizado: {period_start_text} al {period_end_text} "
+        f"({days} dias) - Total: {posts_total} posts"
+    )
+    platform_label = {
+        "facebook": "Facebook",
+        "instagram": "Instagram",
+        "tiktok": "TikTok",
+    }.get(platform, str(platform).title())
+    narrative_text = (narrative_summary or "").strip()
+    category_rows = category_effectiveness or []
+    volatility_text = (volatility_alert or "").strip()
+    er_views_display = f"{engagement_by_views:.2f}%" if platform == "tiktok" else "N/A"
+    analysis_mode_label = {
+        "standard": "Comunidad",
+        "views_only": "Alcance",
+        "hybrid": "Hibrido",
+    }.get((analysis_mode or "").lower(), str(analysis_mode).title() if analysis_mode else "Comunidad")
     
     # Detectar diagnóstico nivel
     if "EXCELENTE" in diagnosis or "🟢" in diagnosis:
@@ -308,40 +351,73 @@ def generate_engagement_report_html(
     for post in posts_list:
         validation = None
         icon = "❓"
+        inconsistency_badge = ""
+
+        if post.get("inconsistency"):
+            inconsistency_badge = " ⚠️ Inconsistencia"
         
         if post["total"] == 0:
             validation = "Sin datos"
             icon = "⚪"
         else:
             engagement = (post["total"] / followers * 100) if followers > 0 else 0
-            if engagement >= expected["typical"] * 1.5:
+            if engagement >= expected_typical * 1.5:
                 validation = "Excelente"
                 icon = "🟢"
-            elif engagement >= expected["typical"] * 0.7:
+            elif engagement >= expected_typical * 0.7:
                 validation = "Normal"
                 icon = "🟡"
             else:
                 validation = "Bajo"
                 icon = "🔴"
         
+        post_url = str(post.get("url", "")).strip()
+        post_comment = str(post.get("comentario", "")).strip() or "-"
+        post_mode = str(post.get("analysis_mode", "standard")).lower()
+        post_mode_label = "Alcance" if post_mode == "views_only" else "Comunidad"
+        if post_url:
+            post_link = f"<a href='{post_url}' target='_blank' rel='noopener noreferrer'>Ver post</a>"
+        else:
+            post_link = "-"
+
         posts_table_html += f"""
         <tr>
             <td style='padding: 10px; border-bottom: 1px solid #DEE2E6;'>{post['num']}</td>
             <td style='padding: 10px; border-bottom: 1px solid #DEE2E6;'>{post['type']}</td>
+            <td style='padding: 10px; border-bottom: 1px solid #DEE2E6;'>{post.get('categoria', '-')}</td>
+            <td style='padding: 10px; border-bottom: 1px solid #DEE2E6;'>{post_mode_label}</td>
             <td style='padding: 10px; border-bottom: 1px solid #DEE2E6;'>{post['total']}</td>
-            <td style='padding: 10px; border-bottom: 1px solid #DEE2E6;'>{icon} {validation}</td>
+            <td style='padding: 10px; border-bottom: 1px solid #DEE2E6;'>{icon} {validation}{inconsistency_badge}</td>
+            <td style='padding: 10px; border-bottom: 1px solid #DEE2E6;'>{post_link}</td>
+            <td style='padding: 10px; border-bottom: 1px solid #DEE2E6;'>{post_comment}</td>
+        </tr>
+        """
+
+    category_table_html = ""
+    for row in category_rows:
+        category_table_html += f"""
+        <tr>
+            <td style='padding: 10px; border-bottom: 1px solid #DEE2E6;'>{row.get('categoria', '-')}</td>
+            <td style='padding: 10px; border-bottom: 1px solid #DEE2E6;'>{int(row.get('posts', 0))}</td>
+            <td style='padding: 10px; border-bottom: 1px solid #DEE2E6;'><strong>{float(row.get('er_promedio', 0.0)):.2f}%</strong></td>
+            <td style='padding: 10px; border-bottom: 1px solid #DEE2E6;'>{int(row.get('interacciones', 0))}</td>
         </tr>
         """
     
     # Tabla de contenido
     content_table_html = ""
-    for ctype, stats in sorted(content_stats.items(), key=lambda x: x[1]["engagement"], reverse=True):
+    for ctype, stats in sorted(
+        content_stats.items(),
+        key=lambda x: x[1].get("avg_engagement", x[1].get("engagement", 0)),
+        reverse=True,
+    ):
+        content_engagement = stats.get("avg_engagement", stats.get("engagement", 0))
         content_table_html += f"""
         <tr>
             <td style='padding: 10px; border-bottom: 1px solid #DEE2E6;'>{ctype}</td>
             <td style='padding: 10px; border-bottom: 1px solid #DEE2E6;'>{stats['posts']}</td>
             <td style='padding: 10px; border-bottom: 1px solid #DEE2E6;'>{stats['total_interactions']}</td>
-            <td style='padding: 10px; border-bottom: 1px solid #DEE2E6;'><strong>{stats['engagement']:.2f}%</strong></td>
+            <td style='padding: 10px; border-bottom: 1px solid #DEE2E6;'><strong>{content_engagement:.2f}%</strong></td>
         </tr>
         """
     
@@ -609,6 +685,11 @@ def generate_engagement_report_html(
             }}
             
             @media print {{
+                @page {{
+                    size: A4;
+                    margin: 12mm;
+                }}
+
                 body {{
                     background: white;
                 }}
@@ -620,6 +701,15 @@ def generate_engagement_report_html(
                 .header {{
                     page-break-after: avoid;
                 }}
+
+                .section, table, tr, .metric-card, .growth-card {{
+                    break-inside: avoid;
+                    page-break-inside: avoid;
+                }}
+
+                thead {{
+                    display: table-header-group;
+                }}
             }}
         </style>
     </head>
@@ -628,7 +718,7 @@ def generate_engagement_report_html(
             <!-- HEADER -->
             <div class="header">
                 <h1>📊 Reporte de Engagement</h1>
-                <p>Análisis completo de tu estrategia de contenido en {'Facebook' if platform == 'facebook' else 'TikTok'}</p>
+                <p>Análisis completo de tu estrategia de contenido en {platform_label}</p>
                 <p style='margin-top: 10px; font-size: 12px;'>Generado el {timestamp}</p>
             </div>
             
@@ -636,12 +726,50 @@ def generate_engagement_report_html(
             <div class="section">
                 <h2>📋 Información del Análisis</h2>
                 <div style='background: #F2F4F7; padding: 20px; border-radius: 8px;'>
-                    <p><strong>Plataforma:</strong> {'Facebook' if platform == 'facebook' else 'TikTok'}</p>
+                    <p><strong>Plataforma:</strong> {platform_label}</p>
                     <p><strong>Seguidores:</strong> {followers:,}</p>
+                    <p><strong>{period_header}</strong></p>
                     <p><strong>Período analizado:</strong> {days} días</p>
-                    <p><strong>Publicaciones analizadas:</strong> {len(posts_list)}</p>
+                    <p><strong>Publicaciones analizadas:</strong> {posts_total}</p>
+                    <p><strong>Modo de análisis:</strong> {analysis_mode_label}</p>
                     <p><strong>Frecuencia:</strong> {posts_per_week:.1f} posts por semana</p>
                 </div>
+            </div>
+
+            <!-- KPIs DESTACADOS -->
+            <div class="section">
+                <h2>🚀 KPIs Destacados</h2>
+                <div class="metrics">
+                    <div class="metric-card">
+                        <div class="metric-label">ER Comunidad</div>
+                        <div class="metric-value">{engagement_pct:.2f}%</div>
+                        <div class="metric-desc">Indicador principal de respuesta de audiencia</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">ER Vistas</div>
+                        <div class="metric-value">{er_views_display}</div>
+                        <div class="metric-desc">Rendimiento sobre visualizaciones (TikTok)</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Frecuencia</div>
+                        <div class="metric-value">{posts_per_week:.1f}</div>
+                        <div class="metric-desc">Publicaciones por semana</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Periodo</div>
+                        <div class="metric-value">{days}</div>
+                        <div class="metric-desc">Dias analizados</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- RESUMEN NARRATIVO -->
+            <div class="section">
+                <h2>🧠 Resumen Narrativo</h2>
+                <div class="benchmark">
+                    <strong>Lectura ejecutiva:</strong> {narrative_text or 'Sin resumen narrativo disponible.'}
+                </div>
+                {f"<div class='benchmark'><strong>Guardrail:</strong> {volatility_text}</div>" if volatility_text else ""}
             </div>
             
             <!-- DIAGNÓSTICO -->
@@ -652,8 +780,8 @@ def generate_engagement_report_html(
                     <p>
                         Tu engagement actual es de <strong>{engagement_pct:.2f}%</strong>.
                         Para tu tamaño de audiencia ({followers:,} seguidores), 
-                        el rango esperado es de <strong>{expected['min']:.1f}% - {expected['max']:.1f}%</strong> 
-                        ({expected['label']}).
+                        el rango esperado es de <strong>{expected_min:.1f}% - {expected_max:.1f}%</strong> 
+                        ({expected_label}).
                     </p>
                 </div>
             </div>
@@ -709,6 +837,23 @@ def generate_engagement_report_html(
                     Los primeros en la lista son los que mejor funcionan con tu audiencia.
                 </div>
             </div>
+
+            <div class="section">
+                <h2>🏫 Efectividad por Categoría Escolar</h2>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Categoría</th>
+                            <th>Posts</th>
+                            <th>ER Promedio</th>
+                            <th>Interacciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {category_table_html if category_table_html else "<tr><td colspan='4' style='padding:10px;'>Sin muestras suficientes (n < 2) para comparar categorías.</td></tr>"}
+                    </tbody>
+                </table>
+            </div>
             
             <!-- TABLA DE PUBLICACIONES -->
             <div class="section">
@@ -718,8 +863,12 @@ def generate_engagement_report_html(
                         <tr>
                             <th>#</th>
                             <th>Tipo</th>
+                            <th>Categoría</th>
+                            <th>Modo</th>
                             <th>Interacciones</th>
                             <th>Estado</th>
+                            <th>Link</th>
+                            <th>Nota</th>
                         </tr>
                     </thead>
                     <tbody>
