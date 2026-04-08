@@ -50,3 +50,24 @@ def test_end_to_end_tiktok_hybrid_includes_reach_posts():
     assert "standard" in modes
     assert "views_only" in modes
     assert totals == [47, 0]
+
+
+def test_engagement_changes_when_followers_change():
+    row = {
+        "Post #": 1,
+        "Categoria": "Eventos",
+        "Tipo": "📸 Imagen",
+        "Me gusta": 100,
+        "Comentarios": 20,
+        "Compartidos": 10,
+        "Interacciones": 0,
+    }
+
+    result_1k = calculate_engagement_engine("instagram", {**row, "followers": 1000})
+    result_2k = calculate_engagement_engine("instagram", {**row, "followers": 2000})
+
+    assert result_1k.total_interactions == 120
+    assert result_2k.total_interactions == 120
+    assert result_1k.er_community == 12.0
+    assert result_2k.er_community == 6.0
+    assert result_1k.er_community > result_2k.er_community

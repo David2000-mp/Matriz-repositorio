@@ -268,6 +268,8 @@ def generate_engagement_report_html(
     narrative_summary: str | None = None,
     category_effectiveness: list | None = None,
     volatility_alert: str | None = None,
+    content_insights: dict | None = None,
+    action_plan: list[str] | None = None,
 ) -> str:
     """
     Genera un reporte HTML profesional con toda la información del análisis.
@@ -321,6 +323,12 @@ def generate_engagement_report_html(
     narrative_text = (narrative_summary or "").strip()
     category_rows = category_effectiveness or []
     volatility_text = (volatility_alert or "").strip()
+    content_insights = content_insights or {}
+    action_plan = action_plan or []
+    best_format = content_insights.get("best_format") or {}
+    most_consumed = content_insights.get("most_consumed_format") or {}
+    most_saved = content_insights.get("most_saved_format") or {}
+    best_combo = content_insights.get("best_combo") or {}
     er_views_display = f"{engagement_by_views:.2f}%" if platform == "tiktok" else "N/A"
     analysis_mode_label = {
         "standard": "Comunidad",
@@ -406,21 +414,56 @@ def generate_engagement_report_html(
     
     # Tabla de contenido
     content_table_html = ""
-    for ctype, stats in sorted(
+    content_rank_visual_html = ""
+    sorted_content_stats = sorted(
         content_stats.items(),
         key=lambda x: x[1].get("avg_engagement", x[1].get("engagement", 0)),
         reverse=True,
-    ):
+    )
+    max_content_engagement = max(
+        [float(stats.get("avg_engagement", stats.get("engagement", 0)) or 0) for _, stats in sorted_content_stats],
+        default=0.0,
+    )
+    for ctype, stats in sorted_content_stats:
         content_engagement = stats.get("avg_engagement", stats.get("engagement", 0))
+        width_pct = (float(content_engagement) / max_content_engagement * 100.0) if max_content_engagement > 0 else 0.0
         content_table_html += f"""
         <tr>
             <td style='padding: 10px; border-bottom: 1px solid #DEE2E6;'>{ctype}</td>
             <td style='padding: 10px; border-bottom: 1px solid #DEE2E6;'>{stats['posts']}</td>
             <td style='padding: 10px; border-bottom: 1px solid #DEE2E6;'>{stats['total_interactions']}</td>
+            <td style='padding: 10px; border-bottom: 1px solid #DEE2E6;'>{int(stats.get('total_views', 0) or 0)}</td>
+            <td style='padding: 10px; border-bottom: 1px solid #DEE2E6;'>{int(stats.get('total_saves', 0) or 0)}</td>
             <td style='padding: 10px; border-bottom: 1px solid #DEE2E6;'><strong>{content_engagement:.2f}%</strong></td>
         </tr>
         """
+        content_rank_visual_html += f"""
+        <div style='margin-bottom: 12px;'>
+            <div style='display:flex; justify-content:space-between; font-size: 14px; margin-bottom: 4px;'>
+                <span><strong>{ctype}</strong></span>
+                <span>{content_engagement:.2f}% ER</span>
+            </div>
+            <div style='background:#E9ECEF; border-radius:999px; overflow:hidden; height:10px;'>
+                <div style='width:{width_pct:.1f}%; background:linear-gradient(90deg, #003696 0%, #FFB81C 100%); height:10px;'></div>
+            </div>
+        </div>
+        """
     
+    if not action_plan:
+        if best_combo:
+            action_plan.append(
+                f"Repite más piezas de {best_combo.get('label', 'tu mejor combinación')} para capitalizar el formato y tema que hoy mejor convierten."
+            )
+        if best_format and most_consumed and best_format.get("tipo") != most_consumed.get("tipo"):
+            action_plan.append(
+                f"Ojo: lo más consumido no es lo que mejor convierte. {most_consumed.get('tipo', 'Ese formato')} atrae atención, pero {best_format.get('tipo', 'otro formato')} genera mejor respuesta."
+            )
+        if most_saved:
+            action_plan.append(
+                f"Incluye más contenidos tipo {most_saved.get('tipo', 'contenido guardable')} porque es el formato con más guardados."
+            )
+    action_plan_html = "".join(f"<li>{str(item).replace('**', '')}</li>" for item in action_plan)
+
     # Recomendaciones basadas en diagnosis
     if diagnosis_level == "excellent":
         recommendations = """
@@ -736,6 +779,33 @@ def generate_engagement_report_html(
                 </div>
             </div>
 
+            <!-- RESUMEN EJECUTIVO DE CONTENIDO -->
+            <div class="section">
+                <h2>🧠 Resumen Ejecutivo del Contenido</h2>
+                <div class="metrics">
+                    <div class="metric-card">
+                        <div class="metric-label">Formato que mejor funciona</div>
+                        <div class="metric-value" style="font-size: 24px;">{best_format.get('tipo', 'N/D')}</div>
+                        <div class="metric-desc">ER promedio: {float(best_format.get('avg_engagement', 0.0)):.2f}%</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Formato más consumido</div>
+                        <div class="metric-value" style="font-size: 24px;">{most_consumed.get('tipo', 'N/D')}</div>
+                        <div class="metric-desc">{most_consumed.get('metric_label', 'Interacciones')}: {int(float(most_consumed.get('metric_value', 0) or 0))}</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Formato más guardado</div>
+                        <div class="metric-value" style="font-size: 24px;">{most_saved.get('tipo', 'Sin datos')}</div>
+                        <div class="metric-desc">Guardados: {int(float(most_saved.get('metric_value', 0) or 0)) if most_saved else 0}</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Mejor combinación</div>
+                        <div class="metric-value" style="font-size: 20px;">{best_combo.get('label', 'N/D')}</div>
+                        <div class="metric-desc">ER promedio: {float(best_combo.get('avg_engagement', 0.0)):.2f}%</div>
+                    </div>
+                </div>
+            </div>
+
             <!-- KPIs DESTACADOS -->
             <div class="section">
                 <h2>🚀 KPIs Destacados</h2>
@@ -785,6 +855,19 @@ def generate_engagement_report_html(
                     </p>
                 </div>
             </div>
+
+            <!-- METODOLOGIA -->
+            <div class="section">
+                <h2>🧮 Cómo se calcularon estas cifras</h2>
+                <div class="benchmark">
+                    <p><strong>Base usada:</strong> {followers:,} seguidores capturados al inicio del análisis.</p>
+                    <p><strong>Engagement general:</strong> (interacciones totales / seguidores) × 100 = ({sum([p['total'] for p in posts_list])} / {followers:,}) × 100 = <strong>{engagement_pct:.2f}%</strong></p>
+                    <p><strong>Engagement por post:</strong> (promedio de interacciones por post / seguidores) × 100 = ({sum([p['total'] for p in posts_list])} / {max(posts_total, 1)}) / {followers:,} × 100 = <strong>{engagement_per_post:.2f}%</strong></p>
+                    <p><strong>Frecuencia:</strong> (posts analizados / días del periodo) × 7 = ({posts_total} / {days}) × 7 = <strong>{posts_per_week:.1f}</strong> posts por semana.</p>
+                    <p><strong>Por tipo de contenido:</strong> cada porcentaje se calcula con el promedio de interacciones de ese tipo dividido entre los seguidores iniciales.</p>
+                    {f"<p><strong>ER por vistas:</strong> (interacciones totales / vistas totales) × 100 = ({sum([p['total'] for p in posts_list])} / {sum([p.get('views', 0) for p in posts_list])}) × 100 = <strong>{engagement_by_views:.2f}%</strong></p>" if platform == "tiktok" and sum([p.get('views', 0) for p in posts_list]) > 0 else ""}
+                </div>
+            </div>
             
             <!-- MÉTRICAS PRINCIPALES -->
             <div class="section">
@@ -825,6 +908,8 @@ def generate_engagement_report_html(
                             <th>Tipo de Contenido</th>
                             <th>Posts</th>
                             <th>Total Interacciones</th>
+                            <th>Vistas</th>
+                            <th>Guardados</th>
                             <th>Engagement %</th>
                         </tr>
                     </thead>
@@ -835,6 +920,10 @@ def generate_engagement_report_html(
                 <div class="benchmark">
                     <strong>💡 Insight:</strong> Enfócate en los tipos de contenido con mayor engagement.
                     Los primeros en la lista son los que mejor funcionan con tu audiencia.
+                </div>
+                <div style='background:#F8F9FA; border:1px solid #DEE2E6; border-radius:8px; padding:16px; margin-top:18px;'>
+                    <h3 style='color:#003696; margin-bottom:12px;'>📉 Ranking visual por formato</h3>
+                    {content_rank_visual_html}
                 </div>
             </div>
 
@@ -906,8 +995,19 @@ def generate_engagement_report_html(
                 </div>
             </div>
             
+            <!-- PLAN DE ACCION -->
+            <div class="section">
+                <h2>🎯 Qué repetir</h2>
+                <div class="recommendation-box">
+                    <ul style='line-height: 1.8; color: #495057;'>
+                        {action_plan_html}
+                    </ul>
+                </div>
+            </div>
+
             <!-- RECOMENDACIONES -->
             <div class="section">
+                <h2>💡 Recomendaciones Estratégicas</h2>
                 <div class="recommendation-box">
                     {recommendations}
                 </div>

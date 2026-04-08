@@ -70,9 +70,10 @@ def main():
         st.title("CHAMPILEAKS")
 
         st.subheader("Navegación")
+        st.caption("Primero elige una vista; después usa los filtros globales para refinar la lectura.")
         
         # Navegación simplificada sin index calculado
-        menu_options = ["🏠 Inicio", "📊 Dashboard Global", "📈 Comparativas", "� Calc. Engagement", "�📝 Captura", "🔍 Auditoría de Respuestas", "⚙️ Configuración"]
+        menu_options = ["🏠 Inicio", "📊 Dashboard Global", "📈 Comparativas", "💡 Calc. Engagement", "📝 Captura", "🔍 Auditoría de Respuestas", "⚙️ Configuración"]
         selected_display = st.radio(
             "Seleccionar página", 
             menu_options, 
@@ -85,8 +86,8 @@ def main():
             "🏠 Inicio": "Inicio",
             "📊 Dashboard Global": "Dashboard Global", 
             "📈 Comparativas": "Comparativas",
-            "� Calc. Engagement": "Calc. Engagement",
-            "�📝 Captura": "Captura",
+            "💡 Calc. Engagement": "Calc. Engagement",
+            "📝 Captura": "Captura",
             "🔍 Auditoría de Respuestas": "Auditoría de Respuestas",
             "⚙️ Configuración": "Configuración",
         }
@@ -97,6 +98,7 @@ def main():
 
         st.markdown("---")
         st.subheader("Filtros Globales")
+        st.caption("Estos filtros impactan dashboards y comparativas para mantener el contexto.")
 
         # Filtros globales (sin cargar datos aquí - lazy loading)
         entidades = ["Todas"]  # Placeholder, se actualizará cuando se carguen datos

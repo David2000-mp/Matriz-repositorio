@@ -83,6 +83,9 @@ preview_report.html
 Colegio*.pdf
 *_reporte.pdf
 
+# Local app draft caches
+/data/cache/
+
 # Virtual envs (duplicates for clarity)
 venv_stable/
 venv_local/

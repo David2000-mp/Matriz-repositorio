@@ -6,16 +6,155 @@ Arquitectura: Paso 1 (Datos Base) → Paso 2 (Publicaciones) → Paso 3 (Resulta
 import streamlit as st
 import pandas as pd
 from datetime import datetime
+from pathlib import Path
 import json
 import logging
 from utils.report_generator import generate_engagement_report_html
 from utils.rules_engine import calculate_engagement_engine
-from utils.content_analyzer import classify_school_content, identify_top_performer
+from utils.content_analyzer import (
+    build_content_action_plan,
+    classify_school_content,
+    identify_top_performer,
+    summarize_content_insights,
+)
 from utils.smart_diagnosis import (
     build_recommendation_text,
     category_effectiveness,
     compute_volatility_guardrail,
 )
+
+logger = logging.getLogger(__name__)
+BASE_DIR = Path(__file__).resolve().parent.parent
+DRAFT_DIR = BASE_DIR / "data" / "cache" / "engagement_drafts"
+
+
+def _draft_file_for_platform(platform: str | None = None, draft_path: str | Path | None = None) -> Path:
+    """Resuelve la ruta del borrador local para la calculadora."""
+    if draft_path is not None:
+        return Path(draft_path)
+
+    safe_platform = str(platform or "general").strip().lower() or "general"
+    return DRAFT_DIR / f"{safe_platform}_draft.json"
+
+
+def _serialize_draft_grid(grid_data) -> list[dict]:
+    """Convierte DataFrame/lista de posts a un JSON seguro."""
+    if isinstance(grid_data, pd.DataFrame):
+        records = grid_data.to_dict("records")
+    elif isinstance(grid_data, list):
+        records = grid_data
+    else:
+        records = []
+
+    serialized: list[dict] = []
+    for row in records:
+        clean_row = {}
+        for key, value in dict(row).items():
+            if pd.isna(value):
+                clean_row[key] = None
+            elif hasattr(value, "isoformat"):
+                clean_row[key] = value.isoformat()
+            else:
+                clean_row[key] = value
+        serialized.append(clean_row)
+    return serialized
+
+
+def save_draft_snapshot(payload: dict, platform: str | None = None, draft_path: str | Path | None = None) -> str:
+    """Guarda un borrador del analisis para recuperarlo si se pierde el formulario."""
+    target_path = _draft_file_for_platform(platform or payload.get("wizard_platform"), draft_path)
+    target_path.parent.mkdir(parents=True, exist_ok=True)
+
+    data = dict(payload or {})
+    data["wizard_posts_grid"] = _serialize_draft_grid(data.get("wizard_posts_grid", []))
+    data["saved_at"] = datetime.now().isoformat(timespec="seconds")
+
+    with open(target_path, "w", encoding="utf-8") as handle:
+        json.dump(data, handle, ensure_ascii=False, indent=2)
+
+    return str(target_path)
+
+
+def load_draft_snapshot(platform: str | None = None, draft_path: str | Path | None = None) -> dict | None:
+    """Carga el ultimo borrador disponible desde disco local."""
+    target_path = _draft_file_for_platform(platform, draft_path)
+
+    if not target_path.exists():
+        if draft_path is None and DRAFT_DIR.exists():
+            candidates = sorted(DRAFT_DIR.glob("*_draft.json"), key=lambda item: item.stat().st_mtime, reverse=True)
+            if candidates:
+                target_path = candidates[0]
+            else:
+                return None
+        else:
+            return None
+
+    try:
+        with open(target_path, "r", encoding="utf-8") as handle:
+            return json.load(handle)
+    except Exception as exc:
+        logger.warning(f"No se pudo cargar borrador de engagement: {exc}")
+        return None
+
+
+def clear_draft_snapshot(platform: str | None = None, draft_path: str | Path | None = None) -> bool:
+    """Elimina un borrador local si existe."""
+    target_path = _draft_file_for_platform(platform, draft_path)
+    if not target_path.exists():
+        return False
+
+    try:
+        target_path.unlink()
+        return True
+    except Exception as exc:
+        logger.warning(f"No se pudo borrar borrador de engagement: {exc}")
+        return False
+
+
+def _restore_draft_to_session(draft_data: dict | None, state=None) -> bool:
+    """Restaura un borrador guardado al session_state de Streamlit."""
+    if not draft_data:
+        return False
+
+    target_state = state if state is not None else st.session_state
+
+    for key, value in draft_data.items():
+        if not str(key).startswith("wizard_"):
+            continue
+
+        if key == "wizard_posts_grid":
+            target_state[key] = pd.DataFrame(value) if isinstance(value, list) else value
+        else:
+            target_state[key] = value
+
+    platform_options = ["facebook", "instagram", "tiktok"]
+    platform_value = draft_data.get("wizard_platform")
+    if platform_value in platform_options:
+        target_state["wizard_platform_idx"] = platform_options.index(platform_value)
+        target_state["wizard_posts_grid_platform"] = platform_value
+
+    return True
+
+
+def queue_draft_restore_request(draft_data: dict | None, state=None) -> bool:
+    """Agenda la restauracion del borrador para el siguiente rerun, antes de crear widgets."""
+    if not draft_data:
+        return False
+
+    target_state = state if state is not None else st.session_state
+    target_state["wizard_restore_pending"] = draft_data
+    return True
+
+
+def apply_pending_draft_restore(state=None) -> bool:
+    """Aplica una restauracion pendiente al inicio del render, antes de instanciar widgets."""
+    target_state = state if state is not None else st.session_state
+    pending = target_state.get("wizard_restore_pending")
+    if not pending:
+        return False
+
+    del target_state["wizard_restore_pending"]
+    return _restore_draft_to_session(pending, state=target_state)
 
 
 # ============================================================================
@@ -224,6 +363,7 @@ def _build_default_posts_grid(platform: str) -> pd.DataFrame:
                 "Me gusta": 0,
                 "Comentarios": 0,
                 "Compartidos": 0,
+                "Guardados": 0,
                 "Vistas": 0,
                 "Interacciones": 0,
                 "Estado": "⚪ Sin datos",
@@ -285,7 +425,7 @@ def _sanitize_and_score_posts_df(posts_df: pd.DataFrame, platform: str, follower
         if col in work_df.columns:
             work_df[col] = work_df[col].fillna("").astype(str)
 
-    numeric_columns = ["Reacciones", "Me gusta", "Comentarios", "Compartidos", "Vistas", "Interacciones"]
+    numeric_columns = ["Reacciones", "Me gusta", "Comentarios", "Compartidos", "Guardados", "Vistas", "Interacciones"]
     for col in numeric_columns:
         if col in work_df.columns:
             work_df[col] = pd.to_numeric(work_df[col], errors="coerce").fillna(0).astype(int)
@@ -323,6 +463,10 @@ def _sanitize_and_score_posts_df(posts_df: pd.DataFrame, platform: str, follower
                 "status": status,
                 "analysis_mode": row_result.analysis_mode,
                 "views": int(row.get("Vistas", 0) or 0),
+                "saves": int(row.get("Guardados", 0) or 0),
+                "categoria": row.get("Categoria", ""),
+                "url": row.get("URL/Link", ""),
+                "comentario": row.get("Comentario", ""),
                 "fecha": row.get("Fecha Publicacion"),
             }
         )
@@ -343,9 +487,11 @@ def _sync_grid_to_legacy_state(posts_df: pd.DataFrame, platform: str):
         elif platform == "instagram":
             st.session_state[f"wizard_post_{post_num}_likes"] = int(row.get("Me gusta", 0) or 0)
             st.session_state[f"wizard_post_{post_num}_shares"] = int(row.get("Compartidos", 0) or 0)
+            st.session_state[f"wizard_post_{post_num}_saves"] = int(row.get("Guardados", 0) or 0)
         else:
             st.session_state[f"wizard_post_{post_num}_likes"] = int(row.get("Me gusta", 0) or 0)
             st.session_state[f"wizard_post_{post_num}_views"] = int(row.get("Vistas", 0) or 0)
+            st.session_state[f"wizard_post_{post_num}_saves"] = int(row.get("Guardados", 0) or 0)
 
 
 # ============================================================================
@@ -359,6 +505,10 @@ def render_step_1_basic_data():
     st.markdown("## Paso 1: Datos Básicos")
     st.markdown("Cuéntanos sobre tu cuenta para comenzar el análisis.")
     
+    notice = st.session_state.pop("wizard_restore_notice", None) if "wizard_restore_notice" in st.session_state else None
+    if notice:
+        st.success(notice)
+
     col1, col2 = st.columns(2)
     
     with col1:
@@ -408,8 +558,58 @@ def render_step_1_basic_data():
         f"en los últimos **{days} días** con **{followers:,} seguidores**.",
         icon="📋"
     )
+    expected_range = calculate_expected_engagement(int(followers))
+    benchmark_col1, benchmark_col2 = st.columns(2)
+    with benchmark_col1:
+        st.metric("Benchmark esperado", f"{expected_range['typical']:.1f}%")
+    with benchmark_col2:
+        st.metric("Rango saludable", f"{expected_range['min']:.1f}% – {expected_range['max']:.1f}%")
+    st.caption("Este benchmark usa la cantidad de seguidores que ingresaste al inicio y te sirve como referencia antes de capturar publicaciones.")
+    st.info(
+        "Antes de pasar al Paso 2, ten a la mano reacciones/likes, comentarios, compartidos y, si aplica, vistas o guardados.",
+        icon="🧾",
+    )
+
+    draft_payload = {
+        "wizard_step": st.session_state.get("wizard_step", 1),
+        "wizard_platform": platform_clean,
+        "wizard_followers": int(followers),
+        "wizard_days": int(days),
+        "wizard_posts_count": int(expected_posts),
+        "wizard_period_start": st.session_state.get("wizard_period_start"),
+        "wizard_period_end": st.session_state.get("wizard_period_end"),
+        "wizard_posts_grid_platform": platform_clean,
+        "wizard_posts_grid": st.session_state.get("wizard_posts_grid", _ensure_posts_grid(platform_clean)),
+    }
+    existing_draft = load_draft_snapshot(platform=platform_clean)
+    if existing_draft and existing_draft.get("saved_at"):
+        st.caption(f"🛟 Borrador disponible guardado el {existing_draft['saved_at'].replace('T', ' ')}")
+
+    action_col1, action_col2, action_col3 = st.columns(3)
+    with action_col1:
+        if st.button("💾 Guardar borrador", use_container_width=True):
+            save_draft_snapshot(draft_payload, platform=platform_clean)
+            st.success("Borrador guardado localmente.")
+
+    with action_col2:
+        if st.button("↩️ Recuperar borrador", use_container_width=True):
+            draft_data = load_draft_snapshot(platform=platform_clean)
+            if queue_draft_restore_request(draft_data):
+                st.session_state["wizard_restore_notice"] = "Borrador recuperado correctamente."
+                st.rerun()
+            else:
+                st.info("No encontré un borrador previo para recuperar.")
+
+    with action_col3:
+        if st.button("🗑️ Borrar borrador", use_container_width=True):
+            removed = clear_draft_snapshot(platform=platform_clean)
+            if removed:
+                st.success("Borrador eliminado.")
+            else:
+                st.info("No había borrador guardado para esta plataforma.")
     
     if st.button("Continuar al Paso 2 →", use_container_width=True, type="primary"):
+        save_draft_snapshot({**draft_payload, "wizard_step": 2}, platform=platform_clean)
         st.session_state["wizard_step"] = 2
         st.rerun()
 
@@ -449,6 +649,7 @@ def render_step_2_posts():
             - **Me gusta:** Número de likes
             - **Comentarios:** Comentarios del post
             - **Compartidos:** Opcional (si se dispone)
+            - **Guardados:** Cuántas personas lo guardaron
             - **Tipo:** Qué tipo de contenido
             """)
         else:  # tiktok
@@ -481,6 +682,11 @@ def render_step_2_posts():
     ]
 
     st.caption("Tip: Puedes navegar celda por celda con Tab y pegar datos desde Excel.")
+    st.caption("🛟 Auto-guardado activo: el borrador se respalda al calcular y puedes recuperarlo desde el Paso 1.")
+    st.info(
+        "`Interacciones` y `Estado` se calculan automáticamente con base en tus datos y en los seguidores iniciales. Solo captura los datos fuente.",
+        icon="🧠",
+    )
 
     posts_df = _ensure_posts_grid(platform)
 
@@ -504,6 +710,7 @@ def render_step_2_posts():
             "Comentarios",
             "Me gusta",
             "Compartidos",
+            "Guardados",
             "Interacciones",
             "Estado",
             "Fecha Publicacion",
@@ -517,6 +724,7 @@ def render_step_2_posts():
             "Post #",
             "Comentarios",
             "Compartidos",
+            "Guardados",
             "Me gusta",
             "Vistas",
             "Interacciones",
@@ -541,20 +749,21 @@ def render_step_2_posts():
             key="wizard_posts_grid_editor",
             column_config={
                 "Post #": st.column_config.NumberColumn("Post #", min_value=1, step=1, disabled=True),
-                "Fecha Publicacion": st.column_config.DateColumn("Fecha Publicacion", format="YYYY-MM-DD"),
-                "Categoria": st.column_config.SelectboxColumn("Categoria", options=categories),
-                "Tipo": st.column_config.SelectboxColumn("Tipo", options=content_types),
-                "URL/Link": st.column_config.TextColumn("URL/Link", width="medium"),
-                "Comentario": st.column_config.TextColumn("Comentario", width="large"),
-                "Reacciones": st.column_config.NumberColumn("Reacciones", min_value=0, step=1),
-                "Me gusta": st.column_config.NumberColumn("Me gusta", min_value=0, step=1),
-                "Comentarios": st.column_config.NumberColumn("Comentarios", min_value=0, step=1),
-                "Compartidos": st.column_config.NumberColumn("Compartidos", min_value=0, step=1),
-                "Vistas": st.column_config.NumberColumn("Vistas", min_value=0, step=1),
-                "Interacciones": st.column_config.NumberColumn("Interacciones", min_value=0, step=1),
-                "Estado": st.column_config.TextColumn("Estado", disabled=True),
+                "Fecha Publicacion": st.column_config.DateColumn("Fecha Publicacion", format="YYYY-MM-DD", help="Fecha real de publicación para calcular mejor el periodo."),
+                "Categoria": st.column_config.SelectboxColumn("Categoria", options=categories, help="Tema principal del contenido: eventos, admisiones, vida estudiantil, etc."),
+                "Tipo": st.column_config.SelectboxColumn("Tipo", options=content_types, help="Formato principal de la publicación."),
+                "URL/Link": st.column_config.TextColumn("URL/Link", width="medium", help="Opcional: pega el enlace para rastrear mejor el post en el reporte."),
+                "Comentario": st.column_config.TextColumn("Comentario", width="large", help="Nota breve o contexto para identificar la publicación después."),
+                "Reacciones": st.column_config.NumberColumn("Reacciones", min_value=0, step=1, help="Facebook: incluye me gusta, me encanta y otras reacciones."),
+                "Me gusta": st.column_config.NumberColumn("Me gusta", min_value=0, step=1, help="Likes del post o video."),
+                "Comentarios": st.column_config.NumberColumn("Comentarios", min_value=0, step=1, help="Comentarios publicados por la audiencia."),
+                "Compartidos": st.column_config.NumberColumn("Compartidos", min_value=0, step=1, help="Cuántas veces se compartió el contenido."),
+                "Guardados": st.column_config.NumberColumn("Guardados", min_value=0, step=1, help="Útil para detectar contenido de valor o consulta posterior."),
+                "Vistas": st.column_config.NumberColumn("Vistas", min_value=0, step=1, help="Especialmente relevante en TikTok y contenido de video."),
+                "Interacciones": st.column_config.NumberColumn("Interacciones", min_value=0, step=1, help="Campo calculado automáticamente por el sistema."),
+                "Estado": st.column_config.TextColumn("Estado", disabled=True, help="Diagnóstico automático por publicación."),
             },
-            disabled=["Post #", "Estado"],
+            disabled=["Post #", "Estado", "Interacciones"],
         )
         st.markdown("")
         _, _, submit_col = st.columns([1, 1, 1])
@@ -592,6 +801,21 @@ def render_step_2_posts():
         st.session_state["wizard_period_end"] = str(period_end)
         st.session_state["wizard_days"] = int(period_days)
         st.session_state["wizard_posts_count"] = int(captured_posts)
+
+        save_draft_snapshot(
+            {
+                "wizard_step": 2,
+                "wizard_platform": platform,
+                "wizard_followers": int(followers),
+                "wizard_days": int(period_days),
+                "wizard_posts_count": int(captured_posts),
+                "wizard_period_start": str(period_start),
+                "wizard_period_end": str(period_end),
+                "wizard_posts_grid_platform": platform,
+                "wizard_posts_grid": posts_df,
+            },
+            platform=platform,
+        )
 
         if captured_posts <= 0:
             if platform == "tiktok":
@@ -671,6 +895,7 @@ def calculate_and_render_results():
                 "url": row.get("URL/Link", ""),
                 "comentario": row.get("Comentario", ""),
             }
+            post["saves"] = int(row.get("Guardados", 0) or 0)
 
             comments = int(row.get("Comentarios", 0) or 0)
             shares = int(row.get("Compartidos", 0) or 0)
@@ -741,6 +966,7 @@ def calculate_and_render_results():
                 "num": i,
                 "type": st.session_state.get(f"wizard_post_{i}_type", "📸 Imagen"),
             }
+            post["saves"] = int(st.session_state.get(f"wizard_post_{i}_saves", 0) or 0)
 
             if platform == "facebook":
                 reactions = st.session_state.get(f"wizard_post_{i}_reactions", 0)
@@ -883,14 +1109,18 @@ def calculate_and_render_results():
         ctype = post["type"]
         if ctype not in content_stats:
             content_stats[ctype] = {
-                "total_interactions": 0, 
-                "posts": 0, 
+                "total_interactions": 0,
+                "total_views": 0,
+                "total_saves": 0,
+                "posts": 0,
                 "engagement": 0,
                 "pct": 0,  # Porcentaje del total de posts
                 "avg_engagement": 0  # Engagement promedio por post
             }
         
         content_stats[ctype]["total_interactions"] += post["total"]
+        content_stats[ctype]["total_views"] += int(post.get("views", 0) or 0)
+        content_stats[ctype]["total_saves"] += int(post.get("saves", 0) or 0)
         content_stats[ctype]["posts"] += 1
     
     # Calcular porcentajes y engagement promedio por tipo
@@ -945,6 +1175,7 @@ def calculate_and_render_results():
 
     # Analizador de contenido: clasificacion y top performer
     analysis_df = pd.DataFrame(posts_list)
+    content_insights = summarize_content_insights(analysis_df, followers=followers)
     classification = classify_school_content(analysis_df)
     ranked = identify_top_performer(
         classification["data"].assign(
@@ -954,6 +1185,10 @@ def calculate_and_render_results():
     category_signal = category_effectiveness(classification["data"], followers=followers, min_samples=2)
     post_ers = [(p.get("total", 0) / followers * 100) if followers > 0 else 0.0 for p in analyzed_posts]
     volatility = compute_volatility_guardrail(post_ers)
+    content_action_plan = build_content_action_plan(
+        content_insights,
+        best_category=category_signal.get("best_category") if category_signal.get("has_signal") else None,
+    )
 
     best_category_name = None
     if category_signal.get("has_signal") and category_signal.get("best_category"):
@@ -967,6 +1202,21 @@ def calculate_and_render_results():
         is_volatile=bool(volatility.get("is_volatile", False)),
     )
     
+    save_draft_snapshot(
+        {
+            "wizard_step": 3,
+            "wizard_platform": platform,
+            "wizard_followers": int(followers),
+            "wizard_days": int(days),
+            "wizard_posts_count": int(num_posts),
+            "wizard_period_start": period_start,
+            "wizard_period_end": period_end,
+            "wizard_posts_grid_platform": platform,
+            "wizard_posts_grid": st.session_state.get("wizard_posts_grid", pd.DataFrame(posts_list)),
+        },
+        platform=platform,
+    )
+
     # ========================================================================
     # RENDERIZAR RESULTADOS
     # ========================================================================
@@ -1022,6 +1272,35 @@ def calculate_and_render_results():
             f"(diferencia {volatility['relative_diff'] * 100:.1f}%). Un post viral puede estar maquillando el promedio.",
             icon="🟧",
         )
+
+    with st.expander("🧮 Cómo se calcularon estas cifras", expanded=False):
+        st.markdown(
+            f"""
+            - **Seguidores base:** `{followers:,}`
+            - **Interacciones totales:** `{total_interactions:,}`
+            - **Engagement general:** `({total_interactions} / {followers:,}) × 100 = {engagement_pct:.2f}%`
+            - **Engagement por post:** `(({total_interactions} / {max(num_posts, 1)}) / {followers:,}) × 100 = {engagement_per_post:.2f}%`
+            - **Frecuencia:** `({num_posts} / {max(days, 1)}) × 7 = {posts_per_week:.1f}` posts por semana
+            {f'- **ER por vistas:** `({total_interactions} / {total_views:,}) × 100 = {engagement_by_views:.2f}%`' if platform == 'tiktok' and total_views > 0 else ''}
+            """
+        )
+
+    st.markdown("### 🧭 Resumen ejecutivo")
+    executive_col1, executive_col2 = st.columns([1.1, 1.4])
+    with executive_col1:
+        st.success(
+            f"**Diagnóstico actual:** {diagnosis}\n\n"
+            f"Trabajaste con **{followers:,} seguidores** y **{num_posts} publicaciones útiles** en un periodo de **{days} días**."
+        )
+    with executive_col2:
+        quick_takeaways = []
+        if content_action_plan:
+            quick_takeaways.extend(content_action_plan[:3])
+        if not quick_takeaways:
+            quick_takeaways.append("Sigue capturando datos comparables para obtener una recomendación más precisa.")
+        st.markdown("**Qué haría primero:**")
+        for takeaway in quick_takeaways:
+            st.markdown(f"- {takeaway}")
     
     # ========================================================================
     # SECCIÓN ESPECIAL: ENGAGEMENT POR VISTAS (SOLO TIKTOK)
@@ -1084,7 +1363,44 @@ def calculate_and_render_results():
     # ========================================================================
     
     st.markdown("### 📊 Rendimiento por Tipo de Contenido")
-    
+
+    if content_insights.get("has_data"):
+        best_format = content_insights.get("best_format") or {}
+        most_consumed = content_insights.get("most_consumed_format") or {}
+        most_saved = content_insights.get("most_saved_format") or {}
+        best_combo = content_insights.get("best_combo") or {}
+
+        insight_col1, insight_col2, insight_col3 = st.columns(3)
+        with insight_col1:
+            st.metric(
+                "Formato que mejor funciona",
+                best_format.get("tipo", "N/D"),
+                f"ER {float(best_format.get('avg_engagement', 0.0)):.2f}%",
+            )
+        with insight_col2:
+            consumed_label = most_consumed.get("metric_label", "Interacciones")
+            st.metric(
+                "Formato más consumido",
+                most_consumed.get("tipo", "N/D"),
+                f"{consumed_label}: {int(float(most_consumed.get('metric_value', 0) or 0))}",
+            )
+        with insight_col3:
+            if most_saved:
+                st.metric(
+                    "Formato más guardado",
+                    most_saved.get("tipo", "N/D"),
+                    f"Guardados: {int(float(most_saved.get('metric_value', 0) or 0))}",
+                )
+            else:
+                st.metric("Formato más guardado", "Sin datos", "Agrega guardados")
+
+        if best_combo:
+            st.success(
+                f"🔗 Mejor combinación: **{best_combo.get('label', 'N/D')}** con "
+                f"{float(best_combo.get('avg_engagement', 0.0)):.2f}% de ER promedio.",
+                icon="🎯",
+            )
+
     content_df = []
     for ctype, stats in sorted(content_stats.items(), key=lambda x: x[1]["avg_engagement"], reverse=True):
         content_df.append({
@@ -1092,7 +1408,9 @@ def calculate_and_render_results():
             "% Posts": f"{stats['pct']:.0f}%",
             "Engagement x Post": f"{stats['avg_engagement']:.2f}%",
             "Posts": stats["posts"],
-            "Total Interacciones": stats["total_interactions"]
+            "Total Interacciones": stats["total_interactions"],
+            "Vistas Totales": stats.get("total_views", 0),
+            "Guardados": stats.get("total_saves", 0),
         })
     
     if content_df:
@@ -1116,6 +1434,45 @@ def calculate_and_render_results():
                 f"🏫 Efectividad por categoría: **{best_cat['categoria']}** lidera con "
                 f"{float(best_cat['er_promedio']):.2f}% de ER promedio (n={int(best_cat['posts'])})."
             )
+
+        st.markdown("#### 📊 Visual rápido del rendimiento")
+        visual_col1, visual_col2 = st.columns(2)
+        chart_source = pd.DataFrame(content_df)
+        with visual_col1:
+            er_chart = chart_source[["Tipo", "Engagement x Post"]].copy()
+            er_chart["Engagement x Post"] = er_chart["Engagement x Post"].str.rstrip("%").astype(float)
+            st.caption("ER promedio por tipo")
+            st.bar_chart(er_chart.set_index("Tipo"))
+        with visual_col2:
+            if category_signal.get("has_signal"):
+                cat_chart = category_signal["table"][["categoria", "er_promedio"]].copy()
+                st.caption("ER promedio por categoría")
+                st.bar_chart(cat_chart.set_index("categoria"))
+            else:
+                inter_chart = chart_source[["Tipo", "Total Interacciones"]].copy()
+                st.caption("Interacciones por tipo")
+                st.bar_chart(inter_chart.set_index("Tipo"))
+
+        ranking_df = pd.DataFrame(analyzed_posts).copy()
+        if not ranking_df.empty:
+            ranking_df["ER Post"] = ranking_df["total"].astype(float) / max(followers, 1) * 100.0
+            ranking_df = ranking_df.sort_values(by=["ER Post", "total"], ascending=[False, False]).head(5)
+            ranking_df = ranking_df.rename(
+                columns={
+                    "num": "Post #",
+                    "type": "Tipo",
+                    "categoria": "Categoría",
+                    "total": "Interacciones",
+                }
+            )
+            st.caption("Top 5 publicaciones por rendimiento")
+            st.dataframe(
+                ranking_df[["Post #", "Tipo", "Categoría", "Interacciones", "ER Post"]].assign(
+                    **{"ER Post": lambda df: df["ER Post"].map(lambda val: f"{val:.2f}%")}
+                ),
+                use_container_width=True,
+                hide_index=True,
+            )
         
         # Agregar análisis detallado
         st.markdown("#### Interpretación:")
@@ -1132,6 +1489,9 @@ def calculate_and_render_results():
     st.markdown("### 🎯 Diagnóstico y Acciones Recomendadas")
 
     st.info(narrative_recommendation, icon="🧠")
+    st.markdown("#### Qué repetir la próxima semana")
+    for action in content_action_plan:
+        st.markdown(f"- {action}")
     
     if diagnosis_level == "alto":
         st.markdown(f"""
@@ -1216,28 +1576,27 @@ def calculate_and_render_results():
     # SECCIÓN: POTENCIAL DE CRECIMIENTO
     # ========================================================================
     
-    st.markdown("### 📈 Calculadora de Potencial de Crecimiento")
-    
-    st.markdown("Si mejoras tu engagement, ¿cuántos nuevos seguidores podrías ganar?")
-    
-    growth_cols = st.columns(3)
-    
-    for idx, (improvement, scenario) in enumerate(sorted(growth_scenarios.items())):
-        with growth_cols[idx]:
-            st.markdown(f"""
-            <div style='background: #F2F4F7; padding: 16px; border-radius: 10px; border-left: 4px solid #003696;'>
-                <div style='font-weight: bold; color: #003696; margin-bottom: 8px;'>+{improvement}% Engagement</div>
-                <div style='font-size: 24px; font-weight: bold; color: #0A7D35; margin-bottom: 8px;'>
-                    +{scenario['growth_pct']:.0f}% crecimiento
+    with st.expander("📈 Proyección de crecimiento (opcional)", expanded=False):
+        st.markdown("Si mejoras tu engagement, ¿cuántos nuevos seguidores podrías ganar?")
+        
+        growth_cols = st.columns(3)
+        
+        for idx, (improvement, scenario) in enumerate(sorted(growth_scenarios.items())):
+            with growth_cols[idx]:
+                st.markdown(f"""
+                <div style='background: #F2F4F7; padding: 16px; border-radius: 10px; border-left: 4px solid #003696;'>
+                    <div style='font-weight: bold; color: #003696; margin-bottom: 8px;'>+{improvement}% Engagement</div>
+                    <div style='font-size: 24px; font-weight: bold; color: #0A7D35; margin-bottom: 8px;'>
+                        +{scenario['growth_pct']:.0f}% crecimiento
+                    </div>
+                    <small style='color: #495057;'>
+                        De {followers:,} → {scenario['followers_3m']:,} seguidores<br>
+                        en 3 meses
+                    </small>
                 </div>
-                <small style='color: #495057;'>
-                    De {followers:,} → {scenario['followers_3m']:,} seguidores<br>
-                    en 3 meses
-                </small>
-            </div>
-            """, unsafe_allow_html=True)
-    
-    st.markdown("**Nota:** Proyecciones basadas en relación engagement-crecimiento histórica en redes sociales.")
+                """, unsafe_allow_html=True)
+        
+        st.markdown("**Nota:** Proyecciones basadas en relación engagement-crecimiento histórica en redes sociales.")
     
     # ========================================================================
     # BOTONES DE ACCIÓN
@@ -1248,12 +1607,12 @@ def calculate_and_render_results():
     col1, col2, col3 = st.columns(3)
     
     with col1:
-        if st.button("← Modificar Datos", use_container_width=True):
+        if st.button("← Volver a editar publicaciones", use_container_width=True):
             st.session_state["wizard_step"] = 2
             st.rerun()
     
     with col2:
-        if st.button("🔄 Nuevos Datos", use_container_width=True):
+        if st.button("🆕 Empezar nuevo análisis", use_container_width=True):
             # Limpiar todos los datos del wizard
             for key in list(st.session_state.keys()):
                 if key.startswith("wizard_"):
@@ -1281,12 +1640,14 @@ def calculate_and_render_results():
             content_stats=content_stats,
             growth_scenarios=growth_scenarios,
             expected=expected_payload,
+            content_insights=content_insights,
             period_start=period_start,
             period_end=period_end,
             total_posts=num_posts,
             narrative_summary=narrative_recommendation,
             category_effectiveness=category_signal.get("table", pd.DataFrame()).to_dict("records") if category_signal.get("has_signal") else [],
             volatility_alert=volatility.get("message") if volatility.get("is_volatile") else "",
+            action_plan=content_action_plan,
         )
 
         st.download_button(
@@ -1314,6 +1675,8 @@ def render(df=None):
         "Analiza tu engagement en datos reales y obtén recomendaciones accionables."
     )
     
+    apply_pending_draft_restore()
+
     # Inicializar step
     if "wizard_step" not in st.session_state:
         st.session_state["wizard_step"] = 1

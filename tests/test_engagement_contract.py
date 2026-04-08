@@ -105,3 +105,27 @@ def test_report_marks_post_mode_for_hybrid_tiktok():
     assert "<th>Modo</th>" in html
     assert "Comunidad" in html
     assert "Alcance" in html
+
+
+def test_report_includes_visual_executive_summary_and_action_plan():
+    expected = {"typical": 3.5, "min": 1.5, "max": 8.0, "label": "Tipico 3.5%"}
+    content_stats = {
+        "🎥 Video": {"posts": 2, "total_interactions": 260, "total_views": 12000, "total_saves": 10, "avg_engagement": 5.2},
+        "📸 Imagen": {"posts": 2, "total_interactions": 180, "total_views": 18000, "total_saves": 26, "avg_engagement": 3.6},
+    }
+    payload = _base_payload(expected, content_stats)
+    payload["content_insights"] = {
+        "best_format": {"tipo": "🎥 Video", "avg_engagement": 5.2},
+        "most_consumed_format": {"tipo": "📸 Imagen", "metric_label": "Vistas totales", "metric_value": 18000},
+        "most_saved_format": {"tipo": "📸 Imagen", "metric_value": 26},
+        "best_combo": {"label": "🎥 Video + Eventos", "avg_engagement": 5.2},
+    }
+
+    html = generate_engagement_report_html(**payload)
+
+    assert "Resumen Ejecutivo del Contenido" in html
+    assert "🎥 Video + Eventos" in html
+    assert "Qué repetir" in html
+    assert "lo más consumido no es lo que mejor convierte" in html.lower()
+    assert "Cómo se calcularon estas cifras" in html
+    assert "(interacciones totales / seguidores) × 100" in html
