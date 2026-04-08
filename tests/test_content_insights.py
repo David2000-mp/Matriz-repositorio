@@ -90,6 +90,8 @@ def test_apply_pending_draft_restore_updates_state_without_touching_widgets():
 
     assert applied is True
     assert state["wizard_followers"] == 4200
+    assert state["wizard_followers_input"] == 4200
     assert state["wizard_days"] == 21
+    assert state["wizard_days_input"] == 21
     assert list(state["wizard_posts_grid"].columns) == ["Post #", "Tipo", "Guardados"]
     assert "wizard_restore_pending" not in state

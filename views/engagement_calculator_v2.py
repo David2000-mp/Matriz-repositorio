@@ -127,6 +127,11 @@ def _restore_draft_to_session(draft_data: dict | None, state=None) -> bool:
         else:
             target_state[key] = value
 
+    if "wizard_followers" in target_state:
+        target_state["wizard_followers_input"] = int(target_state.get("wizard_followers") or 0)
+    if "wizard_days" in target_state:
+        target_state["wizard_days_input"] = int(target_state.get("wizard_days") or 0)
+
     platform_options = ["facebook", "instagram", "tiktok"]
     platform_value = draft_data.get("wizard_platform")
     if platform_value in platform_options:
@@ -134,6 +139,24 @@ def _restore_draft_to_session(draft_data: dict | None, state=None) -> bool:
         target_state["wizard_posts_grid_platform"] = platform_value
 
     return True
+
+
+def _get_followers_value(default: int = 2500) -> int:
+    """Obtiene el valor actual de seguidores, priorizando el input sincronizado."""
+    raw_value = st.session_state.get("wizard_followers", st.session_state.get("wizard_followers_input", default))
+    try:
+        return int(raw_value)
+    except Exception:
+        return int(default)
+
+
+def _get_days_value(default: int = 30) -> int:
+    """Obtiene el periodo actual en días, priorizando el input sincronizado."""
+    raw_value = st.session_state.get("wizard_days", st.session_state.get("wizard_days_input", default))
+    try:
+        return int(raw_value)
+    except Exception:
+        return int(default)
 
 
 def queue_draft_restore_request(draft_data: dict | None, state=None) -> bool:
@@ -530,20 +553,22 @@ def render_step_1_basic_data():
         followers = st.number_input(
             "¿Cuántas personas te siguen?",
             min_value=1,
-            value=st.session_state.get("wizard_followers", 2500),
+            value=_get_followers_value(2500),
             step=100,
-            key="wizard_followers",
+            key="wizard_followers_input",
             help="Número total de seguidores actuales. Ejemplo: 2.500"
         )
+        st.session_state["wizard_followers"] = int(followers)
         
         days = st.number_input(
             "Período de análisis (días)",
             min_value=1,
             max_value=365,
-            value=st.session_state.get("wizard_days", 30),
-            key="wizard_days",
+            value=_get_days_value(30),
+            key="wizard_days_input",
             help="¿Cuántos días de publicaciones vas a analizar? Recomendado: 30"
         )
+        st.session_state["wizard_days"] = int(days)
     
     # Mostrar estimación de publicaciones
     expected_posts = int((st.session_state.get("wizard_posts_count", 15)))
@@ -626,7 +651,7 @@ def render_step_2_posts():
     st.markdown(f"Ingresa datos de tus últimas **15 publicaciones** en {st.session_state.get('wizard_platform', 'Facebook').upper()}")
     
     platform = st.session_state.get("wizard_platform", "facebook")
-    followers = st.session_state.get("wizard_followers", 2500)
+    followers = _get_followers_value(2500)
     
     # Instrucciones
     with st.expander("💡 ¿Cómo llenar esto?", expanded=True):
@@ -793,7 +818,7 @@ def render_step_2_posts():
             period_end = valid_dates.max().date()
             period_days = max((period_end - period_start).days + 1, 1)
         else:
-            period_days = int(st.session_state.get("wizard_days", 30))
+            period_days = _get_days_value(30)
             period_end = datetime.now().date()
             period_start = period_end - pd.Timedelta(days=max(period_days - 1, 0))
 
@@ -850,7 +875,7 @@ def render_step_2_posts():
 
     period_start_disp = st.session_state.get("wizard_period_start", str(datetime.now().date()))
     period_end_disp = st.session_state.get("wizard_period_end", str(datetime.now().date()))
-    period_days_disp = int(st.session_state.get("wizard_days", 30))
+    period_days_disp = _get_days_value(30)
     captured_posts_disp = int(st.session_state.get("wizard_posts_count", 0))
     posting_frequency_disp = (captured_posts_disp / period_days_disp) * 7 if period_days_disp > 0 else 0
     if captured_posts_disp > 0:
@@ -874,8 +899,8 @@ def calculate_and_render_results():
     """Paso 3: Calcular y mostrar resultados con análisis completo."""
     
     platform = st.session_state.get("wizard_platform", "facebook")
-    followers = st.session_state.get("wizard_followers", 2500)
-    days = int(st.session_state.get("wizard_days", 30))
+    followers = _get_followers_value(2500)
+    days = _get_days_value(30)
     
     # Recopilar datos de publicaciones
     posts_list = []
