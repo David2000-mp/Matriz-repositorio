@@ -80,7 +80,7 @@ def load_draft_snapshot(platform: str | None = None, draft_path: str | Path | No
     target_path = _draft_file_for_platform(platform, draft_path)
 
     if not target_path.exists():
-        if draft_path is None and DRAFT_DIR.exists():
+        if draft_path is None and platform is None and DRAFT_DIR.exists():
             candidates = sorted(DRAFT_DIR.glob("*_draft.json"), key=lambda item: item.stat().st_mtime, reverse=True)
             if candidates:
                 target_path = candidates[0]
@@ -157,6 +157,56 @@ def _get_days_value(default: int = 30) -> int:
         return int(raw_value)
     except Exception:
         return int(default)
+
+
+def _is_captured_post_record(record: dict | pd.Series | None) -> bool:
+    """Determina si una fila representa una publicacion real capturada, aunque tenga 0 interacciones."""
+    if record is None:
+        return False
+
+    data = record.to_dict() if isinstance(record, pd.Series) else dict(record)
+
+    numeric_fields = [
+        "Interacciones", "total", "Vistas", "views", "Reacciones", "Me gusta",
+        "Comentarios", "Compartidos", "Guardados", "reactions", "likes",
+        "comments", "shares", "saves",
+    ]
+    for field in numeric_fields:
+        try:
+            if float(data.get(field, 0) or 0) > 0:
+                return True
+        except Exception:
+            continue
+
+    text_fields = ["Fecha Publicacion", "fecha", "URL/Link", "url", "Comentario", "comentario"]
+    for field in text_fields:
+        value = str(data.get(field, "") or "").strip()
+        if value and value.lower() not in {"nan", "nat", "none"}:
+            return True
+
+    return False
+
+
+def count_captured_posts(posts_source) -> int:
+    """Cuenta publicaciones realmente capturadas para frecuencia y promedios por post."""
+    if posts_source is None:
+        return 0
+
+    if isinstance(posts_source, pd.DataFrame):
+        iterable = [row for _, row in posts_source.iterrows()]
+    elif isinstance(posts_source, list):
+        iterable = posts_source
+    else:
+        return 0
+
+    return sum(1 for item in iterable if _is_captured_post_record(item))
+
+
+def calculate_posts_per_week(total_posts: int, period_days: int) -> float:
+    """Calcula frecuencia semanal usando las publicaciones capturadas y el periodo analizado."""
+    safe_posts = max(int(total_posts or 0), 0)
+    safe_days = max(int(period_days or 0), 1)
+    return (safe_posts / safe_days) * 7
 
 
 def queue_draft_restore_request(draft_data: dict | None, state=None) -> bool:
@@ -290,8 +340,8 @@ def validate_post_engagement(reactions: int, comments: int, shares: int, followe
     engagement_pct = (total / followers * 100) if followers > 0 else 0
     expected = calculate_expected_engagement(followers)
     
-    # Sanity check: engagement no puede ser > 100% de seguidores
-    if total > followers * 5:
+    # Sanity check: engagement no puede ser > 100% de seguidores en un solo post
+    if engagement_pct > 100:
         return {
             "status": "red",
             "color": "#B42318",
@@ -342,7 +392,8 @@ def calculate_growth_potential(current_engagement: float, current_followers: int
     
     scenarios = {}
     for improvement in [10, 20, 30]:  # Mejorar 10%, 20%, 30%
-        new_engagement = current_engagement + improvement
+        multiplier = 1 + (improvement / 100)
+        new_engagement = current_engagement * multiplier
         monthly_growth = (new_engagement / 100) * current_followers * factor / 100
         growth_3months = monthly_growth * 3
         
@@ -805,12 +856,13 @@ def render_step_2_posts():
         st.session_state["wizard_posts_grid"] = posts_df
         _sync_grid_to_legacy_state(posts_df, platform)
 
+        captured_posts = count_captured_posts(posts_df)
         if platform == "tiktok":
-            captured_posts = len(
+            qualifying_posts = len(
                 [p for p in posts_data if p["total"] > 0 or (p.get("analysis_mode") == "views_only" and p.get("views", 0) > 0)]
             )
         else:
-            captured_posts = len([p for p in posts_data if p["total"] > 0])
+            qualifying_posts = len([p for p in posts_data if p["total"] > 0])
 
         valid_dates = pd.to_datetime(posts_df["Fecha Publicacion"], errors="coerce").dropna()
         if not valid_dates.empty:
@@ -842,7 +894,7 @@ def render_step_2_posts():
             platform=platform,
         )
 
-        if captured_posts <= 0:
+        if qualifying_posts <= 0:
             if platform == "tiktok":
                 st.warning("Captura al menos un post con interacciones o vistas antes de calcular.")
             else:
@@ -877,7 +929,7 @@ def render_step_2_posts():
     period_end_disp = st.session_state.get("wizard_period_end", str(datetime.now().date()))
     period_days_disp = _get_days_value(30)
     captured_posts_disp = int(st.session_state.get("wizard_posts_count", 0))
-    posting_frequency_disp = (captured_posts_disp / period_days_disp) * 7 if period_days_disp > 0 else 0
+    posting_frequency_disp = calculate_posts_per_week(captured_posts_disp, period_days_disp)
     if captured_posts_disp > 0:
         st.info(
             f"Periodo analizado: **{period_start_disp}** al **{period_end_disp}** "
@@ -1060,22 +1112,24 @@ def calculate_and_render_results():
             total_interactions += post["total"]
             posts_list.append(post)
 
-    community_posts = [p for p in posts_list if p.get("total", 0) > 0]
+    captured_posts = [p for p in posts_list if _is_captured_post_record(p)]
+    community_posts = [p for p in captured_posts if p.get("total", 0) > 0]
     reach_posts = [
         p
-        for p in posts_list
+        for p in captured_posts
         if p.get("analysis_mode") == "views_only" or (platform == "tiktok" and p.get("total", 0) == 0 and p.get("views", 0) > 0)
     ]
 
     if platform == "tiktok":
-        analyzed_posts = community_posts + [p for p in reach_posts if p not in community_posts]
-        if not analyzed_posts:
+        qualifying_posts = community_posts + [p for p in reach_posts if p not in community_posts]
+        if not qualifying_posts:
             st.error("⚠️ No hay datos para analizar. En TikTok necesitas interacciones o vistas.")
             if st.button("← Volver al Paso 2"):
                 st.session_state["wizard_step"] = 2
                 st.rerun()
             return
 
+        analyzed_posts = captured_posts
         if community_posts and reach_posts:
             analysis_mode = "hybrid"
         elif reach_posts and not community_posts:
@@ -1083,9 +1137,9 @@ def calculate_and_render_results():
         else:
             analysis_mode = "standard"
     else:
-        analyzed_posts = community_posts
+        analyzed_posts = captured_posts
         analysis_mode = "standard"
-        if not analyzed_posts:
+        if not community_posts:
             st.error("⚠️ No hay datos para analizar. Por favor completa al menos algunos posts.")
             if st.button("← Volver al Paso 2"):
                 st.session_state["wizard_step"] = 2
@@ -1096,8 +1150,8 @@ def calculate_and_render_results():
     # CÁLCULOS PRINCIPALES
     # ========================================================================
     
-    # Total de posts capturados con interacciones
-    num_posts = len(analyzed_posts)
+    # Total de posts realmente capturados en el periodo (incluye publicaciones con 0 interacciones)
+    num_posts = max(count_captured_posts(analyzed_posts), len(community_posts), 1)
 
     # Derivar periodo real desde fechas validas cuando existan
     if not period_start or not period_end:
@@ -1120,7 +1174,7 @@ def calculate_and_render_results():
     # Posts por semana varía según el período de DÍAS que ingresa el usuario
     # Fórmula: (número de posts / días) * 7
     # Ej: 15 posts en 30 días = (15 / 30) * 7 = 3.5 posts/semana
-    posts_per_week = (num_posts / max(days, 1)) * 7
+    posts_per_week = calculate_posts_per_week(num_posts, days)
     
     # Para TikTok
     if platform == "tiktok" and total_views > 0:
@@ -1199,7 +1253,7 @@ def calculate_and_render_results():
     growth_scenarios = calculate_growth_potential(engagement_pct, followers, platform)
 
     # Analizador de contenido: clasificacion y top performer
-    analysis_df = pd.DataFrame(posts_list)
+    analysis_df = pd.DataFrame(analyzed_posts)
     content_insights = summarize_content_insights(analysis_df, followers=followers)
     classification = classify_school_content(analysis_df)
     ranked = identify_top_performer(

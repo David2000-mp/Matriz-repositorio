@@ -32,6 +32,59 @@ def _normalize_category(value: Any) -> str:
     return CATEGORY_ALIASES.get(text, str(value).strip())
 
 
+def _normalize_posts_frame(posts_df: pd.DataFrame) -> pd.DataFrame:
+    """Alinea nombres de columnas entre la captura del wizard y el analizador."""
+    work = posts_df.copy()
+    alias_map = {
+        "num": "Post #",
+        "type": "Tipo",
+        "categoria": "Categoria",
+        "total": "Interacciones",
+        "views": "Vistas",
+        "saves": "Guardados",
+        "comments": "Comentarios",
+        "shares": "Compartidos",
+    }
+    for source, target in alias_map.items():
+        if target not in work.columns and source in work.columns:
+            work[target] = work[source]
+
+    if "Categoria" not in work.columns:
+        work["Categoria"] = "Sin categoria"
+    if "Tipo" not in work.columns:
+        work["Tipo"] = "Sin tipo"
+
+    return work
+
+
+def _drop_placeholder_rows(posts_df: pd.DataFrame) -> pd.DataFrame:
+    """Excluye filas vacías del grid que todavía no representan publicaciones reales."""
+    work = posts_df.copy()
+
+    numeric_cols = ["Interacciones", "Vistas", "Guardados", "Comentarios", "Compartidos"]
+    for col in numeric_cols:
+        if col not in work.columns:
+            work[col] = 0
+        work[col] = pd.to_numeric(work[col], errors="coerce").fillna(0)
+
+    def _is_meaningful_row(row: pd.Series) -> bool:
+        if float(row[numeric_cols].sum()) > 0:
+            return True
+
+        text_values = [
+            str(row.get("Tipo", "") or "").strip(),
+            str(row.get("Categoria", "") or "").strip(),
+            str(row.get("Comentario", "") or "").strip(),
+            str(row.get("URL/Link", "") or "").strip(),
+            str(row.get("Fecha Publicacion", "") or "").strip(),
+        ]
+        meaningful_tokens = {"sin tipo", "sin categoria", "nan", "none", "nat", ""}
+        return any(value.lower() not in meaningful_tokens for value in text_values)
+
+    filtered = work[work.apply(_is_meaningful_row, axis=1)].copy()
+    return filtered.reset_index(drop=True)
+
+
 def classify_school_content(posts_df: pd.DataFrame) -> dict[str, Any]:
     """Normaliza categoria escolar y valida campos clave no vacios."""
     if posts_df is None or posts_df.empty:
@@ -42,9 +95,14 @@ def classify_school_content(posts_df: pd.DataFrame) -> dict[str, Any]:
             "message": "Sin datos para clasificar.",
         }
 
-    work = posts_df.copy()
-    if "Categoria" not in work.columns:
-        work["Categoria"] = "Sin categoria"
+    work = _drop_placeholder_rows(_normalize_posts_frame(posts_df))
+    if work.empty:
+        return {
+            "data": pd.DataFrame(),
+            "missing_rows": [],
+            "is_valid": False,
+            "message": "Sin datos para clasificar.",
+        }
 
     work["Categoria Canonica"] = work["Categoria"].apply(_normalize_category)
 
@@ -102,21 +160,17 @@ def summarize_content_insights(posts_df: pd.DataFrame, followers: int = 0) -> di
             "consumption_metric": "interacciones",
         }
 
-    work = posts_df.copy()
-
-    if "Tipo" not in work.columns and "type" in work.columns:
-        work["Tipo"] = work["type"]
-    if "Categoria" not in work.columns and "categoria" in work.columns:
-        work["Categoria"] = work["categoria"]
-    if "Interacciones" not in work.columns and "total" in work.columns:
-        work["Interacciones"] = work["total"]
-    if "Vistas" not in work.columns and "views" in work.columns:
-        work["Vistas"] = work["views"]
-    if "Guardados" not in work.columns and "saves" in work.columns:
-        work["Guardados"] = work["saves"]
-
-    if "Tipo" not in work.columns:
-        work["Tipo"] = "Sin tipo"
+    work = _drop_placeholder_rows(_normalize_posts_frame(posts_df))
+    if work.empty:
+        return {
+            "has_data": False,
+            "table": pd.DataFrame(),
+            "best_format": None,
+            "most_consumed_format": None,
+            "most_saved_format": None,
+            "best_combo": None,
+            "consumption_metric": "interacciones",
+        }
 
     for col in ["Interacciones", "Vistas", "Guardados", "Comentarios", "Compartidos"]:
         if col not in work.columns:

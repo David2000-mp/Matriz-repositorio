@@ -1,7 +1,15 @@
 import pandas as pd
 
+import views.engagement_calculator_v2 as calc_view
 from utils.content_analyzer import build_content_action_plan, summarize_content_insights
-from views.engagement_calculator_v2 import apply_pending_draft_restore, load_draft_snapshot, queue_draft_restore_request, save_draft_snapshot
+from views.engagement_calculator_v2 import (
+    apply_pending_draft_restore,
+    calculate_posts_per_week,
+    count_captured_posts,
+    load_draft_snapshot,
+    queue_draft_restore_request,
+    save_draft_snapshot,
+)
 
 
 def test_summarize_content_insights_detects_best_consumed_and_saved_formats():
@@ -95,3 +103,47 @@ def test_apply_pending_draft_restore_updates_state_without_touching_widgets():
     assert state["wizard_days_input"] == 21
     assert list(state["wizard_posts_grid"].columns) == ["Post #", "Tipo", "Guardados"]
     assert "wizard_restore_pending" not in state
+
+
+def test_posting_frequency_counts_captured_posts_not_only_posts_with_interactions():
+    df = pd.DataFrame(
+        [
+            {"Post #": 1, "Fecha Publicacion": "2026-04-01", "Tipo": "📸 Imagen", "Categoria": "Eventos", "Interacciones": 0, "Vistas": 0, "URL/Link": "", "Comentario": "Publicado sin respuesta"},
+            {"Post #": 2, "Fecha Publicacion": "2026-04-05", "Tipo": "🎥 Video", "Categoria": "Admisiones", "Interacciones": 80, "Vistas": 0, "URL/Link": "", "Comentario": ""},
+        ]
+    )
+
+    captured = count_captured_posts(df)
+    per_week = calculate_posts_per_week(captured, 14)
+
+    assert captured == 2
+    assert per_week == 1.0
+
+
+def test_summarize_content_insights_ignores_blank_placeholder_rows():
+    df = pd.DataFrame(
+        [
+            {"Post #": 1, "Tipo": "🎥 Video", "Categoria": "Eventos", "Interacciones": 200, "Vistas": 5000, "Guardados": 12},
+            {"Post #": 2, "Tipo": "📸 Imagen", "Categoria": "Admisiones", "Interacciones": 100, "Vistas": 2500, "Guardados": 5},
+            {"Post #": 3, "Tipo": "", "Categoria": "", "Interacciones": 0, "Vistas": 0, "Guardados": 0},
+        ]
+    )
+
+    summary = summarize_content_insights(df, followers=1000)
+
+    tipos = set(summary["table"]["Tipo"].tolist())
+    assert "" not in tipos
+    assert "Sin tipo" not in tipos
+
+
+def test_load_draft_snapshot_does_not_restore_other_platform_latest_draft(tmp_path):
+    original_dir = calc_view.DRAFT_DIR
+    calc_view.DRAFT_DIR = tmp_path
+    try:
+        save_draft_snapshot({"wizard_platform": "facebook", "wizard_followers": 1111}, platform="facebook")
+
+        loaded = load_draft_snapshot(platform="instagram")
+
+        assert loaded is None
+    finally:
+        calc_view.DRAFT_DIR = original_dir

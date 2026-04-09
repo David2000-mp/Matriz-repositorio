@@ -516,7 +516,7 @@ def generate_engagement_report_html(
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Reporte de Engagement - {'Facebook' if platform == 'facebook' else 'TikTok'}</title>
+        <title>Reporte de Engagement - {platform_label}</title>
         <style>
             * {{
                 margin: 0;

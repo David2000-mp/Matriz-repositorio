@@ -1,4 +1,5 @@
 from utils.report_generator import generate_engagement_report_html
+from views.engagement_calculator_v2 import calculate_growth_potential, validate_post_engagement
 
 
 def _base_payload(expected: dict, content_stats: dict):
@@ -129,3 +130,31 @@ def test_report_includes_visual_executive_summary_and_action_plan():
     assert "lo más consumido no es lo que mejor convierte" in html.lower()
     assert "Cómo se calcularon estas cifras" in html
     assert "(interacciones totales / seguidores) × 100" in html
+
+
+def test_report_uses_correct_instagram_title():
+    expected = {"typical": 3.5, "min": 1.5, "max": 8.0, "label": "Tipico 3.5%"}
+    content_stats = {
+        "📸 Imagen": {"posts": 1, "total_interactions": 120, "avg_engagement": 4.8},
+    }
+    payload = _base_payload(expected, content_stats)
+    payload["platform"] = "instagram"
+
+    html = generate_engagement_report_html(**payload)
+
+    assert "<title>Reporte de Engagement - Instagram</title>" in html
+
+
+def test_growth_projection_uses_relative_improvement_not_plus_ten_points():
+    scenarios = calculate_growth_potential(2.0, 1000, "facebook")
+
+    assert round(scenarios[10]["new_engagement"], 2) == 2.2
+    assert round(scenarios[20]["new_engagement"], 2) == 2.4
+    assert round(scenarios[30]["new_engagement"], 2) == 2.6
+
+
+def test_validate_post_engagement_flags_over_hundred_percent_as_suspicious():
+    result = validate_post_engagement(150, 0, 0, 100)
+
+    assert result["status"] == "red"
+    assert "sospechosos" in result["message"].lower()
