@@ -588,6 +588,48 @@ def render(df=None):
             </div>
             """, unsafe_allow_html=True)
 
+    school_name = st.session_state.get('filtro_entidad', 'Todos')
+    meta_seguidores = 0.0
+    meta_engagement = 0.0
+    df_configs = pd.DataFrame()
+    config_inst = pd.DataFrame()
+
+    try:
+        df_configs = load_configs()
+        if school_name != 'Todas' and df_configs is not None and not df_configs.empty and 'entidad' in df_configs.columns:
+            config_inst = df_configs[
+                df_configs['entidad'].astype(str).str.strip().str.casefold() == str(school_name).strip().casefold()
+            ]
+            if not config_inst.empty:
+                meta_seguidores = float(pd.to_numeric(config_inst.iloc[0].get('meta_seguidores', 0), errors='coerce') or 0)
+                meta_engagement = float(pd.to_numeric(config_inst.iloc[0].get('meta_engagement', 0), errors='coerce') or 0)
+    except Exception as e:
+        logging.warning(f"No se pudieron cargar metas del dashboard: {e}")
+
+    if school_name != 'Todas' and (meta_seguidores > 0 or meta_engagement > 0):
+        st.markdown("### 🎯 Avance contra Metas")
+        goal_col1, goal_col2 = st.columns(2)
+
+        with goal_col1:
+            progreso_seg = (tot_seg / meta_seguidores) if meta_seguidores > 0 else 0.0
+            st.caption(f"🎯 Meta: {meta_seguidores:,.0f} seguidores")
+            st.progress(min(float(progreso_seg), 1.0))
+            if progreso_seg >= 1.0:
+                st.success(f"¡Meta cumplida! 🎉 Seguidores al {progreso_seg:.0%}")
+            elif meta_seguidores > 0:
+                st.caption(f"Actual: {tot_seg:,.0f} ({progreso_seg:.0%})")
+
+        with goal_col2:
+            progreso_eng = (er_global / meta_engagement) if meta_engagement > 0 else 0.0
+            st.caption(f"🎯 Meta: {meta_engagement:.2f}% engagement")
+            st.progress(min(float(progreso_eng), 1.0))
+            if progreso_eng >= 1.0:
+                st.success(f"¡Meta cumplida! 🎉 Engagement al {progreso_eng:.0%}")
+            elif meta_engagement > 0:
+                st.caption(f"Actual: {er_global:.2f}% ({progreso_eng:.0%})")
+    elif school_name != 'Todas':
+        st.caption("🎯 Configura metas para esta institución y así visualizar el avance contra objetivo.")
+
     # Desglose por Red Social
     st.subheader("Desglose por Red Social")
     
@@ -611,6 +653,64 @@ def render(df=None):
         status = get_engagement_status(engagement_rate=row['engagement_promedio'])
         engagement_display = status if status else f"{row['engagement_promedio']:.2f}%"
         st.write(f"**{row['plataforma']}**: Seguidores totales: {row['seguidores']:,.0f}, Engagement promedio: {engagement_display}")
+
+    # Pulse Ejecutivo por Plataforma
+    st.markdown("### 🧭 Pulse Ejecutivo por Plataforma")
+    if not platform_summary.empty:
+        platform_summary = platform_summary.sort_values('engagement_promedio', ascending=False).reset_index(drop=True)
+        leader_row = platform_summary.iloc[0]
+        watch_row = platform_summary.iloc[-1]
+
+        if health_score < 60:
+            priority_text = "Reforzar contenido y frecuencia en las plataformas con ER bajo."
+            priority_delta = "Atención inmediata"
+        elif delta_seg < 0:
+            priority_text = "Recuperar crecimiento antes de aumentar volumen de publicaciones."
+            priority_delta = "Vigilar tendencia"
+        else:
+            priority_text = "Escalar el formato ganador y mantener consistencia semanal."
+            priority_delta = "Momentum positivo"
+
+        p1, p2, p3 = st.columns(3)
+        with p1:
+            st.metric(
+                "🏆 Plataforma líder",
+                str(leader_row['plataforma']),
+                f"ER {float(leader_row['engagement_promedio']):.2f}%"
+            )
+        with p2:
+            st.metric(
+                "👀 Plataforma a vigilar",
+                str(watch_row['plataforma']),
+                f"ER {float(watch_row['engagement_promedio']):.2f}%"
+            )
+        with p3:
+            st.metric(
+                "🎯 Prioridad inmediata",
+                priority_delta,
+                f"Salud {health_score:.0f}/100"
+            )
+
+        pulse_rows = []
+        for _, row in platform_summary.iterrows():
+            health_status, emoji = _get_engagement_health(str(row['plataforma']), float(row['engagement_promedio']))
+            if health_status == 'Bajo':
+                action = 'Optimizar contenido y revisar frecuencia'
+            elif health_status == 'Correcto':
+                action = 'Probar formatos de mayor interacción'
+            else:
+                action = 'Escalar el formato ganador'
+
+            pulse_rows.append({
+                'Plataforma': row['plataforma'],
+                'Seguidores': int(row['seguidores']),
+                'ER promedio': f"{float(row['engagement_promedio']):.2f}%",
+                'Estado': f"{emoji} {health_status}",
+                'Acción sugerida': action,
+            })
+
+        st.dataframe(pd.DataFrame(pulse_rows), width='stretch', hide_index=True)
+        st.info(f"**Lectura ejecutiva:** {priority_text}")
 
     # Desglose detallado por plataforma
     st.markdown("### 📱 Desglose Detallado por Plataforma")
@@ -673,13 +773,35 @@ def render(df=None):
             value=f"{tt_cov:.1f}%"
         )
 
-    # Alertas suaves basadas en análisis de crecimiento
-    if mes_anterior and delta_seg < 0:
-        st.caption("💡 Crecimiento mensual por debajo del promedio. Considera revisar estrategias de engagement.")
+    st.markdown("### 🚨 Alertas automáticas")
+    alert_messages = []
+    if mes_anterior and delta_seg < -5:
+        alert_messages.append(("error", f"Caída de seguidores detectada: {delta_seg:+.1f}% vs mes anterior."))
+    elif mes_anterior and delta_seg < 0:
+        alert_messages.append(("warning", f"Crecimiento mensual por debajo del promedio: {delta_seg:+.1f}% vs mes anterior."))
 
-    # Alerta de salud digital baja
+    if mes_anterior and delta_er < -0.5:
+        alert_messages.append(("warning", f"El engagement bajó {delta_er:+.2f} pp respecto al corte anterior."))
+
     if health_score < 60:
-        st.caption("⚠️ Salud Digital baja. El engagement está por debajo del umbral recomendado.")
+        alert_messages.append(("error", "Salud Digital baja. El engagement está por debajo del umbral recomendado."))
+    elif health_score < 80:
+        alert_messages.append(("info", "Salud Digital estable, con margen claro de mejora para llegar a nivel óptimo."))
+
+    if len(plataformas_anomalas) > 0:
+        plataformas_alerta = ", ".join(str(p) for p in plataformas_anomalas if pd.notna(p))
+        alert_messages.append(("warning", f"Se detectaron anomalías recientes en: {plataformas_alerta}."))
+
+    if not alert_messages:
+        st.success("✅ Sin alertas críticas. La red mantiene una tendencia saludable.")
+    else:
+        for level, message in alert_messages[:3]:
+            if level == "error":
+                st.error(message)
+            elif level == "warning":
+                st.warning(message)
+            else:
+                st.info(message)
 
     # Microcopy contextual para lectura ejecutiva
     if delta_seg > 10:
@@ -688,7 +810,6 @@ def render(df=None):
         st.caption("📈 Crecimiento positivo: La tendencia es favorable.")
 
     # Botón de descarga PDF
-    school_name = st.session_state.get('filtro_entidad', 'Todos')
     period = st.session_state.get('filtro_mes', periodo_label)
     kpis = {
         'seguidores': {'valor': tot_seg, 'delta': delta_display},
@@ -795,7 +916,7 @@ def render(df=None):
                     hovertemplate="<b>%{x}</b><br>" +
                                  "Seguidores: %{y:,.0f}<br>" +
                                  "Porcentaje: %{customdata[0]}%<br>" +
-                                 "Tendencia vs mes anterior: %{customdata[1]}+%",
+                                 "Tendencia vs mes anterior: %{customdata[1]:+.1f}%<extra></extra>",
                     customdata=platform_data[["porcentaje", "tendencia"]].values,
                     showlegend=False
                 )
@@ -842,6 +963,16 @@ def render(df=None):
     tab_evo, tab_rank = st.tabs(["Evolución", "Ranking"])
 
     with tab_evo:
+        st.markdown("#### ⏱️ Comparativa temporal rápida")
+        evo_col1, evo_col2, evo_col3 = st.columns(3)
+        with evo_col1:
+            st.metric("Seguidores vs mes anterior", f"{tot_seg:,.0f}", f"{delta_seg:+.1f}%")
+        with evo_col2:
+            st.metric("Engagement vs mes anterior", f"{er_global:.2f}%", f"{delta_er:+.2f} pp")
+        with evo_col3:
+            status_label = "Óptimo" if health_score >= 80 else "Atención" if health_score < 60 else "Estable"
+            st.metric("Salud digital", f"{health_score:.0f}/100", status_label)
+
         # Área: evolución de seguidores por plataforma (usar df_full para mostrar tendencia completa)
         fig_area = None
         evolution_placeholder = st.empty()
@@ -936,6 +1067,34 @@ def render(df=None):
                                         hoverinfo="skip",
                                     )
                                 )
+
+                        for plat in df_evo["plataforma"].dropna().unique():
+                            dfp = df_evo[df_evo["plataforma"] == plat].sort_values("fecha")
+                            if dfp.empty:
+                                continue
+                            latest_point = dfp.iloc[-1]
+                            prev_value = dfp.iloc[-2]["seguidores"] if len(dfp) > 1 else 0
+                            delta_pct = ((latest_point["seguidores"] - prev_value) / prev_value * 100.0) if prev_value else 0.0
+                            is_anomaly = False
+                            if "anomalia_seguidores" in df_full.columns:
+                                latest_matches = df_full[
+                                    (df_full["plataforma"] == plat) & (df_full["fecha"] == latest_point["fecha"])
+                                ]
+                                is_anomaly = bool(latest_matches.get("anomalia_seguidores", pd.Series(False)).any())
+
+                            badge = "⚠️" if is_anomaly else ""
+                            fig_area.add_annotation(
+                                x=latest_point["fecha"],
+                                y=latest_point["seguidores"],
+                                text=f"{badge}{plat} {delta_pct:+.1f}%",
+                                showarrow=True,
+                                arrowhead=2,
+                                ax=35,
+                                ay=-25,
+                                bgcolor="rgba(255,255,255,0.9)",
+                                bordercolor="#D0D5DD",
+                                font={"size": 10, "color": "#101828"},
+                            )
 
                         evolution_placeholder.empty()  # Remover skeleton
                         st.plotly_chart(
@@ -1136,7 +1295,7 @@ def render(df=None):
             st.error(f"Error en gráfica de ranking: {str(e)}")
 
     # --- Ranking de Crecimiento de Seguidores ---
-    st.markdown("### � Top 15: Crecimiento de Seguidores por Institución")
+    st.markdown("### 🚀 Top 15: Crecimiento de Seguidores por Institución")
     st.markdown("*Comparación entre las últimas 2 mediciones disponibles*")
 
     try:

@@ -516,6 +516,20 @@ def _render_followers_evolution_comparison(
             line=dict(color="#ff7f0e", width=3),
             marker=dict(size=8),
         ))
+
+    summary_cols = st.columns(2)
+    if 'data_a_grouped' in locals() and not data_a_grouped.empty:
+        start_a = float(data_a_grouped.iloc[0]["seguidores"])
+        end_a = float(data_a_grouped.iloc[-1]["seguidores"])
+        delta_a = ((end_a - start_a) / start_a * 100.0) if start_a else 0.0
+        summary_cols[0].metric(f"🔵 {entity_a}", f"{end_a:,.0f}", f"{delta_a:+.1f}%")
+        fig.add_annotation(x=data_a_grouped.iloc[-1]["fecha"], y=end_a, text=f"{end_a:,.0f}", showarrow=False, yshift=12, font={"color": "#1f77b4"})
+    if 'data_b_grouped' in locals() and not data_b_grouped.empty:
+        start_b = float(data_b_grouped.iloc[0]["seguidores"])
+        end_b = float(data_b_grouped.iloc[-1]["seguidores"])
+        delta_b = ((end_b - start_b) / start_b * 100.0) if start_b else 0.0
+        summary_cols[1].metric(f"🟠 {entity_b}", f"{end_b:,.0f}", f"{delta_b:+.1f}%")
+        fig.add_annotation(x=data_b_grouped.iloc[-1]["fecha"], y=end_b, text=f"{end_b:,.0f}", showarrow=False, yshift=-14, font={"color": "#ff7f0e"})
     
     # Layout con formato de fechas en eje X
     fig.update_layout(
@@ -610,6 +624,20 @@ def _render_engagement_evolution_comparison(
             line=dict(color="#ff7f0e", width=3),
             marker=dict(size=8),
         ))
+
+    summary_cols = st.columns(2)
+    if 'data_a_grouped' in locals() and not data_a_grouped.empty:
+        start_a = float(data_a_grouped.iloc[0]["engagement_rate"])
+        end_a = float(data_a_grouped.iloc[-1]["engagement_rate"])
+        delta_a = end_a - start_a
+        summary_cols[0].metric(f"🔵 {entity_a}", f"{end_a:.2f}%", f"{delta_a:+.2f} pp")
+        fig.add_annotation(x=data_a_grouped.iloc[-1]["fecha"], y=end_a, text=f"{end_a:.2f}%", showarrow=False, yshift=12, font={"color": "#1f77b4"})
+    if 'data_b_grouped' in locals() and not data_b_grouped.empty:
+        start_b = float(data_b_grouped.iloc[0]["engagement_rate"])
+        end_b = float(data_b_grouped.iloc[-1]["engagement_rate"])
+        delta_b = end_b - start_b
+        summary_cols[1].metric(f"🟠 {entity_b}", f"{end_b:.2f}%", f"{delta_b:+.2f} pp")
+        fig.add_annotation(x=data_b_grouped.iloc[-1]["fecha"], y=end_b, text=f"{end_b:.2f}%", showarrow=False, yshift=-14, font={"color": "#ff7f0e"})
     
     # Layout con formato de fechas en eje X
     fig.update_layout(

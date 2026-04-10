@@ -246,10 +246,12 @@ def load_comments() -> pd.DataFrame:
         return pd.DataFrame(columns=COLS_COMENTARIOS)
 
 
+@st.cache_data(ttl=300)
 def load_configs() -> pd.DataFrame:
     """
     Carga configuraciones de metas desde Google Sheets.
     Aplica .fillna('') para prevenir NaN.
+    Se mantiene en caché para no ralentizar el dashboard en cada navegación.
     """
     try:
         from utils.sheets_connector import get_sheets_connection
