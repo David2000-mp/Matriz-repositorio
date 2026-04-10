@@ -198,13 +198,12 @@ def _load_data_impl() -> Tuple[pd.DataFrame, pd.DataFrame]:
     return cuentas_df, metricas_df
 
 
-@st.cache_data(ttl=15)
+@st.cache_data(ttl=300)
 def load_data() -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
-    Carga datos cacheados (15 segundos).
+    Carga datos cacheados (5 minutos).
     Retorna (cuentas_df, metricas_df) con IDs como strings.
-    TTL muy corto para reflejar cambios en Google Sheets casi inmediatamente.
-    El botón 'Refrescar' en dashboard limpia completamente el caché.
+    La frescura se controla con invalidación explícita al guardar o refrescar.
     """
     return _load_data_impl()
 def load_usernames_editados() -> pd.DataFrame:

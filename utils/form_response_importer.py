@@ -16,38 +16,58 @@ Responsabilidades:
 import pandas as pd
 import hashlib
 from datetime import datetime
-from typing import Tuple, Optional
+from typing import Optional, Tuple
+
+from utils.account_normalization import build_account_key, normalize_platform_name, normalize_social_user
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
 
 
 def _normalize_platform_name(platform: str) -> str:
-    """Normaliza nombres de plataforma a estándares."""
-    platform = platform.strip().lower()
-    mapping = {
-        'instagram': 'Instagram',
-        'facebook': 'Facebook',
-        'facebook page': 'Facebook',
-        'tiktok': 'TikTok',
-        'tik tok': 'TikTok',
-        'twitter': 'Twitter',
-        'x': 'X',
-        'linkedin': 'LinkedIn',
-        'youtube': 'YouTube',
-        'threads': 'Threads',
-        'bluesky': 'BlueSky',
-    }
-    return mapping.get(platform, platform.title())
+    """Compatibilidad interna: delega a la normalización compartida."""
+    return normalize_platform_name(platform)
+
+
+def _find_existing_account(cuentas_list: list[dict], entidad: str, plataforma: str, usuario_red: str):
+    """Busca coincidencias previas para no partir una misma cuenta en varios IDs."""
+    entidad_key = str(entidad or "").strip().lower()
+    plataforma_key = _normalize_platform_name(plataforma).strip().lower()
+    usuario_key = normalize_social_user(usuario_red, plataforma)
+
+    candidates = [
+        cuenta for cuenta in cuentas_list
+        if str(cuenta.get("entidad", "")).strip().lower() == entidad_key
+        and _normalize_platform_name(cuenta.get("plataforma", "")).strip().lower() == plataforma_key
+    ]
+
+    if not candidates:
+        return None
+
+    if usuario_key:
+        for cuenta in candidates:
+            if normalize_social_user(cuenta.get("usuario_red", ""), plataforma) == usuario_key:
+                return cuenta
+
+        blank_candidate = next(
+            (cuenta for cuenta in candidates if not normalize_social_user(cuenta.get("usuario_red", ""), plataforma)),
+            None,
+        )
+        if blank_candidate is not None:
+            return blank_candidate
+
+    if len(candidates) == 1:
+        return candidates[0]
+
+    return None
 
 
 def _generate_account_id(entidad: str, plataforma: str, usuario_red: str = "") -> str:
     """
     Genera un ID único y consistente para una cuenta.
-    Usa formato: entidad|plataforma|usuario_red
+    Usa una llave canónica para que variantes de URL no creen cuentas duplicadas.
     """
-    key = f"{entidad.strip()}|{plataforma.strip()}|{usuario_red.strip()}".lower()
-    # Crear hash corto pero único
+    key = build_account_key(entidad, plataforma, usuario_red)
     hash_obj = hashlib.md5(key.encode())
     short_hash = hash_obj.hexdigest()[:8]
     return f"form_{short_hash}"
@@ -71,6 +91,32 @@ def _parse_fecha(fecha_str: str) -> Optional[str]:
     # Fallback: usar fecha actual
     logger.warning(f"No se pudo parsear fecha '{fecha_str}', usando actual")
     return datetime.now().strftime("%Y-%m-%d")
+
+
+def _parse_numeric_value(raw_value, default: float = 0.0) -> float:
+    """Convierte textos numéricos flexibles como `0.49%`, `1,25` o `1 200` a float."""
+    if raw_value is None or pd.isna(raw_value):
+        return default
+
+    cleaned = str(raw_value).strip()
+    if not cleaned:
+        return default
+
+    cleaned = (
+        cleaned.replace('%', '')
+        .replace('\u00a0', '')
+        .replace(' ', '')
+        .replace(',', '.')
+    )
+
+    if cleaned.count('.') > 1:
+        parts = cleaned.split('.')
+        cleaned = ''.join(parts[:-1]) + '.' + parts[-1]
+
+    try:
+        return float(cleaned)
+    except (TypeError, ValueError):
+        return default
 
 
 def _calculate_interactions(engagement_rate: float, seguidores: int) -> int:
@@ -140,27 +186,14 @@ def import_form_responses(spreadsheet) -> Tuple[pd.DataFrame, pd.DataFrame]:
                 interacciones_str = row[8] if len(row) > 8 else ''
                 
                 # Normalizar valores
-                try:
-                    seguidores = int(float(str(seguidores_str).replace(',', '.').strip() or 0))
-                except:
-                    seguidores = 0
-                
-                try:
-                    engagement_rate = float(str(engagement_str).replace(',', '.').strip() or 0)
-                except:
-                    engagement_rate = 0
-                
-                try:
-                    alcance = int(float(str(alcance_str).replace(',', '.').strip() or 0))
-                except:
-                    alcance = 0
+                seguidores = int(_parse_numeric_value(seguidores_str, 0))
+                engagement_rate = _parse_numeric_value(engagement_str, 0.0)
+                alcance = int(_parse_numeric_value(alcance_str, 0))
                 
                 # Interacciones: usar valor ingresado o calcular desde engagement
                 if interacciones_str and str(interacciones_str).strip():
-                    try:
-                        interacciones = int(float(str(interacciones_str).replace(',', '.').strip()))
-                    except:
-                        interacciones = _calculate_interactions(engagement_rate, seguidores)
+                    parsed_interacciones = _parse_numeric_value(interacciones_str, -1)
+                    interacciones = int(parsed_interacciones) if parsed_interacciones >= 0 else _calculate_interactions(engagement_rate, seguidores)
                 else:
                     interacciones = _calculate_interactions(engagement_rate, seguidores)
                 
@@ -171,20 +204,21 @@ def import_form_responses(spreadsheet) -> Tuple[pd.DataFrame, pd.DataFrame]:
                 
                 # Normalizar plataforma
                 plataforma = _normalize_platform_name(plataforma)
-                
-                # Generar ID de cuenta
-                id_cuenta = _generate_account_id(entidad, plataforma, usuario_red)
-                
-                # Agregar a lista de cuentas (evitar duplicados con set)
-                cuenta_dict = {
-                    'id_cuenta': id_cuenta,
-                    'entidad': entidad,
-                    'plataforma': plataforma,
-                    'usuario_red': usuario_red,
-                }
-                
-                # Evitar duplicados: solo agregar si no existe con mismo id_cuenta
-                if not any(c['id_cuenta'] == id_cuenta for c in cuentas_list):
+
+                # Reutilizar cuenta existente si la URL cambió, trae query params o viene vacía
+                existing_account = _find_existing_account(cuentas_list, entidad, plataforma, usuario_red)
+                if existing_account is not None:
+                    id_cuenta = existing_account['id_cuenta']
+                    if usuario_red and not str(existing_account.get('usuario_red', '')).strip():
+                        existing_account['usuario_red'] = usuario_red
+                else:
+                    id_cuenta = _generate_account_id(entidad, plataforma, usuario_red)
+                    cuenta_dict = {
+                        'id_cuenta': id_cuenta,
+                        'entidad': entidad,
+                        'plataforma': plataforma,
+                        'usuario_red': usuario_red,
+                    }
                     cuentas_list.append(cuenta_dict)
                 
                 # Agregar a lista de métricas

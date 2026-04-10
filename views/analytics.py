@@ -16,6 +16,7 @@ from components import COLOR_MAP, PLOTLY_CONFIG
 from components.skeleton_loaders import show_chart_skeleton
 from utils.data_manager import get_reverse_lookup
 from utils.helpers import generate_social_url
+from utils.visualizations import sanitize_chart_dataframe
 
 
 def render(df=None):
@@ -28,23 +29,17 @@ def render(df=None):
 
     # Cargar datos usando data provider con force_reload para datos frescos
     if df is None:
-        # Progress bar con pasos para analytics
+        # Progress bar con pasos para analytics (usa caché compartido)
         progress_bar = st.progress(0)
         status = st.empty()
-        
-        status.text("📥 1/3: Cargando datos comparativos...")
-        progress_bar.progress(33)
-        import time
-        time.sleep(0.2)
-        
-        status.text("🔄 2/3: Procesando métricas...")
-        progress_bar.progress(66)
-        df = data_provider.get_merged_data(force_reload=True)
-        
-        status.text("✅ 3/3: Aplicando normalización...")
+
+        status.text("📥 1/2: Cargando datos comparativos...")
+        progress_bar.progress(45)
+
+        status.text("✅ 2/2: Aplicando normalización...")
         progress_bar.progress(100)
-        time.sleep(0.2)
-        
+        df = data_provider.get_merged_data(force_reload=False)
+
         # Limpiar progress bar
         progress_bar.empty()
         status.empty()
@@ -63,6 +58,13 @@ def render(df=None):
     if df.empty:
         st.warning("⚠️ Todos los registros fueron eliminados al limpiar datos vacíos. Intenta con otros filtros.")
         return
+
+    df = sanitize_chart_dataframe(
+        df,
+        date_cols=["fecha"],
+        numeric_cols=["seguidores", "alcance", "interacciones", "likes_promedio"],
+        percent_cols=["engagement_rate"],
+    )
 
     tab_dist, tab_perf, tab_cuenta, tab_avanzadas = st.tabs(["Distribución", "Rendimiento", "Vista por Cuenta", "Visualizaciones Avanzadas"])
 
@@ -87,14 +89,30 @@ def render(df=None):
                         pie_placeholder.empty()
                         st.error("Plotly no está disponible. Instala `plotly` para ver gráficos.")
                     else:
-                        fig = px.pie(df_plat, names="plataforma", values="seguidores", color="plataforma", color_discrete_map=COLOR_MAP)
+                        total_followers = int(df_plat["seguidores"].sum())
+                        fig = px.pie(
+                            df_plat,
+                            names="plataforma",
+                            values="seguidores",
+                            color="plataforma",
+                            color_discrete_map=COLOR_MAP,
+                            hole=0.45,
+                            title="Distribución de Seguidores por Plataforma",
+                        )
                         fig.update_traces(
                             textposition="inside",
                             textinfo="percent+label",
                             textfont={"color": "#000000"},
                         )
+                        fig.add_annotation(
+                            text=f"<b>{total_followers:,}</b><br>seguidores",
+                            x=0.5,
+                            y=0.5,
+                            showarrow=False,
+                            font={"size": 16, "color": "#003696"},
+                        )
                         fig.update_layout(
-                            margin=dict(t=30, b=10),
+                            margin=dict(t=50, b=10),
                             paper_bgcolor="white",
                             plot_bgcolor="white",
                             font={"color": "#000000"},
@@ -177,6 +195,42 @@ def render(df=None):
                         )
                         bar_placeholder.empty()  # Remover skeleton
                         st.plotly_chart(fig2, width='stretch', config=PLOTLY_CONFIG)
+
+                        stacked_df = (
+                            df[df['entidad'].notna() & (df['entidad'] != '')]
+                            .groupby(['entidad', 'plataforma'], dropna=False)['seguidores']
+                            .sum()
+                            .reset_index()
+                        )
+                        top_entities = (
+                            stacked_df.groupby('entidad')['seguidores']
+                            .sum()
+                            .sort_values(ascending=False)
+                            .head(8)
+                            .index
+                        )
+                        stacked_df = stacked_df[stacked_df['entidad'].isin(top_entities)]
+
+                        if not stacked_df.empty:
+                            st.markdown("#### 📚 Composición por plataforma (Top instituciones)")
+                            fig_stack = px.bar(
+                                stacked_df,
+                                x='entidad',
+                                y='seguidores',
+                                color='plataforma',
+                                barmode='stack',
+                                color_discrete_map=COLOR_MAP,
+                                title='Seguidores totales por institución y plataforma',
+                            )
+                            fig_stack.update_layout(
+                                paper_bgcolor='white',
+                                plot_bgcolor='white',
+                                font={'color': '#000000'},
+                                xaxis={'tickangle': -25, 'color': '#000000'},
+                                yaxis={'gridcolor': '#E0E0E0', 'color': '#000000'},
+                                hoverlabel={'font': {'color': '#000000'}, 'bgcolor': '#FFFFFF', 'bordercolor': '#003696'},
+                            )
+                            st.plotly_chart(fig_stack, width='stretch', config=PLOTLY_CONFIG)
                         
                         # Botones de exportación
                         col1, col2 = st.columns(2)
@@ -420,59 +474,147 @@ def render(df=None):
 
     with tab_avanzadas:
         st.subheader("Visualizaciones Avanzadas")
-        
+
         # Scatter Plot: Engagement vs Seguidores
-        if 'engagement_rate' in df.columns and 'seguidores' in df.columns:
+        if px is not None and 'engagement_rate' in df.columns and 'seguidores' in df.columns:
             st.markdown("### 📊 Scatter Plot: Engagement vs Seguidores")
-            fig_scatter = px.scatter(df, x='seguidores', y='engagement_rate', color='plataforma', hover_data=['entidad', 'usuario_red'])
-            st.plotly_chart(fig_scatter, config=PLOTLY_CONFIG)
+            scatter_kwargs = {
+                "data_frame": df,
+                "x": "seguidores",
+                "y": "engagement_rate",
+                "color": "plataforma",
+                "hover_data": ["entidad", "usuario_red"],
+                "opacity": 0.8,
+                "title": "Relación entre tamaño de audiencia y engagement",
+            }
+            if 'interacciones' in df.columns:
+                scatter_kwargs["size"] = "interacciones"
+                scatter_kwargs["size_max"] = 22
+
+            fig_scatter = px.scatter(**scatter_kwargs)
+            fig_scatter.update_yaxes(title="Engagement (%)", ticksuffix="%")
+            fig_scatter.update_layout(
+                paper_bgcolor="white",
+                plot_bgcolor="white",
+                font={"color": "#000000"},
+                hoverlabel={"font": {"color": "#000000"}, "bgcolor": "#FFFFFF", "bordercolor": "#003696"},
+            )
+            st.plotly_chart(fig_scatter, width='stretch', config=PLOTLY_CONFIG)
         else:
             st.warning("Datos insuficientes para scatter plot.")
-        
+
         # Heatmap de correlación
         numeric_cols = ['seguidores', 'engagement_rate', 'alcance', 'interacciones', 'likes_promedio']
         available_cols = [col for col in numeric_cols if col in df.columns]
-        if len(available_cols) > 1:
+        if px is not None and len(available_cols) > 1:
             st.markdown("### 🔥 Heatmap: Matriz de Correlación")
-            corr_matrix = df[available_cols].corr()
-            fig_heatmap = px.imshow(corr_matrix, text_auto=True, aspect="auto")
-            st.plotly_chart(fig_heatmap, config=PLOTLY_CONFIG)
+            corr_matrix = df[available_cols].corr(numeric_only=True)
+            fig_heatmap = px.imshow(
+                corr_matrix,
+                text_auto='.2f',
+                aspect="auto",
+                color_continuous_scale="Blues",
+                title="Correlación entre métricas clave",
+            )
+            st.plotly_chart(fig_heatmap, width='stretch', config=PLOTLY_CONFIG)
         else:
             st.warning("Datos insuficientes para heatmap.")
-        
+
+        if px is not None and {'entidad', 'plataforma', 'seguidores'}.issubset(df.columns):
+            st.markdown("### 🌳 Treemap: Peso por Institución y Plataforma")
+            treemap_df = (
+                df.groupby(['entidad', 'plataforma'], dropna=False)
+                .agg(
+                    seguidores=('seguidores', 'sum'),
+                    engagement_rate=('engagement_rate', 'mean'),
+                )
+                .reset_index()
+            )
+            treemap_df = treemap_df[treemap_df['seguidores'] > 0]
+
+            if not treemap_df.empty:
+                fig_treemap = px.treemap(
+                    treemap_df,
+                    path=[px.Constant('Red Marista'), 'entidad', 'plataforma'],
+                    values='seguidores',
+                    color='engagement_rate',
+                    color_continuous_scale='Blues',
+                    hover_data={'seguidores': ':,.0f', 'engagement_rate': ':.2f'},
+                    title='Distribución jerárquica de seguidores',
+                )
+                fig_treemap.update_layout(margin=dict(t=50, l=10, r=10, b=10))
+                st.plotly_chart(fig_treemap, width='stretch', config=PLOTLY_CONFIG)
+
+        distribution_col1, distribution_col2 = st.columns(2)
+        with distribution_col1:
+            if px is not None and 'engagement_rate' in df.columns:
+                st.markdown("### 📦 Box Plot: Distribución de Engagement")
+                box_df = df[df['engagement_rate'] > 0].copy()
+                if not box_df.empty:
+                    fig_box = px.box(
+                        box_df,
+                        x='plataforma',
+                        y='engagement_rate',
+                        color='plataforma',
+                        color_discrete_map=COLOR_MAP,
+                        points='outliers',
+                        title='Variabilidad del engagement por plataforma',
+                    )
+                    fig_box.update_yaxes(ticksuffix='%')
+                    fig_box.update_layout(paper_bgcolor='white', plot_bgcolor='white', font={'color': '#000000'})
+                    st.plotly_chart(fig_box, width='stretch', config=PLOTLY_CONFIG)
+
+        with distribution_col2:
+            if px is not None and 'engagement_rate' in df.columns:
+                st.markdown("### 📚 Histograma: Frecuencia de Engagement")
+                hist_df = df[df['engagement_rate'] > 0].copy()
+                if not hist_df.empty:
+                    fig_hist = px.histogram(
+                        hist_df,
+                        x='engagement_rate',
+                        color='plataforma',
+                        nbins=20,
+                        opacity=0.8,
+                        barmode='overlay',
+                        color_discrete_map=COLOR_MAP,
+                        title='Frecuencia de rangos de engagement',
+                    )
+                    fig_hist.update_xaxes(title='Engagement (%)', ticksuffix='%')
+                    fig_hist.update_layout(paper_bgcolor='white', plot_bgcolor='white', font={'color': '#000000'})
+                    st.plotly_chart(fig_hist, width='stretch', config=PLOTLY_CONFIG)
+
         # Radar Chart: Promedios por Plataforma
         st.markdown("### 🕸️ Radar Chart: Promedios por Plataforma")
-        if go is not None and not df.empty:
-            # Calcular promedios por plataforma para métricas disponibles
+        if go is not None and not df.empty and available_cols:
             radar_data = {}
             for col in available_cols:
-                platform_avg = df.groupby('plataforma')[col].mean()
-                radar_data[col] = platform_avg
-            
-            # Crear radar chart
+                radar_data[col] = df.groupby('plataforma')[col].mean()
+
             fig_radar = go.Figure()
-            for platform in df['plataforma'].unique():
+            max_radar_value = 0.0
+            for platform in df['plataforma'].dropna().unique():
                 values = []
                 for col in available_cols:
-                    if platform in radar_data[col].index:
-                        values.append(radar_data[col][platform])
-                    else:
-                        values.append(0)
-                
+                    value = float(radar_data[col].get(platform, 0) or 0)
+                    values.append(value)
+                    max_radar_value = max(max_radar_value, value)
+
                 fig_radar.add_trace(go.Scatterpolar(
                     r=values,
                     theta=available_cols,
                     fill='toself',
                     name=platform
                 ))
-            
+
             fig_radar.update_layout(
                 polar=dict(
-                    radialaxis=dict(visible=True, range=[0, None])
+                    radialaxis=dict(visible=True, range=[0, max(max_radar_value * 1.15, 1)])
                 ),
-                showlegend=True
+                showlegend=True,
+                paper_bgcolor='white',
+                font={"color": "#000000"},
             )
-            st.plotly_chart(fig_radar, config=PLOTLY_CONFIG)
+            st.plotly_chart(fig_radar, width='stretch', config=PLOTLY_CONFIG)
         else:
             st.warning("Datos insuficientes para radar chart.")
 

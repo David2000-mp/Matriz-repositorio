@@ -9,6 +9,13 @@ from datetime import datetime
 from pathlib import Path
 import json
 import logging
+try:
+    import plotly.express as px
+    import plotly.graph_objects as go
+except Exception:
+    px = None
+    go = None
+from components import COLOR_MAP, PLOTLY_CONFIG
 from utils.report_generator import generate_engagement_report_html
 from utils.rules_engine import calculate_engagement_engine
 from utils.content_analyzer import (
@@ -228,6 +235,98 @@ def apply_pending_draft_restore(state=None) -> bool:
 
     del target_state["wizard_restore_pending"]
     return _restore_draft_to_session(pending, state=target_state)
+
+
+def _render_plotly_bar_chart(
+    chart_df: pd.DataFrame,
+    *,
+    category_col: str,
+    value_col: str,
+    title: str,
+    value_suffix: str = "",
+) -> None:
+    """Renderiza barras estilo dashboard con fallback a `st.bar_chart`."""
+    if chart_df is None or chart_df.empty:
+        st.info("Sin datos suficientes para esta visualización.")
+        return
+
+    safe_df = chart_df.copy()
+    safe_df[category_col] = safe_df[category_col].astype(str)
+    safe_df[value_col] = pd.to_numeric(safe_df[value_col], errors="coerce").fillna(0)
+    safe_df = safe_df.sort_values(value_col, ascending=False)
+
+    if px is None:
+        st.bar_chart(safe_df.set_index(category_col)[value_col])
+        return
+
+    fig = px.bar(
+        safe_df,
+        x=category_col,
+        y=value_col,
+        color=category_col,
+        text=value_col,
+        color_discrete_sequence=list(COLOR_MAP.values()),
+        title=title,
+    )
+    text_template = "%{text:,.0f}" if not value_suffix else "%{text:.2f}" + value_suffix
+    hover_template = (
+        f"<b>%{{x}}</b><br>{value_col}: %{{y:.2f}}{value_suffix}<extra></extra>"
+        if value_suffix
+        else f"<b>%{{x}}</b><br>{value_col}: %{{y:,.0f}}<extra></extra>"
+    )
+    fig.update_traces(texttemplate=text_template, textposition="outside", hovertemplate=hover_template)
+    fig.update_layout(
+        showlegend=False,
+        paper_bgcolor="white",
+        plot_bgcolor="white",
+        font={"color": "#000000"},
+        title_font={"color": "#000000"},
+        hoverlabel={"font": {"color": "#000000"}, "bgcolor": "#FFFFFF", "bordercolor": "#003696"},
+        xaxis={"color": "#000000", "tickfont": {"color": "#000000"}},
+        yaxis={"color": "#000000", "gridcolor": "#E0E0E0", "tickfont": {"color": "#000000"}},
+        margin=dict(t=60, r=10, b=10, l=10),
+    )
+    if value_suffix:
+        fig.update_yaxes(ticksuffix=value_suffix)
+
+    st.plotly_chart(fig, width='stretch', config=PLOTLY_CONFIG)
+
+
+def _render_engagement_gauge(platform: str, engagement_value: float, thresholds: dict) -> None:
+    """Muestra un indicador tipo gauge para el engagement actual."""
+    if go is None:
+        st.metric("Engagement actual", f"{engagement_value:.2f}%")
+        return
+
+    low_value = float(thresholds.get("bajo", 0.0) or 0.0)
+    mid_value = float(thresholds.get("aceptable", thresholds.get("promedio", low_value)) or low_value)
+    good_value = float(thresholds.get("bueno", mid_value) or mid_value)
+    gauge_max = max(good_value * 1.6, engagement_value * 1.15, 5.0)
+
+    fig = go.Figure(
+        go.Indicator(
+            mode="gauge+number",
+            value=float(engagement_value),
+            number={"suffix": "%", "font": {"size": 28, "color": "#003696"}},
+            title={"text": f"Salud de engagement · {platform.title()}"},
+            gauge={
+                "axis": {"range": [0, gauge_max], "tickcolor": "#000000"},
+                "bar": {"color": "#003696"},
+                "steps": [
+                    {"range": [0, max(low_value, 0.01)], "color": "#FEE4E2"},
+                    {"range": [low_value, max(mid_value, low_value + 0.01)], "color": "#FFF6E0"},
+                    {"range": [mid_value, gauge_max], "color": "#E7F6EC"},
+                ],
+                "threshold": {
+                    "line": {"color": "#0A7D35", "width": 4},
+                    "thickness": 0.8,
+                    "value": good_value,
+                },
+            },
+        )
+    )
+    fig.update_layout(height=280, margin=dict(t=60, r=20, b=20, l=20), paper_bgcolor="white", font={"color": "#000000"})
+    st.plotly_chart(fig, width='stretch', config=PLOTLY_CONFIG)
 
 
 # ============================================================================
@@ -1166,6 +1265,7 @@ def calculate_and_render_results():
             days = max((max(valid_dates) - min(valid_dates)).days + 1, 1)
     
     # Engagement general de la cuenta
+    # Regla metodológica oficial: total interactions = likes + comments + shares
     engagement_pct = (total_interactions / followers) * 100
     # Engagement por post (comunidad): (Promedio interacciones / Seguidores) * 100
     avg_interactions = total_interactions / max(num_posts, 1)
@@ -1514,23 +1614,46 @@ def calculate_and_render_results():
                 f"{float(best_cat['er_promedio']):.2f}% de ER promedio (n={int(best_cat['posts'])})."
             )
 
-        st.markdown("#### 📊 Visual rápido del rendimiento")
-        visual_col1, visual_col2 = st.columns(2)
+        st.markdown("#### 📊 Panel visual del rendimiento")
         chart_source = pd.DataFrame(content_df)
+
+        visual_col1, visual_col2 = st.columns([1, 1.35])
         with visual_col1:
+            _render_engagement_gauge(platform, engagement_pct, thresholds)
+
+        with visual_col2:
             er_chart = chart_source[["Tipo", "Engagement x Post"]].copy()
             er_chart["Engagement x Post"] = er_chart["Engagement x Post"].str.rstrip("%").astype(float)
-            st.caption("ER promedio por tipo")
-            st.bar_chart(er_chart.set_index("Tipo"))
-        with visual_col2:
+            _render_plotly_bar_chart(
+                er_chart,
+                category_col="Tipo",
+                value_col="Engagement x Post",
+                title="ER promedio por tipo de contenido",
+                value_suffix="%",
+            )
+
+        detail_col1, detail_col2 = st.columns(2)
+        with detail_col1:
             if category_signal.get("has_signal"):
                 cat_chart = category_signal["table"][["categoria", "er_promedio"]].copy()
-                st.caption("ER promedio por categoría")
-                st.bar_chart(cat_chart.set_index("categoria"))
+                _render_plotly_bar_chart(
+                    cat_chart,
+                    category_col="categoria",
+                    value_col="er_promedio",
+                    title="ER promedio por categoría",
+                    value_suffix="%",
+                )
             else:
-                inter_chart = chart_source[["Tipo", "Total Interacciones"]].copy()
-                st.caption("Interacciones por tipo")
-                st.bar_chart(inter_chart.set_index("Tipo"))
+                st.info("Agrega más categorías para desbloquear el ranking por categoría.")
+
+        with detail_col2:
+            inter_chart = chart_source[["Tipo", "Total Interacciones"]].copy()
+            _render_plotly_bar_chart(
+                inter_chart,
+                category_col="Tipo",
+                value_col="Total Interacciones",
+                title="Interacciones totales por tipo",
+            )
 
         ranking_df = pd.DataFrame(analyzed_posts).copy()
         if not ranking_df.empty:

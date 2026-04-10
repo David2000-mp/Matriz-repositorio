@@ -12,12 +12,17 @@ if not df_metricas.empty:
     # Hacer merge con cuentas para obtener información de plataforma
     df_merged = pd.merge(df_metricas, df_cuentas, on='id_cuenta', how='left')
     
-    # Datos del mes actual
+    # Datos del último mes disponible para no depender del calendario real
     df_merged['fecha'] = pd.to_datetime(df_merged['fecha'], errors='coerce')
-    current_month = pd.Timestamp.now().replace(day=1)
-    df_current = df_merged[df_merged['fecha'].dt.to_period('M') == current_month.to_period('M')]
+    available_periods = df_merged['fecha'].dropna().dt.to_period('M')
+    latest_period = available_periods.max() if not available_periods.empty else None
+    df_current = (
+        df_merged[df_merged['fecha'].dt.to_period('M') == latest_period].copy()
+        if latest_period is not None
+        else pd.DataFrame()
+    )
 
-    print(f'Datos del mes actual: {len(df_current)} filas')
+    print(f'Datos del último mes disponible ({latest_period}): {len(df_current)} filas')
 
     if not df_current.empty:
         # Convertir engagement_rate a numérico antes de agrupar

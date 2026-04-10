@@ -177,8 +177,15 @@ class DataProvider:
             numeric_columns = ['seguidores', 'alcance', 'interacciones', 'likes_promedio', 'engagement_rate']
             for col in numeric_columns:
                 if col in df_merged.columns:
-                    # Convertir strings con coma decimal (formato europeo) a punto decimal
-                    df_merged[col] = df_merged[col].astype(str).str.replace(',', '.', regex=False)
+                    # Convertir strings con `%` o coma decimal a formato numérico legible
+                    df_merged[col] = (
+                        df_merged[col]
+                        .astype(str)
+                        .str.replace('%', '', regex=False)
+                        .str.replace('\u00a0', '', regex=False)
+                        .str.replace(' ', '', regex=False)
+                        .str.replace(',', '.', regex=False)
+                    )
                     df_merged[col] = pd.to_numeric(df_merged[col], errors='coerce').fillna(0)
 
             # Consolidar: mantener solo el último registro por cuenta y mes para evitar duplicados

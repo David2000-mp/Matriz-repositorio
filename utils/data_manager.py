@@ -25,6 +25,8 @@ import hashlib
 import os
 from google.oauth2.service_account import Credentials
 from typing import Dict, Tuple
+
+from utils.account_normalization import build_account_key, normalize_platform_name, normalize_social_user
 from utils import catalog as catalog
 from utils.logger import get_logger
 from utils.data_loader import DATA_DIR
@@ -252,15 +254,24 @@ def get_id(entidad: str, plataforma: str, usuario: str, **kwargs) -> str:
     if isinstance(df_cuentas_cache, pd.DataFrame) and not df_cuentas_cache.empty:
         required_cols = {"id_cuenta", "entidad", "plataforma", "usuario_red"}
         if required_cols.issubset(set(df_cuentas_cache.columns)):
-            match = df_cuentas_cache[
-                (df_cuentas_cache["entidad"].astype(str).str.strip().str.lower() == str(entidad).strip().lower())
-                & (df_cuentas_cache["plataforma"].astype(str).str.strip().str.lower() == str(plataforma).strip().lower())
-                & (df_cuentas_cache["usuario_red"].astype(str).str.strip().str.lower() == str(usuario).strip().lower())
+            entidad_key = str(entidad).strip().lower()
+            plataforma_key = normalize_platform_name(plataforma).strip().lower()
+            usuario_key = normalize_social_user(usuario, plataforma)
+
+            cuentas_norm = df_cuentas_cache.copy()
+            cuentas_norm["entidad_key"] = cuentas_norm["entidad"].astype(str).str.strip().str.lower()
+            cuentas_norm["plataforma_key"] = cuentas_norm["plataforma"].apply(normalize_platform_name).astype(str).str.strip().str.lower()
+            cuentas_norm["usuario_key"] = cuentas_norm["usuario_red"].apply(lambda value: normalize_social_user(value, plataforma))
+
+            match = cuentas_norm[
+                (cuentas_norm["entidad_key"] == entidad_key)
+                & (cuentas_norm["plataforma_key"] == plataforma_key)
+                & (cuentas_norm["usuario_key"] == usuario_key)
             ]
             if not match.empty:
                 return str(match.iloc[0]["id_cuenta"])
 
-    base = f"{str(entidad).strip().lower()}|{str(plataforma).strip().lower()}|{str(usuario).strip().lower()}"
+    base = build_account_key(entidad, plataforma, usuario)
     return hashlib.md5(base.encode("utf-8")).hexdigest()[:8]
 
 

@@ -52,9 +52,9 @@ def check_registro_existente(entidad: str, plataforma: str, fecha: date) -> bool
         bool: True si existe registro en ese período, False en caso contrario
     """
     try:
-        # Obtener datos sin caché para información fresca
-        _, df_metricas = data_provider.get_data(force_reload=True)
-        
+        # Obtener datos usando caché compartido; la vista invalida caché tras guardar
+        df_metricas = data_provider.get_merged_data(force_reload=False)
+
         if df_metricas.empty:
             return False
         
@@ -99,7 +99,7 @@ def render(df=None):
 
     # Calcular datos faltantes
     try:
-        df_full = data_provider.get_merged_data(force_reload=True)
+        df_full = data_provider.get_merged_data(force_reload=False)
         if not df_full.empty:
             pending_report = get_monthly_pending_institutions(df_full, min_platforms=2)
             summary = pending_report.get("summary", {})

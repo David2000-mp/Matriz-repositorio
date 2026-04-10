@@ -18,6 +18,8 @@ import pandas as pd
 import hashlib
 from datetime import datetime
 from pathlib import Path
+
+from utils.account_normalization import build_account_key, normalize_platform_name, normalize_social_user
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -36,15 +38,8 @@ def get_id(entidad, plataforma, usuario, df_cuentas_cache=None, **kwargs) -> str
     Busca el ID existente en df_cuentas_cache (case-insensitive) o genera uno nuevo si no existe.
     """
     u_entidad = str(entidad).strip().lower()
-    u_plataforma = str(plataforma).strip().lower()
-    u_usuario = str(usuario).strip()
-    if u_usuario.startswith(('http://', 'https://')):
-        parts = u_usuario.rstrip('/').split('/')
-        if len(parts) > 0:
-            u_usuario = parts[-1]
-    if u_usuario.startswith('@'):
-        u_usuario = u_usuario[1:]
-    u_usuario = u_usuario.lower().strip()
+    u_plataforma = normalize_platform_name(plataforma).strip().lower()
+    u_usuario = normalize_social_user(usuario, plataforma)
 
     cuentas_df = None
     if df_cuentas_cache is not None:
@@ -64,12 +59,13 @@ def get_id(entidad, plataforma, usuario, df_cuentas_cache=None, **kwargs) -> str
         # Check required columns exist
         required_cols = ["entidad", "plataforma", "usuario_red"]
         if all(col in cuentas_norm.columns for col in required_cols):
-            for col in required_cols:
-                cuentas_norm[col] = cuentas_norm[col].astype(str).str.strip().str.lower()
+            cuentas_norm["entidad"] = cuentas_norm["entidad"].astype(str).str.strip().str.lower()
+            cuentas_norm["plataforma_key"] = cuentas_norm["plataforma"].apply(normalize_platform_name).astype(str).str.strip().str.lower()
+            cuentas_norm["usuario_key"] = cuentas_norm["usuario_red"].apply(lambda value: normalize_social_user(value, plataforma))
             mask = (
                 (cuentas_norm["entidad"] == u_entidad) &
-                (cuentas_norm["plataforma"] == u_plataforma) &
-                (cuentas_norm["usuario_red"].str.lstrip('@') == u_usuario)
+                (cuentas_norm["plataforma_key"] == u_plataforma) &
+                (cuentas_norm["usuario_key"] == u_usuario)
             )
             match = cuentas_norm[mask]
             if not match.empty:
@@ -77,7 +73,7 @@ def get_id(entidad, plataforma, usuario, df_cuentas_cache=None, **kwargs) -> str
         else:
             logger.warning(f"DataFrame de cuentas no tiene columnas requeridas: {required_cols}")
 
-    unique_str = f"{u_entidad}|{u_plataforma}|{u_usuario}"
+    unique_str = build_account_key(entidad, plataforma, usuario)
     hash_id = hashlib.md5(unique_str.encode()).hexdigest()[:8]
     return str(hash_id)
 

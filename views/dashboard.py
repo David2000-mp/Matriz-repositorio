@@ -18,7 +18,7 @@ from utils import (
     COLEGIOS_MARISTAS,
 )
 from utils.data_provider import data_provider
-from utils.visualizations import plot_engagement_evolution
+from utils.visualizations import plot_engagement_evolution, sanitize_chart_dataframe
 from utils.data_manager import load_configs
 from components import COLOR_MAP, inject_custom_css, configure_plotly_theme
 from utils.analytics import (
@@ -174,27 +174,20 @@ def render(df=None):
     st.title("Dashboard Global")
     # Cargar datos usando data provider si no se proporcionaron
     if df is None:
-        # Progress bar con pasos
+        # Progress bar con pasos (usa caché compartido; sin recarga forzada)
         progress_bar = st.progress(0)
         status = st.empty()
-        
-        status.text("📥 1/4: Cargando cuentas desde Google Sheets...")
-        progress_bar.progress(25)
-        cuentas, metricas = data_provider.get_data(force_reload=True)
-        
-        status.text("🔄 2/4: Consolidando datos...")
-        progress_bar.progress(50)
-        import time
-        time.sleep(0.3)  # Breve pausa para visualización
-        
-        status.text("🧹 3/4: Normalizando columnas...")
-        progress_bar.progress(75)
-        df = data_provider.get_merged_data(force_reload=True)
-        
-        status.text("✅ 4/4: Aplicando filtros...")
+
+        status.text("📥 1/3: Recuperando datos cacheados...")
+        progress_bar.progress(35)
+
+        status.text("🔄 2/3: Consolidando métricas...")
+        progress_bar.progress(70)
+        df = data_provider.get_merged_data(force_reload=False)
+
+        status.text("✅ 3/3: Aplicando filtros...")
         progress_bar.progress(100)
-        time.sleep(0.2)
-        
+
         # Limpiar progress bar
         progress_bar.empty()
         status.empty()
@@ -228,11 +221,15 @@ def render(df=None):
         # Trabajaremos con dos vistas internas:
         # - df_full: todo el histórico recibido (p. ej. filtrado por entidad si aplica)
         # - df_m_month: datos limitados al mes seleccionado (usado para KPIs y ranking)
-        df_full = df.copy()
+        df_full = sanitize_chart_dataframe(
+            df.copy(),
+            date_cols=["fecha"],
+            numeric_cols=["seguidores", "alcance", "interacciones", "likes_promedio"],
+            percent_cols=["engagement_rate"],
+        )
 
         # Asegurar tipos antes de cualquier cálculo
         if "fecha" in df_full.columns:
-            df_full["fecha"] = pd.to_datetime(df_full["fecha"], errors="coerce")
             # Eliminar filas con fechas inválidas para evitar errores en .dt.strftime
             df_full = df_full.dropna(subset=['fecha'])
             # Consolidar: mantener solo último registro por cuenta y mes para evitar doble conteo
@@ -1072,10 +1069,28 @@ def render(df=None):
                                 barmode='group',
                                 labels={'engagement_rate': 'Engagement Rate (%)', 'entidad': 'Institución'},
                             )
+
+                            benchmark_map = (
+                                resumen_engagement.groupby('plataforma')['engagement_rate']
+                                .mean()
+                                .sort_values(ascending=False)
+                                .to_dict()
+                            )
+                            for plataforma, benchmark in benchmark_map.items():
+                                fig_engagement.add_vline(
+                                    x=float(benchmark),
+                                    line_dash='dot',
+                                    line_width=2,
+                                    line_color=COLOR_MAP.get(plataforma, '#98A2B3'),
+                                    opacity=0.7,
+                                    annotation_text=f"Bench {plataforma}: {benchmark:.2f}%",
+                                    annotation_position='top',
+                                )
                             
                             fig_engagement.update_traces(
                                 texttemplate='%{x:.2f}%',
-                                textposition='outside'
+                                textposition='outside',
+                                hovertemplate='<b>%{y}</b><br>%{fullData.name}<br>ER: %{x:.2f}%<extra></extra>'
                             )
                             
                             fig_engagement.update_layout(
@@ -1105,6 +1120,11 @@ def render(df=None):
                                 fig_engagement,
                                 width='stretch',
                                 config=PLOTLY_CONFIG,
+                            )
+                            st.caption(
+                                "Benchmarks por plataforma: " + ", ".join(
+                                    f"{plataforma} {benchmark:.2f}%" for plataforma, benchmark in benchmark_map.items()
+                                )
                             )
                 except Exception as e:
                     engagement_placeholder.empty()
