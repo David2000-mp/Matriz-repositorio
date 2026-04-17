@@ -353,10 +353,32 @@ def _render_entity_kpis(data: pd.DataFrame, color: str = "#1f77b4"):
         st.metric("Total Interacciones", "0", delta=None)
         return
     
-    # CORRECCIÓN CRÍTICA: Usar max() en lugar de sum() para seguidores
-    # Anteriormente sumaba valores acumulados inflando los totales
-    # Ahora toma el último valor disponible para total actual
-    total_followers = data["seguidores"].max() if "seguidores" in data.columns else 0
+    # Seguidores totales: sumar todas las plataformas en su valor más reciente
+    total_followers = 0
+    if "seguidores" in data.columns and not data.empty:
+        followers_df = data.copy()
+        if "fecha" in followers_df.columns:
+            followers_df["fecha"] = pd.to_datetime(followers_df["fecha"], errors="coerce")
+        if "id_cuenta" in followers_df.columns and "fecha" in followers_df.columns:
+            latest_rows = (
+                followers_df.sort_values("fecha")
+                .dropna(subset=["seguidores"])
+                .groupby("id_cuenta", as_index=False)
+                .tail(1)
+            )
+            total_followers = float(latest_rows["seguidores"].sum()) if not latest_rows.empty else 0
+        elif "plataforma" in followers_df.columns and "fecha" in followers_df.columns:
+            latest_rows = (
+                followers_df.sort_values("fecha")
+                .dropna(subset=["seguidores"])
+                .groupby("plataforma", as_index=False)
+                .tail(1)
+            )
+            total_followers = float(latest_rows["seguidores"].sum()) if not latest_rows.empty else 0
+        elif "plataforma" in followers_df.columns:
+            total_followers = float(followers_df.groupby("plataforma")["seguidores"].max().sum())
+        else:
+            total_followers = float(followers_df["seguidores"].max())
     
     # Calcular interacciones: usar columna interacciones si existe, sino estimar
     if "interacciones" in data.columns:
@@ -429,7 +451,7 @@ def _render_entity_kpis(data: pd.DataFrame, color: str = "#1f77b4"):
         # Agrupar por plataforma solo con columnas disponibles para evitar errores
         agg_dict = {"seguidores": "max"}
         if "interacciones" in data.columns:
-            agg_dict["interacciones"] = "sum"
+            agg_dict["interacciones"] = "mean"
         if "engagement_rate" in data.columns:
             agg_dict["engagement_rate"] = "mean"
 
@@ -448,8 +470,10 @@ def _render_entity_kpis(data: pd.DataFrame, color: str = "#1f77b4"):
                 platform_engagement = row.get("engagement_rate", 0)
                 platform_interactions = (platform_engagement / 100) * platform_followers
             
-            # Calcular engagement ponderado por plataforma
-            platform_engagement_weighted = (platform_interactions / platform_followers * 100) if platform_followers > 0 else 0
+            # Engagement por plataforma: siempre promedio (no suma)
+            platform_engagement_weighted = row.get("engagement_rate", 0)
+            if pd.isna(platform_engagement_weighted):
+                platform_engagement_weighted = 0
             
             # Verificar estado por plataforma
             platform_status = get_engagement_status(platform_interactions, platform_followers)
@@ -949,23 +973,67 @@ def _render_benchmark_comparison(state, df: pd.DataFrame, selected_platform: str
     # ---- KPIs comparativos ----
     st.markdown("### 📈 Métricas Clave vs Promedio Red")
 
-    # Valores actuales de la entidad
-    entity_followers = data_entity["seguidores"].max() if "seguidores" in data_entity.columns else 0
+    # Valores actuales de la entidad (consolidando todas las plataformas)
+    entity_followers = 0.0
+    if "seguidores" in data_entity.columns and not data_entity.empty:
+        entity_work = data_entity.copy()
+        if "fecha" in entity_work.columns:
+            entity_work["fecha"] = pd.to_datetime(entity_work["fecha"], errors="coerce")
+        if "id_cuenta" in entity_work.columns and "fecha" in entity_work.columns:
+            latest_entity_rows = (
+                entity_work.sort_values("fecha")
+                .dropna(subset=["seguidores"])
+                .groupby("id_cuenta", as_index=False)
+                .tail(1)
+            )
+            entity_followers = float(latest_entity_rows["seguidores"].sum()) if not latest_entity_rows.empty else 0.0
+        elif "plataforma" in entity_work.columns and "fecha" in entity_work.columns:
+            latest_entity_rows = (
+                entity_work.sort_values("fecha")
+                .dropna(subset=["seguidores"])
+                .groupby("plataforma", as_index=False)
+                .tail(1)
+            )
+            entity_followers = float(latest_entity_rows["seguidores"].sum()) if not latest_entity_rows.empty else 0.0
+        elif "plataforma" in entity_work.columns:
+            entity_followers = float(entity_work.groupby("plataforma")["seguidores"].max().sum())
+        else:
+            entity_followers = float(entity_work["seguidores"].max())
 
-    if "plataforma" in data_entity.columns and "engagement_rate" in data_entity.columns and not data_entity.empty:
-        per_plat_er = data_entity.groupby("plataforma")["engagement_rate"].mean()
-        entity_engagement = per_plat_er.mean() if not per_plat_er.empty else 0.0
-    elif "engagement_rate" in data_entity.columns:
-        entity_engagement = float(data_entity["engagement_rate"].mean())
+    if "engagement_rate" in data_entity.columns and not data_entity.empty:
+        entity_er_work = data_entity.copy()
+        if "fecha" in entity_er_work.columns:
+            entity_er_work["fecha"] = pd.to_datetime(entity_er_work["fecha"], errors="coerce")
+            latest_date_entity = entity_er_work["fecha"].max()
+            if pd.notna(latest_date_entity):
+                entity_er_work = entity_er_work[entity_er_work["fecha"] == latest_date_entity]
+
+        if "plataforma" in entity_er_work.columns:
+            per_plat_er = entity_er_work.groupby("plataforma")["engagement_rate"].mean()
+            entity_engagement = float(per_plat_er.mean()) if not per_plat_er.empty else 0.0
+        else:
+            entity_engagement = float(entity_er_work["engagement_rate"].mean())
     else:
         entity_engagement = 0.0
 
     entity_interactions = float(data_entity["interacciones"].mean()) if "interacciones" in data_entity.columns else 0.0
 
-    # Promedios de la red
-    net_followers = float(benchmark["seguidores_avg"].iloc[-1]) if "seguidores_avg" in benchmark.columns and not benchmark.empty else 0.0
-    net_engagement = float(benchmark["engagement_rate_avg"].mean()) if "engagement_rate_avg" in benchmark.columns and not benchmark.empty else 0.0
-    net_interactions = float(benchmark["interacciones_avg"].mean()) if "interacciones_avg" in benchmark.columns and not benchmark.empty else 0.0
+    # Promedios de la red (último periodo disponible)
+    net_followers = 0.0
+    net_engagement = 0.0
+    net_interactions = 0.0
+    if not benchmark.empty and "fecha" in benchmark.columns:
+        benchmark_work = benchmark.copy()
+        benchmark_work["fecha"] = pd.to_datetime(benchmark_work["fecha"], errors="coerce")
+        latest_benchmark_date = benchmark_work["fecha"].max()
+        latest_benchmark = benchmark_work[benchmark_work["fecha"] == latest_benchmark_date] if pd.notna(latest_benchmark_date) else benchmark_work
+
+        if "seguidores_avg" in latest_benchmark.columns:
+            net_followers = float(latest_benchmark["seguidores_avg"].sum())
+        if "engagement_rate_avg" in latest_benchmark.columns:
+            net_engagement = float(latest_benchmark["engagement_rate_avg"].mean())
+        if "interacciones_avg" in latest_benchmark.columns:
+            net_interactions = float(latest_benchmark["interacciones_avg"].mean())
 
     kpi_col1, kpi_col2, kpi_col3 = st.columns(3)
 
