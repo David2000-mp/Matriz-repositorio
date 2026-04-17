@@ -990,7 +990,7 @@ def render(df=None):
                     st.error("Plotly no está disponible. Instala `plotly` para ver gráficos.")
                 else:
                     df_evo = (
-                        df_full.groupby(["fecha", "plataforma"])["seguidores"].max().reset_index()
+                        df_full.groupby(["fecha", "plataforma"])["seguidores"].sum().reset_index()
                     )
                     
                     # Asegurar que fecha sea datetime para Plotly

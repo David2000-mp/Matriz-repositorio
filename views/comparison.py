@@ -513,10 +513,15 @@ def _render_followers_evolution_comparison(
     
     fig = go.Figure()
     
-    # Línea para entidad A - agrupar por fecha
+    # Línea para entidad A - sumar seguidores de todas las plataformas por fecha
     if not data_a.empty and "fecha" in data_a.columns and "seguidores" in data_a.columns:
-        # Agrupar por fecha y tomar máximo seguidores (último valor por fecha)
-        data_a_grouped = data_a.groupby("fecha")["seguidores"].max().reset_index()
+        work_a = data_a.copy()
+        work_a["fecha"] = pd.to_datetime(work_a["fecha"], errors="coerce")
+        work_a = work_a.dropna(subset=["fecha"])
+
+        # Normalmente data_provider ya entrega 1 registro por cuenta/mes.
+        # Aquí sumamos por fecha para reflejar el total de la entidad.
+        data_a_grouped = work_a.groupby("fecha")["seguidores"].sum().reset_index()
         data_a_grouped = data_a_grouped.sort_values("fecha")
         
         fig.add_trace(go.Scatter(
@@ -528,10 +533,13 @@ def _render_followers_evolution_comparison(
             marker=dict(size=8),
         ))
     
-    # Línea para entidad B - agrupar por fecha
+    # Línea para entidad B - sumar seguidores de todas las plataformas por fecha
     if not data_b.empty and "fecha" in data_b.columns and "seguidores" in data_b.columns:
-        # Agrupar por fecha y tomar máximo seguidores (último valor por fecha)
-        data_b_grouped = data_b.groupby("fecha")["seguidores"].max().reset_index()
+        work_b = data_b.copy()
+        work_b["fecha"] = pd.to_datetime(work_b["fecha"], errors="coerce")
+        work_b = work_b.dropna(subset=["fecha"])
+
+        data_b_grouped = work_b.groupby("fecha")["seguidores"].sum().reset_index()
         data_b_grouped = data_b_grouped.sort_values("fecha")
         
         fig.add_trace(go.Scatter(
@@ -613,13 +621,18 @@ def _render_engagement_evolution_comparison(
     
     # Línea para entidad A - agrupar por plataforma y fecha, luego promediar
     if not data_a.empty and "fecha" in data_a.columns and "engagement_rate" in data_a.columns:
+        work_a = data_a.copy()
+        work_a["fecha"] = pd.to_datetime(work_a["fecha"], errors="coerce")
+        work_a["engagement_rate"] = pd.to_numeric(work_a["engagement_rate"], errors="coerce")
+        work_a = work_a.dropna(subset=["fecha", "engagement_rate"])
+
         # Primero agrupar por fecha y plataforma, luego promediar entre plataformas
         # (consistente con Dashboard Global)
-        if "plataforma" in data_a.columns:
-            data_a_temp = data_a.groupby(["fecha", "plataforma"])["engagement_rate"].mean().reset_index()
+        if "plataforma" in work_a.columns:
+            data_a_temp = work_a.groupby(["fecha", "plataforma"])["engagement_rate"].mean().reset_index()
             data_a_grouped = data_a_temp.groupby("fecha")["engagement_rate"].mean().reset_index()
         else:
-            data_a_grouped = data_a.groupby("fecha")["engagement_rate"].mean().reset_index()
+            data_a_grouped = work_a.groupby("fecha")["engagement_rate"].mean().reset_index()
         data_a_grouped = data_a_grouped.sort_values("fecha")
         
         fig.add_trace(go.Scatter(
@@ -633,13 +646,18 @@ def _render_engagement_evolution_comparison(
     
     # Línea para entidad B - agrupar por plataforma y fecha, luego promediar
     if not data_b.empty and "fecha" in data_b.columns and "engagement_rate" in data_b.columns:
+        work_b = data_b.copy()
+        work_b["fecha"] = pd.to_datetime(work_b["fecha"], errors="coerce")
+        work_b["engagement_rate"] = pd.to_numeric(work_b["engagement_rate"], errors="coerce")
+        work_b = work_b.dropna(subset=["fecha", "engagement_rate"])
+
         # Primero agrupar por fecha y plataforma, luego promediar entre plataformas
         # (consistente con Dashboard Global)
-        if "plataforma" in data_b.columns:
-            data_b_temp = data_b.groupby(["fecha", "plataforma"])["engagement_rate"].mean().reset_index()
+        if "plataforma" in work_b.columns:
+            data_b_temp = work_b.groupby(["fecha", "plataforma"])["engagement_rate"].mean().reset_index()
             data_b_grouped = data_b_temp.groupby("fecha")["engagement_rate"].mean().reset_index()
         else:
-            data_b_grouped = data_b.groupby("fecha")["engagement_rate"].mean().reset_index()
+            data_b_grouped = work_b.groupby("fecha")["engagement_rate"].mean().reset_index()
         data_b_grouped = data_b_grouped.sort_values("fecha")
         
         fig.add_trace(go.Scatter(
@@ -1119,11 +1137,18 @@ def _render_benchmark_chart(
 
     # Línea entidad
     if not data_entity.empty and "fecha" in data_entity.columns and metric_entity in data_entity.columns:
-        if "plataforma" in data_entity.columns and plataforma_sel == "Todas":
-            grp = data_entity.groupby(["fecha", "plataforma"])[metric_entity].mean().reset_index()
-            entity_series = grp.groupby("fecha")[metric_entity].mean().reset_index()
+        entity_work = data_entity.copy()
+        entity_work["fecha"] = pd.to_datetime(entity_work["fecha"], errors="coerce")
+        entity_work[metric_entity] = pd.to_numeric(entity_work[metric_entity], errors="coerce")
+        entity_work = entity_work.dropna(subset=["fecha", metric_entity])
+
+        if "plataforma" in entity_work.columns and plataforma_sel == "Todas":
+            agg_fn = "sum" if metric_entity == "seguidores" else "mean"
+            grp = entity_work.groupby(["fecha", "plataforma"])[metric_entity].agg(agg_fn).reset_index()
+            entity_series = grp.groupby("fecha")[metric_entity].agg(agg_fn).reset_index()
         else:
-            entity_series = data_entity.groupby("fecha")[metric_entity].mean().reset_index()
+            agg_fn = "sum" if metric_entity == "seguidores" else "mean"
+            entity_series = entity_work.groupby("fecha")[metric_entity].agg(agg_fn).reset_index()
         entity_series = entity_series.sort_values("fecha")
 
         fig.add_trace(go.Scatter(
@@ -1137,10 +1162,16 @@ def _render_benchmark_chart(
 
     # Línea benchmark (punteada gris)
     if not benchmark.empty and "fecha" in benchmark.columns and metric_bench in benchmark.columns:
-        if "plataforma" in benchmark.columns and plataforma_sel == "Todas":
-            bench_series = benchmark.groupby("fecha")[metric_bench].mean().reset_index()
+        benchmark_work = benchmark.copy()
+        benchmark_work["fecha"] = pd.to_datetime(benchmark_work["fecha"], errors="coerce")
+        benchmark_work[metric_bench] = pd.to_numeric(benchmark_work[metric_bench], errors="coerce")
+        benchmark_work = benchmark_work.dropna(subset=["fecha", metric_bench])
+
+        if "plataforma" in benchmark_work.columns and plataforma_sel == "Todas":
+            agg_fn = "sum" if metric_bench == "seguidores_avg" else "mean"
+            bench_series = benchmark_work.groupby("fecha")[metric_bench].agg(agg_fn).reset_index()
         else:
-            bench_series = benchmark[["fecha", metric_bench]].copy()
+            bench_series = benchmark_work[["fecha", metric_bench]].copy()
         bench_series = bench_series.sort_values("fecha")
 
         fig.add_trace(go.Scatter(
