@@ -426,12 +426,14 @@ def _render_entity_kpis(data: pd.DataFrame, color: str = "#1f77b4"):
     if not data.empty and "plataforma" in data.columns:
         st.markdown("### 📊 Desglose por Plataforma")
         
-        # Agrupar por plataforma
-        platform_summary = data.groupby("plataforma").agg({
-            "seguidores": "max",
-            "interacciones": "sum" if "interacciones" in data.columns else None,
-            "engagement_rate": "mean"
-        }).reset_index()
+        # Agrupar por plataforma solo con columnas disponibles para evitar errores
+        agg_dict = {"seguidores": "max"}
+        if "interacciones" in data.columns:
+            agg_dict["interacciones"] = "sum"
+        if "engagement_rate" in data.columns:
+            agg_dict["engagement_rate"] = "mean"
+
+        platform_summary = data.groupby("plataforma").agg(agg_dict).reset_index()
         
         # Calcular métricas por plataforma
         for _, row in platform_summary.iterrows():
@@ -443,7 +445,7 @@ def _render_entity_kpis(data: pd.DataFrame, color: str = "#1f77b4"):
                 platform_interactions = row["interacciones"]
             else:
                 # Estimar usando engagement_rate promedio de la plataforma
-                platform_engagement = row["engagement_rate"]
+                platform_engagement = row.get("engagement_rate", 0)
                 platform_interactions = (platform_engagement / 100) * platform_followers
             
             # Calcular engagement ponderado por plataforma
