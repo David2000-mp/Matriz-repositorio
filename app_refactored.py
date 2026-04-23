@@ -73,7 +73,17 @@ def main():
         st.caption("Primero elige una vista; después usa los filtros globales para refinar la lectura.")
         
         # Navegación simplificada sin index calculado
-        menu_options = ["🏠 Inicio", "📊 Dashboard Global", "📈 Comparativas", "💡 Calc. Engagement", "📝 Captura", "🔍 Auditoría de Respuestas", "⚙️ Configuración"]
+        menu_options = [
+            "🏠 Inicio",
+            "📊 Dashboard Global",
+            "📈 Comparativas",
+            "🆕 Tipo de contenidos",
+            "🧠 Analisis de textos",
+            "💡 Calc. Engagement",
+            "📝 Captura",
+            "🔍 Auditoría de Respuestas",
+            "⚙️ Configuración",
+        ]
         selected_display = st.radio(
             "Seleccionar página", 
             menu_options, 
@@ -86,6 +96,8 @@ def main():
             "🏠 Inicio": "Inicio",
             "📊 Dashboard Global": "Dashboard Global", 
             "📈 Comparativas": "Comparativas",
+            "🆕 Tipo de contenidos": "Tipo de contenidos",
+            "🧠 Analisis de textos": "Analisis de textos",
             "💡 Calc. Engagement": "Calc. Engagement",
             "📝 Captura": "Captura",
             "🔍 Auditoría de Respuestas": "Auditoría de Respuestas",
@@ -138,6 +150,14 @@ def main():
                 del st.session_state["filtro_entidad"]
             if "filtro_mes" in st.session_state:
                 del st.session_state["filtro_mes"]
+            st.rerun()
+
+        if st.button("Forzar recarga", help="Limpia caché y vuelve a cargar datos desde Google Sheets"):
+            from utils.data_provider import data_provider
+
+            data_provider.invalidate_cache()
+            st.session_state.force_data_refresh = True
+            st.toast("Recarga forzada activada", icon="🔄")
             st.rerun()
 
         st.divider()
@@ -248,6 +268,14 @@ def main():
         # Sprint 2 Week 3: Nueva vista de comparación lado a lado
         from views import comparison
         comparison.render_comparison_view()
+    elif selected == "Tipo de contenidos":
+        from views import new_data_dashboard
+
+        new_data_dashboard.render_new_data_dashboard()
+    elif selected == "Analisis de textos":
+        from views import text_analysis_dashboard
+
+        text_analysis_dashboard.render_text_analysis_dashboard()
     elif selected == "Calc. Engagement":
         # Calculadora de Engagement para Facebook y TikTok
         from views import engagement_calculator_v2 as engagement_calculator
@@ -267,6 +295,8 @@ def main():
             if df_forms.empty:
                 st.warning("No hay datos nuevos del formulario")
                 st.stop()
+
+            df_forms = df_forms.reset_index(drop=True)
             
             # Métricas rápidas
             col1, col2, col3 = st.columns(3)
@@ -275,18 +305,18 @@ def main():
                 st.metric("Total de Registros", total_registros)
             
             with col2:
-                promedio_engagement = df_forms['engagement_rate'].mean()
+                promedio_engagement = df_forms['engagement_rate'].mean() if 'engagement_rate' in df_forms.columns else 0.0
                 st.metric("Promedio de Engagement", f"{promedio_engagement:.2f}%")
             
             with col3:
-                ultima_fecha = df_forms['fecha'].max()
+                ultima_fecha = df_forms['fecha'].max() if 'fecha' in df_forms.columns else pd.NaT
                 st.metric("Última Fecha de Reporte", ultima_fecha.strftime('%Y-%m-%d') if pd.notna(ultima_fecha) else "N/A")
             
             # Data Editor para correcciones manuales
             st.subheader("Datos del Formulario")
             edited_df = st.data_editor(
                 df_forms,
-                use_container_width='100%',
+                width="stretch",
                 num_rows="dynamic",
                 column_config={
                     "fecha": st.column_config.DateColumn("Fecha del Reporte"),
@@ -298,10 +328,14 @@ def main():
             )
             
             # Mostrar filas con errores
+            if 'error_validacion' not in df_forms.columns:
+                df_forms['error_validacion'] = ''
+
             errores = df_forms[df_forms['error_validacion'] != '']
             if not errores.empty:
                 st.error("Filas con errores de validación:")
-                st.dataframe(errores[['entidad', 'plataforma', 'error_validacion']], use_container_width='100%')
+                error_cols = [col for col in ['entidad', 'plataforma', 'error_validacion'] if col in errores.columns]
+                st.dataframe(errores[error_cols], width="stretch")
 
         except Exception as e:
             st.error(f"Error cargando datos del formulario: {e}")

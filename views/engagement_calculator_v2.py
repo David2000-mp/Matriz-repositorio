@@ -762,12 +762,12 @@ def render_step_1_basic_data():
 
     action_col1, action_col2, action_col3 = st.columns(3)
     with action_col1:
-        if st.button("💾 Guardar borrador", use_container_width=True):
+        if st.button("💾 Guardar borrador", width="stretch"):
             save_draft_snapshot(draft_payload, platform=platform_clean)
             st.success("Borrador guardado localmente.")
 
     with action_col2:
-        if st.button("↩️ Recuperar borrador", use_container_width=True):
+        if st.button("↩️ Recuperar borrador", width="stretch"):
             draft_data = load_draft_snapshot(platform=platform_clean)
             if queue_draft_restore_request(draft_data):
                 st.session_state["wizard_restore_notice"] = "Borrador recuperado correctamente."
@@ -776,14 +776,14 @@ def render_step_1_basic_data():
                 st.info("No encontré un borrador previo para recuperar.")
 
     with action_col3:
-        if st.button("🗑️ Borrar borrador", use_container_width=True):
+        if st.button("🗑️ Borrar borrador", width="stretch"):
             removed = clear_draft_snapshot(platform=platform_clean)
             if removed:
                 st.success("Borrador eliminado.")
             else:
                 st.info("No había borrador guardado para esta plataforma.")
     
-    if st.button("Continuar al Paso 2 →", use_container_width=True, type="primary"):
+    if st.button("Continuar al Paso 2 →", width="stretch", type="primary"):
         save_draft_snapshot({**draft_payload, "wizard_step": 2}, platform=platform_clean)
         st.session_state["wizard_step"] = 2
         st.rerun()
@@ -917,7 +917,7 @@ def render_step_2_posts():
     with st.form("wizard_posts_form", clear_on_submit=False):
         edited_df = st.data_editor(
             posts_df[visible_columns],
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
             height=520,
             num_rows="fixed",
@@ -945,7 +945,7 @@ def render_step_2_posts():
         with submit_col:
             submitted = st.form_submit_button(
                 "Calcular Resultados →",
-                use_container_width=True,
+                width="stretch",
                 type="primary",
             )
 
@@ -1037,7 +1037,7 @@ def render_step_2_posts():
             icon="📅",
         )
 
-    if st.button("← Volver al Paso 1", use_container_width=True):
+    if st.button("← Volver al Paso 1", width="stretch"):
         st.session_state["wizard_step"] = 1
         st.rerun()
 
@@ -1605,7 +1605,7 @@ def calculate_and_render_results():
                 icon="🏫",
             )
         
-        st.dataframe(pd.DataFrame(content_df), use_container_width=True, hide_index=True)
+        st.dataframe(pd.DataFrame(content_df), width="stretch", hide_index=True)
 
         if category_signal.get("has_signal"):
             best_cat = category_signal["best_category"]
@@ -1672,7 +1672,7 @@ def calculate_and_render_results():
                 ranking_df[["Post #", "Tipo", "Categoría", "Interacciones", "ER Post"]].assign(
                     **{"ER Post": lambda df: df["ER Post"].map(lambda val: f"{val:.2f}%")}
                 ),
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
             )
         
@@ -1809,12 +1809,12 @@ def calculate_and_render_results():
     col1, col2, col3 = st.columns(3)
     
     with col1:
-        if st.button("← Volver a editar publicaciones", use_container_width=True):
+        if st.button("← Volver a editar publicaciones", width="stretch"):
             st.session_state["wizard_step"] = 2
             st.rerun()
     
     with col2:
-        if st.button("🆕 Empezar nuevo análisis", use_container_width=True):
+        if st.button("🆕 Empezar nuevo análisis", width="stretch"):
             # Limpiar todos los datos del wizard
             for key in list(st.session_state.keys()):
                 if key.startswith("wizard_"):
@@ -1858,7 +1858,7 @@ def calculate_and_render_results():
             file_name=f"engagement_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html",
             mime="text/html",
             key="download_report",
-            use_container_width=True,
+            width="stretch",
         )
 
 

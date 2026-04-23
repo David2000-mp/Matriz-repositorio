@@ -15,13 +15,124 @@ Responsabilidades:
 
 import pandas as pd
 import hashlib
+import re
+import unicodedata
 from datetime import datetime
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Dict, List
 
 from utils.account_normalization import build_account_key, normalize_platform_name, normalize_social_user
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
+
+
+def _normalize_header_label(header: str) -> str:
+    """Normaliza headers para matching flexible."""
+    value = "" if header is None else str(header)
+    value = unicodedata.normalize("NFKD", value)
+    value = "".join(ch for ch in value if not unicodedata.combining(ch))
+    value = value.strip().lower()
+    value = re.sub(r"\s+", " ", value)
+    return value
+
+
+def _canonical_alias_map() -> Dict[str, set]:
+    return {
+        "fecha": {"fecha del reporte", "fecha"},
+        "entidad": {"institucion marista", "institucion", "entidad"},
+        "plataforma": {"plataforma social", "plataforma"},
+        "usuario_red": {"usuario o url de la red", "usuario o url", "usuario red"},
+        "seguidores": {
+            "seguidores totales: validacion: es un numero > mayor que 0",
+            "seguidores totales",
+            "seguidores",
+        },
+        "engagement_rate": {
+            "engagement rate (%): validacion: es un numero > entre 0 y 100",
+            "engagement rate (%)",
+            "engagement rate",
+            "engagment rate",
+        },
+        "alcance": {"alcance total", "alcance"},
+        "interacciones": {"interacciones totales", "interacciones"},
+        "comentarios": {
+            "comentarios contextuales",
+            '"comentarios contextuales"',
+            "comentarios",
+        },
+        "media_visualizaciones": {"media de visualizaciones"},
+        "tema_mas_visto": {"tema mas visto"},
+        "engagement_contenido_imagenes": {
+            "engagement por contenido: imagenes",
+            "engagment por contenido: imagenes",
+        },
+        "engagement_contenido_links": {
+            "engagement por contenido: links",
+            "engagment por contenido: links",
+        },
+        "engagement_contenido_videos": {
+            "engagement por contenido: videos",
+            "engagment por contenido: videos",
+        },
+        "top_5_publicaciones": {
+            "top 5 publicaciones por rendimiento",
+            "top 5 publicaciones por rendieminto",
+        },
+        "engagement_tema_mas_visto": {
+            "engagement del tema mas visto",
+            "engagment del tema mas visto",
+        },
+        "publicaciones_por_semana": {"publicaciones por semana"},
+        "tema_principal": {"tema principal del contenido del periodo"},
+        "obs_engagement": {"observaciones de engagement del periodo"},
+        "notas_operacionales": {"notas operacionales relevantes"},
+        "alertas_riesgos": {"alertas o riesgos detectados"},
+        "tuvo_cambios_operacionales": {"¿hubo cambios operacionales durante este periodo?", "hubo cambios operacionales durante este periodo"},
+        "publicacion_destacada": {"publicacion destacada"},
+    }
+
+
+def _build_header_groups(headers: List[str]) -> Dict[str, List[int]]:
+    """Devuelve índices por columna canónica tolerando variantes de texto."""
+    alias_map = _canonical_alias_map()
+    groups: Dict[str, List[int]] = {k: [] for k in alias_map}
+
+    for idx, header in enumerate(headers):
+        normalized = _normalize_header_label(header)
+        for canonical, aliases in alias_map.items():
+            if normalized in aliases:
+                groups[canonical].append(idx)
+                break
+    return groups
+
+
+def _get_first_value(row: List[str], indexes: List[int], default: str = "") -> str:
+    """Toma el primer valor no vacío de una lista de índices."""
+    if not indexes:
+        return default
+
+    for idx in indexes:
+        if idx < len(row):
+            raw = row[idx]
+            text = "" if raw is None else str(raw).strip()
+            if text:
+                return text
+    return default
+
+
+def _get_joined_values(row: List[str], indexes: List[int]) -> str:
+    """Concatena valores no vacíos sin duplicados."""
+    if not indexes:
+        return ""
+
+    chunks: List[str] = []
+    for idx in indexes:
+        if idx < len(row):
+            raw = row[idx]
+            text = "" if raw is None else str(raw).strip()
+            if text and text not in chunks:
+                chunks.append(text)
+    return " | ".join(chunks)
 
 
 def _normalize_platform_name(platform: str) -> str:
@@ -129,6 +240,16 @@ def _calculate_interactions(engagement_rate: float, seguidores: int) -> int:
     return max(0, interactions)
 
 
+def _normalize_booleanish(value: str) -> str:
+    """Normaliza respuestas tipo si/no a valores estables para analitica."""
+    normalized = _normalize_header_label(value)
+    if normalized in {"si", "sí", "yes", "true", "1"}:
+        return "si"
+    if normalized in {"no", "false", "0"}:
+        return "no"
+    return ""
+
+
 def import_form_responses(spreadsheet) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
     Lee las respuestas del formulario y las convierte a DataFrames estructurados.
@@ -150,45 +271,58 @@ def import_form_responses(spreadsheet) -> Tuple[pd.DataFrame, pd.DataFrame]:
             logger.warning("Hoja de respuestas de formulario vacía")
             return pd.DataFrame(), pd.DataFrame()
         
-        headers = [h.strip() for h in raw_data[0]]
+        headers = [str(h).strip() for h in raw_data[0]]
+        header_groups = _build_header_groups(headers)
         
         logger.debug(f"Headers encontrados: {headers}")
         
-        # Procesar cada fila de respuesta
-        # Estructura esperada del formulario:
-        # Col 0: Marca temporal
-        # Col 1: Fecha del Reporte
-        # Col 2: Institución Marista
-        # Col 3: Plataforma Social
-        # Col 4: Usuario o URL
-        # Col 5: Seguidores Totales
-        # Col 6: Engagement Rate (%)
-        # Col 7: Alcance Total
-        # Col 8: Interacciones Totales
-        # Col 9: Comentarios Contextuales
-        
         for row_idx, row in enumerate(raw_data[1:], start=2):
             try:
-                # Extender fila si es necesario
-                if len(row) < 10:
-                    row = row + [''] * (10 - len(row))
-                
-                # Extraer campos por índice
-                fecha = _parse_fecha(row[1] if len(row) > 1 else '')
-                entidad = row[2].strip() if len(row) > 2 else ''
-                plataforma = row[3].strip() if len(row) > 3 else ''
-                usuario_red = row[4].strip() if len(row) > 4 else ''
-                
-                # Campos numéricos
-                seguidores_str = row[5] if len(row) > 5 else '0'
-                engagement_str = row[6] if len(row) > 6 else '0'
-                alcance_str = row[7] if len(row) > 7 else '0'
-                interacciones_str = row[8] if len(row) > 8 else ''
+                row_data = list(row)
+                if len(row_data) < len(headers):
+                    row_data.extend([''] * (len(headers) - len(row_data)))
+
+                # Extraer campos por header canónico
+                fecha = _parse_fecha(_get_first_value(row_data, header_groups.get("fecha", []), ''))
+                entidad = _get_first_value(row_data, header_groups.get("entidad", []), '').strip()
+                plataforma = _get_first_value(row_data, header_groups.get("plataforma", []), '').strip()
+                usuario_red = _get_first_value(row_data, header_groups.get("usuario_red", []), '').strip()
+
+                # Campos numéricos base
+                seguidores_str = _get_first_value(row_data, header_groups.get("seguidores", []), '0')
+                engagement_str = _get_first_value(row_data, header_groups.get("engagement_rate", []), '0')
+                alcance_str = _get_first_value(row_data, header_groups.get("alcance", []), '0')
+                interacciones_str = _get_first_value(row_data, header_groups.get("interacciones", []), '')
+
+                # Campos nuevos
+                media_visualizaciones_str = _get_first_value(row_data, header_groups.get("media_visualizaciones", []), '0')
+                tema_mas_visto = _get_first_value(row_data, header_groups.get("tema_mas_visto", []), '')
+                eng_img_str = _get_first_value(row_data, header_groups.get("engagement_contenido_imagenes", []), '0')
+                eng_links_str = _get_first_value(row_data, header_groups.get("engagement_contenido_links", []), '0')
+                eng_videos_str = _get_first_value(row_data, header_groups.get("engagement_contenido_videos", []), '0')
+                top_5_publicaciones = _get_first_value(row_data, header_groups.get("top_5_publicaciones", []), '')
+                eng_tema_mas_visto_str = _get_first_value(row_data, header_groups.get("engagement_tema_mas_visto", []), '0')
+                publicaciones_semana_str = _get_first_value(row_data, header_groups.get("publicaciones_por_semana", []), '0')
+                comentarios_consolidados = _get_joined_values(row_data, header_groups.get("comentarios", []))
+                tema_principal = _get_first_value(row_data, header_groups.get("tema_principal", []), '').strip()
+                obs_engagement = _get_first_value(row_data, header_groups.get("obs_engagement", []), '').strip()
+                notas_operacionales = _get_first_value(row_data, header_groups.get("notas_operacionales", []), '').strip()
+                alertas_riesgos = _get_first_value(row_data, header_groups.get("alertas_riesgos", []), '').strip()
+                tuvo_cambios_operacionales = _normalize_booleanish(
+                    _get_first_value(row_data, header_groups.get("tuvo_cambios_operacionales", []), '')
+                )
+                publicacion_destacada = _get_first_value(row_data, header_groups.get("publicacion_destacada", []), '').strip()
                 
                 # Normalizar valores
                 seguidores = int(_parse_numeric_value(seguidores_str, 0))
                 engagement_rate = _parse_numeric_value(engagement_str, 0.0)
                 alcance = int(_parse_numeric_value(alcance_str, 0))
+                media_visualizaciones = _parse_numeric_value(media_visualizaciones_str, 0.0)
+                engagement_contenido_imagenes = _parse_numeric_value(eng_img_str, 0.0)
+                engagement_contenido_links = _parse_numeric_value(eng_links_str, 0.0)
+                engagement_contenido_videos = _parse_numeric_value(eng_videos_str, 0.0)
+                engagement_tema_mas_visto = _parse_numeric_value(eng_tema_mas_visto_str, 0.0)
+                publicaciones_por_semana = _parse_numeric_value(publicaciones_semana_str, 0.0)
                 
                 # Interacciones: usar valor ingresado o calcular desde engagement
                 if interacciones_str and str(interacciones_str).strip():
@@ -230,6 +364,21 @@ def import_form_responses(spreadsheet) -> Tuple[pd.DataFrame, pd.DataFrame]:
                     'interacciones': interacciones,
                     'likes_promedio': 0,  # No viene en el formulario
                     'engagement_rate': engagement_rate,
+                    'media_visualizaciones': media_visualizaciones,
+                    'tema_mas_visto': tema_mas_visto,
+                    'engagement_contenido_imagenes': engagement_contenido_imagenes,
+                    'engagement_contenido_links': engagement_contenido_links,
+                    'engagement_contenido_videos': engagement_contenido_videos,
+                    'top_5_publicaciones': top_5_publicaciones,
+                    'engagement_tema_mas_visto': engagement_tema_mas_visto,
+                    'publicaciones_por_semana': publicaciones_por_semana,
+                    'comentarios_consolidados': comentarios_consolidados,
+                    'tema_principal': tema_principal,
+                    'obs_engagement': obs_engagement,
+                    'notas_operacionales': notas_operacionales,
+                    'alertas_riesgos': alertas_riesgos,
+                    'tuvo_cambios_operacionales': tuvo_cambios_operacionales,
+                    'publicacion_destacada': publicacion_destacada,
                 }
                 metricas_list.append(metricas_dict)
                 

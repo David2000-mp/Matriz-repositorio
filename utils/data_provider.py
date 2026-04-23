@@ -17,6 +17,7 @@ import pandas as pd
 from typing import Tuple, List
 from utils.logger import get_logger
 from utils.analytics import normalize_monthly_latest
+from utils.text_mining import enrich_text_columns
 
 logger = get_logger(__name__)
 
@@ -61,6 +62,7 @@ class DataProvider:
         """Inicializa el provider con caché vacío."""
         self._data_cache = None
         self._merged_cache = None
+        self._last_schema_hash = ""
 
     def get_data(self, force_reload: bool = False) -> Tuple[pd.DataFrame, pd.DataFrame]:
         """
@@ -72,10 +74,11 @@ class DataProvider:
         Returns:
             Tuple[pd.DataFrame, pd.DataFrame]: (cuentas, metricas)
         """
+        current_schema_hash = ""
+
         if force_reload:
             # Limpiar caché de Streamlit cuando se fuerza recarga
             try:
-                import streamlit as st
                 logger.info("🔄 Limpiando caché de Streamlit para recargar datos...")
                 st.cache_data.clear()
                 logger.info("✓ Caché de Streamlit limpiado")
@@ -85,19 +88,28 @@ class DataProvider:
             self._data_cache = None
             self._merged_cache = None
             logger.info("Forzando recarga de datos desde Google Sheets...")
+
+        try:
+            from utils.data_loader import load_data, get_form_schema_hash
+
+            current_schema_hash = get_form_schema_hash()
+            if current_schema_hash and current_schema_hash != self._last_schema_hash:
+                logger.info("🔄 Cambio de esquema detectado en formulario. Invalidando caché local...")
+                self._data_cache = None
+                self._merged_cache = None
+            self._last_schema_hash = current_schema_hash
+        except Exception as e:
+            logger.warning(f"No se pudo validar hash de esquema de formulario: {e}")
+            from utils.data_loader import load_data
         
         if self._data_cache is None:
             try:
-                from utils.data_loader import load_data
                 logger.debug("Llamando a load_data()...")
-                self._data_cache = load_data()
+                self._data_cache = load_data(schema_hash=current_schema_hash)
                 cuentas_df, metricas_df = self._data_cache
                 logger.info(f"✓ Datos cargados: {len(cuentas_df)} cuentas, {len(metricas_df)} métricas")
                 if len(cuentas_df) > 0:
                     logger.debug(f"  Entidades: {cuentas_df['entidad'].unique().tolist()}")
-            except Exception as e:
-                logger.error(f"Error cargando datos en DataProvider: {e}")
-                self._data_cache = (pd.DataFrame(), pd.DataFrame())
             except Exception as e:
                 logger.error(f"Error cargando datos en DataProvider: {e}")
                 self._data_cache = (pd.DataFrame(), pd.DataFrame())
@@ -190,6 +202,9 @@ class DataProvider:
 
             # Consolidar: mantener solo el último registro por cuenta y mes para evitar duplicados
             df_merged = normalize_monthly_latest(df_merged)
+
+            # Enriquecer columnas textuales con sentimiento y palabras clave.
+            df_merged = enrich_text_columns(df_merged)
 
             # Recalcular engagement_rate si falta o viene vacío
             if 'engagement_rate' not in df_merged.columns or df_merged['engagement_rate'].isna().any():

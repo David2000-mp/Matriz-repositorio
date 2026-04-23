@@ -9,6 +9,8 @@ from . import analytics
 from . import data_entry
 from . import settings
 from . import changelog
+from . import new_data_dashboard
+from . import text_analysis_dashboard
 
 __all__ = [
 	"landing",
@@ -17,4 +19,6 @@ __all__ = [
 	"data_entry",
 	"settings",
 	"changelog",
+	"new_data_dashboard",
+	"text_analysis_dashboard",
 ]

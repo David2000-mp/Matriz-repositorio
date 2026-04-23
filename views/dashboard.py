@@ -1393,7 +1393,7 @@ def render(df=None):
 
                 st.plotly_chart(
                     fig_growth,
-                    use_container_width=True,
+                    width="stretch",
                     config=PLOTLY_CONFIG,
                 )
 

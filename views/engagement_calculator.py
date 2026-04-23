@@ -178,7 +178,7 @@ def render_facebook_tab():
     # Botones de acción
     col1, col2 = st.columns(2)
     with col1:
-        if st.button("🧮 Calcular Engagement", key="fb_calculate", use_container_width=True):
+        if st.button("🧮 Calcular Engagement", key="fb_calculate", width="stretch"):
             results = calculate_facebook_engagement()
             if results:
                 st.session_state["fb_results"] = results
@@ -187,7 +187,7 @@ def render_facebook_tab():
                 st.error("⚠️ Verifica que hayas ingresado seguidores, período y al menos algunas interacciones.")
     
     with col2:
-        if st.button("🔄 Limpiar Todo", key="fb_reset", use_container_width=True):
+        if st.button("🔄 Limpiar Todo", key="fb_reset", width="stretch"):
             # Limpiar session_state de Facebook
             keys_to_clear = [k for k in st.session_state.keys() if k.startswith("fb_")]
             for key in keys_to_clear:
@@ -387,7 +387,7 @@ def render_tiktok_tab():
     # Botones de acción
     col1, col2 = st.columns(2)
     with col1:
-        if st.button("🧮 Calcular Engagement TikTok", key="tk_calculate", use_container_width=True):
+        if st.button("🧮 Calcular Engagement TikTok", key="tk_calculate", width="stretch"):
             results = calculate_tiktok_engagement()
             if results:
                 st.session_state["tk_results"] = results
@@ -396,7 +396,7 @@ def render_tiktok_tab():
                 st.error("⚠️ Verifica que hayas ingresado seguidores, período, al menos algunas interacciones y vistas.")
     
     with col2:
-        if st.button("🔄 Limpiar Todo", key="tk_reset", use_container_width=True):
+        if st.button("🔄 Limpiar Todo", key="tk_reset", width="stretch"):
             # Limpiar session_state de TikTok
             keys_to_clear = [k for k in st.session_state.keys() if k.startswith("tk_")]
             for key in keys_to_clear:

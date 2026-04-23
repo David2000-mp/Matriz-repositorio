@@ -536,12 +536,12 @@ def render(df=None):
             calc_col1, calc_col2 = st.columns(2)
             
             with calc_col1:
-                if st.button("📘 Calculadora Facebook", key="calc_fb_btn", use_container_width=True):
+                if st.button("📘 Calculadora Facebook", key="calc_fb_btn", width="stretch"):
                     st.session_state["calc_active_tab"] = "facebook"
                     st.rerun()
             
             with calc_col2:
-                if st.button("🎵 Calculadora TikTok", key="calc_tk_btn", use_container_width=True):
+                if st.button("🎵 Calculadora TikTok", key="calc_tk_btn", width="stretch"):
                     st.session_state["calc_active_tab"] = "tiktok"
                     st.rerun()
             
@@ -641,7 +641,7 @@ def render(df=None):
 
                 # Botón de envío
                 submitted_anual = st.form_submit_button(
-                    "💾 Guardar Datos Anuales", type="primary", use_container_width=True
+                    "💾 Guardar Datos Anuales", type="primary", width="stretch"
                 )
 
                 if submitted_anual:
@@ -721,7 +721,7 @@ def render(df=None):
                                 })
 
                             if resumen_data:
-                                st.dataframe(pd.DataFrame(resumen_data), use_container_width=True)
+                                st.dataframe(pd.DataFrame(resumen_data), width="stretch")
 
                         else:
                             status.update(label="❌ No se guardaron registros")

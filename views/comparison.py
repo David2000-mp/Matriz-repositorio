@@ -1291,7 +1291,7 @@ def _render_export_comparison_button(data_a: pd.DataFrame, data_b: pd.DataFrame)
         data_b: Datos de entidad B
     """
     
-    if st.button("📥 Exportar Comparación", use_container_width=True):
+    if st.button("📥 Exportar Comparación", width="stretch"):
         try:
             # Combinar datos
             combined = pd.concat([

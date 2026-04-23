@@ -10,8 +10,11 @@ from gspread.exceptions import APIError, SpreadsheetNotFound
 from google.oauth2.service_account import Credentials
 import os
 import json
+import re
+import hashlib
+import unicodedata
 import pandas as pd
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from dotenv import load_dotenv
 from utils.logger import get_logger
 
@@ -266,6 +269,169 @@ def get_sheets_connection() -> Optional[gspread.Spreadsheet]:
     return conectar_sheets()
 
 
+def _normalize_header_label(header: str) -> str:
+    """Normaliza headers para comparación tolerante a espacios, tildes y mayúsculas."""
+    value = "" if header is None else str(header)
+    value = unicodedata.normalize("NFKD", value)
+    value = "".join(ch for ch in value if not unicodedata.combining(ch))
+    value = value.strip().lower()
+    value = re.sub(r"\s+", " ", value)
+    return value
+
+
+def _unique_headers(raw_headers: List[str]) -> List[str]:
+    """Garantiza nombres de columna únicos preservando orden visual."""
+    seen: Dict[str, int] = {}
+    unique: List[str] = []
+
+    for raw in raw_headers:
+        base = str(raw or "").strip()
+        if not base:
+            base = "columna_sin_nombre"
+
+        count = seen.get(base, 0) + 1
+        seen[base] = count
+
+        unique_name = base if count == 1 else f"{base}__dup_{count}"
+        unique.append(unique_name)
+
+    return unique
+
+
+def _first_non_empty(series: pd.Series):
+    """Devuelve el primer valor no vacío de una serie."""
+    for value in series:
+        text = "" if value is None else str(value).strip()
+        if text:
+            return value
+    return ""
+
+
+def _consolidate_comment_columns(df: pd.DataFrame, source_cols: List[str]) -> pd.Series:
+    """Fusiona columnas de comentarios duplicadas en una sola celda trazable."""
+    if not source_cols:
+        return pd.Series([""] * len(df), index=df.index)
+
+    def join_non_empty(row: pd.Series) -> str:
+        chunks: List[str] = []
+        for col in source_cols:
+            raw = row.get(col, "")
+            text = "" if raw is None else str(raw).strip()
+            if text and text not in chunks:
+                chunks.append(text)
+        return " | ".join(chunks)
+
+    return df.apply(join_non_empty, axis=1)
+
+
+def _canonical_form_column_groups(columns: List[str]) -> Dict[str, List[str]]:
+    """Agrupa columnas de formulario por nombre canónico tolerando variantes."""
+    alias_map = {
+        "fecha": {
+            "fecha del reporte",
+            "fecha",
+        },
+        "entidad": {
+            "institucion marista",
+            "institucion",
+            "entidad",
+        },
+        "plataforma": {
+            "plataforma social",
+            "plataforma",
+        },
+        "usuario_red": {
+            "usuario o url de la red",
+            "usuario o url",
+            "usuario red",
+        },
+        "seguidores": {
+            "seguidores totales: validacion: es un numero > mayor que 0",
+            "seguidores totales",
+            "seguidores",
+        },
+        "engagement_rate": {
+            "engagement rate (%): validacion: es un numero > entre 0 y 100",
+            "engagement rate (%)",
+            "engagement rate",
+            "engagment rate",
+        },
+        "alcance": {
+            "alcance total",
+            "alcance",
+        },
+        "interacciones": {
+            "interacciones totales",
+            "interacciones",
+        },
+        "media_visualizaciones": {
+            "media de visualizaciones",
+        },
+        "tema_mas_visto": {
+            "tema mas visto",
+        },
+        "engagement_contenido_imagenes": {
+            "engagment por contenido: imagenes",
+            "engagement por contenido: imagenes",
+        },
+        "engagement_contenido_links": {
+            "engagment por contenido: links",
+            "engagement por contenido: links",
+        },
+        "engagement_contenido_videos": {
+            "engagment por contenido: videos",
+            "engagement por contenido: videos",
+        },
+        "top_5_publicaciones": {
+            "top 5 publicaciones por rendieminto",
+            "top 5 publicaciones por rendimiento",
+        },
+        "engagement_tema_mas_visto": {
+            "engagment del tema mas visto",
+            "engagement del tema mas visto",
+        },
+        "publicaciones_por_semana": {
+            "publicaciones por semana",
+        },
+        "tema_principal": {
+            "tema principal del contenido del periodo",
+        },
+        "obs_engagement": {
+            "observaciones de engagement del periodo",
+        },
+        "notas_operacionales": {
+            "notas operacionales relevantes",
+        },
+        "alertas_riesgos": {
+            "alertas o riesgos detectados",
+        },
+        "tuvo_cambios_operacionales": {
+            "¿hubo cambios operacionales durante este periodo?",
+            "hubo cambios operacionales durante este periodo",
+        },
+        "publicacion_destacada": {
+            "publicacion destacada",
+        },
+        "comentarios": {
+            "comentarios contextuales",
+            '"comentarios contextuales"',
+            "comentarios contextuales ",
+            "comentarios",
+        },
+    }
+
+    grouped: Dict[str, List[str]] = {key: [] for key in alias_map}
+
+    for col in columns:
+        normalized = _normalize_header_label(col)
+        for canonical, aliases in alias_map.items():
+            if normalized in aliases:
+                grouped[canonical].append(col)
+                break
+
+    return grouped
+
+
 def cargar_respuestas_forms() -> pd.DataFrame:
     """
     Carga y sanitiza datos de la hoja 'Respuestas de formulario 3' en Google Sheets.
@@ -281,55 +447,82 @@ def cargar_respuestas_forms() -> pd.DataFrame:
         
         # Acceder a la hoja 'Respuestas de formulario 3'
         ws = ss.worksheet("Respuestas de formulario 3")
-        records = ws.get_all_records()
-        
-        if not records:
+        raw_data = ws.get()
+
+        if not raw_data or len(raw_data) < 2:
             logger.info("La hoja 'Respuestas de formulario 3' está vacía")
             return pd.DataFrame()
-        
-        df = pd.DataFrame(records)
-        
+        headers = _unique_headers(raw_data[0])
+        rows = raw_data[1:]
+
+        max_cols = len(headers)
+        normalized_rows = []
+        for row in rows:
+            row_copy = list(row)
+            if len(row_copy) < max_cols:
+                row_copy.extend([""] * (max_cols - len(row_copy)))
+            elif len(row_copy) > max_cols:
+                row_copy = row_copy[:max_cols]
+            normalized_rows.append(row_copy)
+
+        df_raw = pd.DataFrame(normalized_rows, columns=headers)
+
         # Ignorar columna 'Marca temporal' si existe (primera columna A1)
-        df = df.drop(columns=['Marca temporal'], errors='ignore')
+        drop_candidates = [
+            col for col in df_raw.columns
+            if _normalize_header_label(col).startswith("marca temporal")
+        ]
+        if drop_candidates:
+            df_raw = df_raw.drop(columns=drop_candidates, errors="ignore")
+
+        grouped = _canonical_form_column_groups(list(df_raw.columns))
+        df = pd.DataFrame(index=df_raw.index)
+
+        for canonical, source_cols in grouped.items():
+            if not source_cols:
+                continue
+
+            if canonical == "comentarios":
+                consolidated = _consolidate_comment_columns(df_raw, source_cols)
+                df["comentarios_consolidados"] = consolidated
+                df["comentarios"] = consolidated
+                if len(source_cols) > 1:
+                    logger.warning(
+                        "Se detectaron columnas duplicadas de comentarios: %s. Se consolidaron en comentarios_consolidados.",
+                        source_cols,
+                    )
+                continue
+
+            if len(source_cols) == 1:
+                df[canonical] = df_raw[source_cols[0]]
+            else:
+                df[canonical] = df_raw[source_cols].apply(_first_non_empty, axis=1)
+                logger.warning("Columnas duplicadas para %s detectadas: %s", canonical, source_cols)
         
-        # 1. Limpiar espacios externos
-        df.columns = df.columns.str.strip()
-        # 2. Reemplazar múltiples espacios internos por uno solo (Regex)
-        df.columns = df.columns.str.replace(r'\s+', ' ', regex=True)
-        
-        # Renombrar columnas para consistencia con la app
-        rename_dict = {
-            "Fecha del Reporte": "fecha",
-            "Institución Marista": "entidad",
-            "Plataforma Social": "plataforma",
-            "Usuario o URL de la red": "usuario_red",
-            "Seguidores Totales: Validación: Es un número > Mayor que 0": "seguidores",
-            "Engagement Rate (%): Validación: Es un número > Entre 0 y 100": "engagement_rate",
-            "Alcance Total": "alcance",
-            "Interacciones Totales": "interacciones",
-            "Comentarios Contextuales": "comentarios"
-        }
-        # Solo renombrar 'Fecha del Reporte' si 'fecha' no existe
-        if 'fecha' not in df.columns and 'Fecha del Reporte' in df.columns:
-            rename_dict["Fecha del Reporte"] = "fecha"
-        
-        df.rename(columns=rename_dict, inplace=True)
-        
+        # Validación de esquema para cache invalidation por hash de columnas
+        ordered_schema = "|".join(_normalize_header_label(col) for col in df_raw.columns)
+        st.session_state["forms_schema_hash"] = hashlib.md5(ordered_schema.encode("utf-8")).hexdigest()
+
         # VALIDACIÓN FINAL: Verificar columna crítica 'fecha'
         if 'fecha' not in df.columns:
-            # Intento de rescate: buscar si existe la columna original limpia
-            if 'Fecha del Reporte' in df.columns:
-                df['fecha'] = pd.to_datetime(df['Fecha del Reporte'], errors='coerce')
-            else:
-                st.error(f"Error crítico: No se encuentra la columna 'fecha'. Columnas disponibles: {list(df.columns)}")
-                return pd.DataFrame()  # Retorno vacío seguro
-        
-        # Sanitización y validación
-        
-        # Sanitización y validación
+            st.error(f"Error crítico: No se encuentra la columna 'fecha'. Columnas disponibles: {list(df.columns)}")
+            return pd.DataFrame()  # Retorno vacío seguro
         
         # Sanitización y validación
         df = df.fillna('')  # Llenar vacíos con string vacío
+
+        if 'tuvo_cambios_operacionales' in df.columns:
+            normalized_changes = (
+                df['tuvo_cambios_operacionales']
+                .astype(str)
+                .str.strip()
+                .str.lower()
+                .replace({'sí': 'si', 'yes': 'si', 'true': 'si', '1': 'si', 'false': 'no', '0': 'no'})
+            )
+            df['tuvo_cambios_operacionales'] = normalized_changes.where(
+                normalized_changes.isin(['si', 'no']),
+                ''
+            )
         
         # CONVERSIÓN OBLIGATORIA DE FECHAS
         if 'fecha' in df.columns:
@@ -375,11 +568,29 @@ def cargar_respuestas_forms() -> pd.DataFrame:
             #     return pd.DataFrame()  # Retornar vacío si no hay fechas válidas
         
         # Convertir columnas numéricas de forma robusta
-        cols_numericas = ['seguidores', 'alcance', 'interacciones']
+        cols_numericas = [
+            'seguidores',
+            'alcance',
+            'interacciones',
+            'media_visualizaciones',
+            'engagement_contenido_imagenes',
+            'engagement_contenido_links',
+            'engagement_contenido_videos',
+            'engagement_tema_mas_visto',
+            'publicaciones_por_semana',
+        ]
         for col in cols_numericas:
             if col in df.columns:
-                # CORRECCIÓN CRÍTICA: Remover comas como separadores de miles
-                df[col] = pd.to_numeric(df[col].astype(str).str.replace(',', '', regex=False), errors='coerce').fillna(0)
+                # Remover separadores de miles y normalizar decimal local
+                cleaned = (
+                    df[col]
+                    .astype(str)
+                    .str.replace('%', '', regex=False)
+                    .str.replace('\u00a0', '', regex=False)
+                    .str.replace(' ', '', regex=False)
+                    .str.replace(',', '.', regex=False)
+                )
+                df[col] = pd.to_numeric(cleaned, errors='coerce').fillna(0)
         
         # Engagement rate especial (tiene %)
         if 'engagement_rate' in df.columns:
@@ -400,9 +611,9 @@ def cargar_respuestas_forms() -> pd.DataFrame:
                 logger.warning(f"Encontrados {unrealistic_mask.sum()} registros con engagement irrealista. Recalculando...")
 
                 # Calcular engagement real: (interacciones / seguidores) * 100
+                safe_followers = df.loc[unrealistic_mask, 'seguidores'].clip(lower=1)
                 df.loc[unrealistic_mask, 'engagement_rate'] = (
-                    df.loc[unrealistic_mask, 'interacciones'] /
-                    df.loc[unrealistic_mask, 'seguidores'] * 100
+                    df.loc[unrealistic_mask, 'interacciones'] / safe_followers * 100
                 ).round(2)
 
                 logger.info("Engagement rates corregidos exitosamente")
@@ -424,6 +635,9 @@ def cargar_respuestas_forms() -> pd.DataFrame:
         # Agregar columna de error general si no existe
         if 'error_validacion' not in df.columns:
             df['error_validacion'] = ''
+
+        # Garantizar que Data Editor reciba un índice continuo
+        df = df.reset_index(drop=True)
         
         return df
     

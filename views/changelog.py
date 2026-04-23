@@ -160,7 +160,7 @@ def render_changelog():
             data=changelog_content,
             file_name="CHAMPILEAKS_Changelog.md",
             mime="text/markdown",
-            use_container_width=True,
+            width="stretch",
         )
 
     with col_download_2:
@@ -171,7 +171,7 @@ def render_changelog():
             data=plain_text,
             file_name="CHAMPILEAKS_Changelog.txt",
             mime="text/plain",
-            use_container_width=True,
+            width="stretch",
         )
 
     # Footer informativo
@@ -307,7 +307,7 @@ def render_roadmap():
         data=roadmap_content,
         file_name="CHAMPILEAKS_Roadmap.md",
         mime="text/markdown",
-        use_container_width=True,
+        width="stretch",
     )
 
     # Footer informativo

@@ -11,6 +11,7 @@ data_loader.py → (imports en data_manager.py al final)
 
 import streamlit as st
 import pandas as pd
+import hashlib
 from pathlib import Path
 from typing import Tuple, Optional
 from utils.logger import get_logger
@@ -24,7 +25,30 @@ METRICAS_CSV = DATA_DIR / "metricas.csv"
 SAMPLE_UPLOAD_FULL_CSV = DATA_DIR / "sample_upload_full.csv"
 
 COLS_CUENTAS = ["id_cuenta", "entidad", "plataforma", "usuario_red"]
-COLS_METRICAS = ["id_cuenta", "fecha", "seguidores", "alcance", "interacciones", "likes_promedio", "engagement_rate"]
+COLS_METRICAS = [
+    "id_cuenta",
+    "fecha",
+    "seguidores",
+    "alcance",
+    "interacciones",
+    "likes_promedio",
+    "engagement_rate",
+    "media_visualizaciones",
+    "tema_mas_visto",
+    "engagement_contenido_imagenes",
+    "engagement_contenido_links",
+    "engagement_contenido_videos",
+    "top_5_publicaciones",
+    "engagement_tema_mas_visto",
+    "publicaciones_por_semana",
+    "comentarios_consolidados",
+    "tema_principal",
+    "obs_engagement",
+    "notas_operacionales",
+    "alertas_riesgos",
+    "tuvo_cambios_operacionales",
+    "publicacion_destacada",
+]
 COLS_CONFIG = ["entidad", "meta_seguidores", "meta_engagement"]
 COLS_COMENTARIOS = ["entidad", "mes", "comentario"]
 COLS_USERNAMES_EDITADOS = ["entidad", "plataforma", "usuario_editado", "fecha_modificacion"]
@@ -62,7 +86,34 @@ def validate_and_fill_columns(df: pd.DataFrame, expected_cols: list) -> pd.DataF
         df = _normalize_id_column(df, 'id_cuenta')
     
     return df
-def _load_data_impl() -> Tuple[pd.DataFrame, pd.DataFrame]:
+
+
+def get_form_schema_hash() -> str:
+    """
+    Calcula hash del esquema (headers) de 'Respuestas de formulario 3'.
+    Se usa como token para invalidar cache cuando cambia la estructura.
+    """
+    try:
+        from utils.sheets_connector import get_sheets_connection
+
+        spreadsheet = get_sheets_connection()
+        if not spreadsheet:
+            return ""
+
+        ws = spreadsheet.worksheet("Respuestas de formulario 3")
+        raw_data = ws.get()
+        if not raw_data:
+            return ""
+
+        headers = [str(h or "").strip().lower() for h in raw_data[0]]
+        schema_signature = "|".join(headers)
+        return hashlib.md5(schema_signature.encode("utf-8")).hexdigest()
+    except Exception as e:
+        logger.warning(f"No se pudo calcular hash de esquema de formulario: {e}")
+        return ""
+
+
+def _load_data_impl(_schema_hash_token: str = "") -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
     Carga datos desde Google Sheets con la siguiente prioridad:
     1. Formulario "Respuestas de formulario 3" (fuente principal)
@@ -199,13 +250,13 @@ def _load_data_impl() -> Tuple[pd.DataFrame, pd.DataFrame]:
 
 
 @st.cache_data(ttl=300)
-def load_data() -> Tuple[pd.DataFrame, pd.DataFrame]:
+def load_data(schema_hash: str = "") -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
     Carga datos cacheados (5 minutos).
     Retorna (cuentas_df, metricas_df) con IDs como strings.
     La frescura se controla con invalidación explícita al guardar o refrescar.
     """
-    return _load_data_impl()
+    return _load_data_impl(schema_hash)
 def load_usernames_editados() -> pd.DataFrame:
     """
     Carga usernames editados desde Google Sheets o retorna DataFrame vacío.

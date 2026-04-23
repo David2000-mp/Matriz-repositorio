@@ -7,17 +7,27 @@ Valida funcionalidad crítica antes de producción:
 - Limpieza de NaN en get_merged_data
 """
 
+# pyright: reportMissingImports=false
+
 import pytest
 import pandas as pd
 import sys
+import importlib
 from pathlib import Path
 
 # Asegurar que el path del proyecto esté disponible
 BASE_DIR = Path(__file__).parent.parent
 sys.path.insert(0, str(BASE_DIR))
 
-from utils.data_saver import get_id, guardar_datos, COLS_METRICAS
-from utils.data_provider import data_provider
+data_saver = importlib.import_module("utils.data_saver")
+data_provider_module = importlib.import_module("utils.data_provider")
+form_response_importer = importlib.import_module("utils.form_response_importer")
+
+get_id = data_saver.get_id
+COLS_METRICAS = data_saver.COLS_METRICAS
+data_provider = data_provider_module.data_provider
+_build_header_groups = form_response_importer._build_header_groups
+_get_joined_values = form_response_importer._get_joined_values
 
 
 class TestIDAgnosticism:
@@ -98,7 +108,7 @@ class TestGuardarDatosSchemaValidation:
         
         # Verificar que falle con KeyError al intentar seleccionar columnas faltantes
         with pytest.raises(KeyError):
-            df_limpio = df_incompleto[COLS_METRICAS]
+            _ = df_incompleto[COLS_METRICAS]
     
     def test_schema_with_extra_columns(self):
         """Debe filtrar columnas extra y guardar solo las requeridas"""
@@ -214,6 +224,70 @@ class TestMergedDataCleaning:
         
         except Exception as e:
             pytest.fail(f"Error al verificar tipos de ID: {e}")
+
+
+class TestFormSchemaRobustness:
+    """Pruebas de robustez para cambios de esquema del formulario."""
+
+    def test_header_alias_mapping_for_new_fields(self):
+        headers = [
+            "Fecha del Reporte",
+            "Institución Marista",
+            "Plataforma Social",
+            "Usuario o URL de la red",
+            "Seguidores Totales:  Validación: Es un número > Mayor que 0",
+            "Engagment por contenido: Imagenes",
+            "Engagment por contenido: Links",
+            "Engagment por contenido: Videos",
+            "Publicaciones por Semana",
+            "Tema principal del contenido del periodo",
+            "Observaciones de engagement del periodo",
+            "Notas operacionales relevantes",
+            "Alertas o riesgos detectados",
+            "¿Hubo cambios operacionales durante este periodo?",
+            "Publicación destacada",
+        ]
+
+        groups = _build_header_groups(headers)
+
+        assert groups["fecha"] == [0]
+        assert groups["entidad"] == [1]
+        assert groups["plataforma"] == [2]
+        assert groups["usuario_red"] == [3]
+        assert groups["seguidores"] == [4]
+        assert groups["engagement_contenido_imagenes"] == [5]
+        assert groups["engagement_contenido_links"] == [6]
+        assert groups["engagement_contenido_videos"] == [7]
+        assert groups["publicaciones_por_semana"] == [8]
+        assert groups["tema_principal"] == [9]
+        assert groups["obs_engagement"] == [10]
+        assert groups["notas_operacionales"] == [11]
+        assert groups["alertas_riesgos"] == [12]
+        assert groups["tuvo_cambios_operacionales"] == [13]
+        assert groups["publicacion_destacada"] == [14]
+
+    def test_duplicate_comments_are_consolidated(self):
+        row = [
+            "2026-04-01",
+            "Comentario A",
+            "",
+            "Comentario B",
+            "Comentario A",
+        ]
+        indexes = [1, 2, 3, 4]
+
+        result = _get_joined_values(row, indexes)
+        assert result == "Comentario A | Comentario B"
+
+    def test_comments_consolidated_for_i_r_y_positions(self):
+        # Simula una fila del esquema A..Y donde I, R y Y son comentarios contextuales.
+        row = ["" for _ in range(25)]
+        row[8] = "Comentario operativo"
+        row[17] = "Comentario operativo"
+        row[24] = "Comentario de alerta"
+
+        result = _get_joined_values(row, [8, 17, 24])
+        assert result == "Comentario operativo | Comentario de alerta"
 
 
 # Fixture para setup/teardown si es necesario
