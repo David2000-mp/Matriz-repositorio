@@ -776,12 +776,93 @@ def export_to_csv(
 
 
 def export_full_csv(df: pd.DataFrame, *, header_mapping: dict[str, str] | None = None) -> bytes:
-    """Exporta CSV maestro con todas las columnas analizadas."""
-    return export_to_csv(
+    """Exporta CSV maestro con todas las columnas analizadas.
+
+    Incluye al final un bloque de resumen ejecutivo para lectura rapida.
+    """
+    aligned = validate_and_align_columns(
         df,
         required_order=CSV_COLUMN_ORDER,
         header_mapping=header_mapping,
     )
+
+    columns = list(aligned.columns)
+    summary_rows = _build_executive_summary_rows(df, columns)
+
+    output_df = aligned
+    if summary_rows:
+        blank_row = {col: "" for col in columns}
+        output_df = pd.concat(
+            [aligned, pd.DataFrame([blank_row]), pd.DataFrame(summary_rows)],
+            ignore_index=True,
+        )
+
+    buffer = io.StringIO()
+    output_df.to_csv(buffer, index=False, encoding="utf-8-sig")
+    return buffer.getvalue().encode("utf-8-sig")
+
+
+def _build_executive_summary_rows(df: pd.DataFrame, columns: list[str]) -> list[dict[str, str]]:
+    """Construye filas de resumen ejecutivo para anexar al CSV completo."""
+    if not columns:
+        return []
+
+    col0 = columns[0]
+    col1 = columns[1] if len(columns) > 1 else columns[0]
+    col2 = columns[2] if len(columns) > 2 else col1
+
+    def _empty_row() -> dict[str, str]:
+        return {col: "" for col in columns}
+
+    total = int(len(df))
+
+    avg_score = 0.0
+    if "sentimiento_score" in df.columns and total > 0:
+        avg_score = float(pd.to_numeric(df["sentimiento_score"], errors="coerce").fillna(0).mean())
+
+    sentiment_counts = {}
+    if "sentimiento_etiqueta" in df.columns:
+        sentiment_counts = (
+            df["sentimiento_etiqueta"]
+            .fillna("Neutral")
+            .value_counts()
+            .to_dict()
+        )
+
+    top_category = "Sin categoria"
+    if "categoria" in df.columns and total > 0:
+        mode_values = df["categoria"].dropna().mode()
+        if not mode_values.empty:
+            top_category = str(mode_values.iloc[0])
+
+    rows: list[dict[str, str]] = []
+
+    row = _empty_row()
+    row[col0] = "RESUMEN_EJECUTIVO"
+    row[col1] = "Total comentarios"
+    row[col2] = str(total)
+    rows.append(row)
+
+    row = _empty_row()
+    row[col0] = "RESUMEN_EJECUTIVO"
+    row[col1] = "Promedio sentimiento"
+    row[col2] = f"{avg_score:.2f}/5"
+    rows.append(row)
+
+    for label in ["Muy Positivo", "Positivo", "Neutral", "Negativo", "Muy Negativo"]:
+        row = _empty_row()
+        row[col0] = "RESUMEN_EJECUTIVO"
+        row[col1] = f"Sentimiento {label}"
+        row[col2] = str(int(sentiment_counts.get(label, 0)))
+        rows.append(row)
+
+    row = _empty_row()
+    row[col0] = "RESUMEN_EJECUTIVO"
+    row[col1] = "Categoria principal"
+    row[col2] = top_category
+    rows.append(row)
+
+    return rows
 
 
 def export_manual_load_csv(

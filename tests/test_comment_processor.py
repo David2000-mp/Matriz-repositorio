@@ -204,6 +204,28 @@ def test_export_full_csv_applies_column_order_and_header_mapping():
     )
 
 
+def test_export_full_csv_includes_executive_summary_rows():
+    """El CSV completo debe anexar bloque de RESUMEN_EJECUTIVO al final."""
+    load_date = datetime(2026, 5, 8, tzinfo=timezone.utc)
+    df = comment_processor.create_dataframe_from_comments(
+        [
+            "Excelente colegio con gran ambiente",
+            "Servicio regular y caro",
+            "Muy buen nivel academico",
+        ],
+        source="Google Maps",
+        load_date=load_date,
+    )
+
+    csv_text = comment_processor.export_full_csv(df).decode("utf-8-sig")
+    lines = csv_text.splitlines()
+
+    assert any("RESUMEN_EJECUTIVO" in line for line in lines)
+    assert any("Total comentarios" in line for line in lines)
+    assert any("Promedio sentimiento" in line for line in lines)
+    assert any("Categoria principal" in line for line in lines)
+
+
 def test_export_manual_load_csv_outputs_only_comment_column_by_default():
     load_date = datetime(2026, 5, 8, tzinfo=timezone.utc)
     df = comment_processor.create_dataframe_from_comments(["Excelente comida"], source="Google Maps", load_date=load_date)
