@@ -422,3 +422,102 @@ def test_real_case_institutional_phrase_gets_filtered():
     result = comment_processor.clean_raw_text(raw)
     assert result["comentarios_validos"] == []
     assert result["total_descartados"] == 1
+
+
+# ── Regression tests: Solución Definitiva (Mayo 2026) ────────────────────────
+
+def test_sentiment_graduating_student_is_very_positive():
+    """'jamás olvidaré' en contexto positivo no debe disparar Muy Negativo."""
+    comment = "Ya me estoy graduando de la prepa y para mi fue una experiencia muy bonita en donde encontré a todos mis amigos y experiencias que jamás olvidaré, doy gracias por todos los profesores"
+    label, score = comment_processor.classify_sentiment(comment)
+    assert score >= 4, f"Esperado >=4, obtenido {score} ({label})"
+
+
+def test_sentiment_torneo_indereq_is_positive():
+    """'nunca olvidaré' en contexto de logro no debe disparar Muy Negativo."""
+    comment = "Muy agradecido con mi escuela por apoyarme en el torneo INDEREQ, donde tuve la suerte de ganar. Fue una gran experiencia que nunca olvidaré."
+    label, score = comment_processor.classify_sentiment(comment)
+    assert score >= 4, f"Esperado >=4, obtenido {score} ({label})"
+
+
+def test_sentiment_miss_carol_grosera_is_negative():
+    """'grosera' en NEGATIVE_WORDS → comentario mixto con crítica debe ser Negativo o Neutral."""
+    comment = "El nivel académico es bueno, algunos profesores son buenos pero otros simplemente no la dan para eso, la miss Carol de formación Marista es muy grosera."
+    label, score = comment_processor.classify_sentiment(comment)
+    assert score <= 3, f"Esperado <=3, obtenido {score} ({label})"
+
+
+def test_sentiment_estoy_contento_is_positive():
+    """'contento' en POSITIVE_WORDS → debe ser al menos Positivo."""
+    comment = "Estoy muy contento de haber cursado mis 3 años de preparatoria en la universidad marista."
+    label, score = comment_processor.classify_sentiment(comment)
+    assert score >= 4, f"Esperado >=4, obtenido {score} ({label})"
+
+
+def test_sentiment_ampliamente_recomendada_is_positive():
+    """'recomendada' en POSITIVE_WORDS → debe ser al menos Positivo."""
+    comment = "Ampliamente recomendada."
+    label, score = comment_processor.classify_sentiment(comment)
+    assert score >= 4, f"Esperado >=4, obtenido {score} ({label})"
+
+
+def test_sentiment_rectora_ineficiente_ratas_is_very_negative():
+    """Crítica severa con 'ineficiente', 'ratas' y 'hay universidades mejores' → Muy Negativo."""
+    comment = "Una rectora ineficiente, algunos profesores buenos, otros malos, ofrecen cosas que no pueden cumplir, cafetería con ratas y sin fin de cosas, la vdd hay universidades mejores."
+    label, score = comment_processor.classify_sentiment(comment)
+    assert score <= 2, f"Esperado <=2, obtenido {score} ({label})"
+
+
+def test_sentiment_desaprovechenla_is_very_negative():
+    """'desaprovéchenla' → debe clasificar como Muy Negativo."""
+    comment = "Si tienen la oportunidad de entrar ahí, desaprovéchenla totalmente. No vale la pena."
+    label, score = comment_processor.classify_sentiment(comment)
+    assert score == 1, f"Esperado 1 (Muy Negativo), obtenido {score} ({label})"
+
+
+def test_filter_propietario_line_is_discarded():
+    """'Universidad Marista de Querétaro (propietario)' → siempre filtrada."""
+    raw = "Universidad Marista de Querétaro (propietario)\n"
+    result = comment_processor.clean_raw_text(raw)
+    assert result["comentarios_validos"] == []
+
+
+def test_filter_local_guide_line_is_discarded():
+    """Línea con 'Local Guide·107 opiniones·270 fotos' → filtrada."""
+    raw = "Local Guide·107 opiniones·270 fotos\n"
+    result = comment_processor.clean_raw_text(raw)
+    assert result["comentarios_validos"] == []
+
+
+def test_filter_reviewer_name_by_lookahead():
+    """Nombre de perfil seguido de '1 opinión' → filtrado por look-ahead."""
+    raw = "hugo mejia\n1 opinión\nHace 7 meses\nestuve interesado en la carrera\n"
+    result = comment_processor.clean_raw_text(raw)
+    validos = result["comentarios_validos"]
+    assert "hugo mejia" not in validos
+    assert any("interesado" in v for v in validos)
+
+
+def test_filter_username_special_chars():
+    """Usernames con ':V XD' o 'xD UwU' → filtrados como username especial."""
+    raw = "Yologamer :V XD\nCara_de_jennys_xD UwU\nExcelente escuela con buenos maestros.\n"
+    result = comment_processor.clean_raw_text(raw)
+    validos = result["comentarios_validos"]
+    assert "Yologamer :V XD" not in validos
+    assert "Cara_de_jennys_xD UwU" not in validos
+    assert any("Excelente" in v for v in validos)
+
+
+def test_filter_institutional_response_anonimato():
+    """Texto institucional sobre anonimato → filtrado."""
+    raw = "Lamentablemente, el anonimato no nos permite iniciar este diálogo contigo directamente."
+    result = comment_processor.clean_raw_text(raw)
+    assert result["comentarios_validos"] == []
+
+
+def test_filter_institutional_comunicate():
+    """'Comunícate con nosotros y atenderemos' → filtrado."""
+    raw = "Comunícate con nosotros y atenderemos puntualmente tu situación."
+    result = comment_processor.clean_raw_text(raw)
+    assert result["comentarios_validos"] == []
+

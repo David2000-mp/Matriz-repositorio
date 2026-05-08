@@ -98,6 +98,8 @@ POSITIVE_WORDS = {
     "recibimiento", "convivir", "buenos", "buena", "bueno", "amables", "atencion", "recomienda",
     "buen", "mejores", "buenisimo", "buenisima", "amplios", "adecuados", "capacitado", "capacitados",
     "bonitas", "amplia", "amplio", "cordial", "respetuoso", "incluyente", "apoyo",
+    "contento", "contenta", "recomendada", "orgullosa", "alegre", "encantada", "encantado",
+    "maravillosa", "maravilloso", "gratitud", "agradecido", "agradecida",
 }
 
 POSITIVE_PHRASES = {
@@ -124,6 +126,10 @@ POSITIVE_PHRASES = {
     "gran cantidad de salones",
     "son bienvenidos siempre",
     "universidad con valores",
+    "muy bonito todo",
+    "experiencia muy bonita",
+    "experiencia increible",
+    "siempre al pendiente",
 }
 
 NEGATIVE_WORDS = {
@@ -138,6 +144,8 @@ NEGATIVE_WORDS = {
     "angosto", "oscuro", "sofocante", "simple", "comun", "ordinario", "mediocre", "repetitivo",
     "cansado", "agobiante", "estresante", "presionado", "apurado", "insuficiente", "desorganizado",
     "tedioso", "impersonal", "burocratico", "viejo",
+    "grosero", "grosera", "malos", "malas", "malisimo", "malisima", "triste", "decepciona",
+    "ineficiente", "incumple",
 }
 
 NEGATIVE_PHRASES = {
@@ -172,11 +180,20 @@ NEGATIVE_PHRASES = {
     "no puede hacer nada",
     "otros lugares con mas accesibilidad",
     "otros lugares con mas accecibilidad",
+    "hay universidades mejores",
+    "algunos profesores buenos otros malos",
+    "algunos son buenos pero otros malos",
+    "les quedo grande el cargo",
+    "ofrecen cosas que no pueden cumplir",
+    "no se abriria",
+    "rectora ineficiente",
+    "no valen la pena",
+    "no vale la pena",
 }
 
 VERY_NEGATIVE_WORDS = {
     "pesimo", "asco", "horrible", "desastre", "terrible", "inaceptable", "sucio", "fatal",
-    "nunca", "jamas", "estafa", "vergonzoso", "robo", "peligroso", "insultante", "insalubre",
+    "estafa", "vergonzoso", "robo", "peligroso", "insultante", "insalubre",
     "groseria", "fraude", "mentira", "engano", "negligencia", "peligro", "riesgo", "inseguro",
     "asqueroso", "podrido", "vencido", "prepotente", "despota", "abusivo", "injusto", "carisimo",
     "inaccesible", "ineficiente", "tortuoso", "caotico", "abandono", "ruina", "inservible",
@@ -220,6 +237,17 @@ VERY_NEGATIVE_PHRASES = {
     "dinero tirado",
     "tiempo perdido",
     "cero estrellas",
+    "desaprovechenla totalmente",
+    "desaprovechenla",
+    "cafeteria con ratas",
+    "encubren casos de acoso",
+    "encubren al acosador",
+    "sistema educativo en primera es malisimo",
+    "si tienen la oportunidad de entrar ahi desaprovechenla",
+    "si tienen la oportunidad desaprovechenla",
+    "me hicieron bullying",
+    "me hacian bullying",
+    "me quisieron tirar",
 }
 
 # Frases boilerplate de plataformas (Google Maps, Facebook, etc) + escuelas
@@ -250,6 +278,7 @@ PLATFORM_BOILERPLATE = {
     "editado hace",
     "opinion",
     "opiniones",
+    "local guide",
 }
 
 # Regex para patrones de boilerplate que no se pueden capturar con frases exactas.
@@ -284,6 +313,22 @@ INSTITUTIONAL_RESPONSE_PHRASES = {
     "gracias por tu comentario y calificacion",
     "hola ",
     "son bienvenidos siempre a esta su casa",
+    "el anonimato no nos permite",
+    "comunicate con nosotros y atenderemos",
+    "apreciamos y valoramos profundamente la retroalimentacion",
+    "derivaremos tu comentario",
+    "nuestras puertas siempre estaran abiertas",
+    "estamos siempre disponibles para atenderte",
+    "nos alegra saber que disfrutas de nuestras instalaciones",
+    "esperamos que hayas disfrutado tu estancia",
+    "reiteramos nuestro compromiso",
+    "te comparto nuestro link",
+    "canal de denuncia se encuentra abierto",
+    "comite de proteccion",
+    "avanzando hacia la construccion de un ambiente libre",
+    "nos alegra saber que valoras la educacion marista",
+    "nos motiva saber que es un espacio que valoras",
+    "confiando en que tu mensaje encontrara el eco que buscas",
 }
 
 # Prioridad de categorias multisectoriales: especificas primero, genericas al final.
@@ -443,6 +488,10 @@ def _detect_platform_boilerplate(text: str) -> bool:
     if not normalized:
         return False
 
+    # Detectar respuestas del propietario por sufijo "(propietario)" o "(owner)"
+    if "(propietario)" in normalized or "(owner)" in normalized:
+        return True
+
     for phrase in PLATFORM_BOILERPLATE:
         if phrase in normalized:
             return True
@@ -548,16 +597,32 @@ def clean_raw_text(raw_text: str, *, min_chars: int = 4) -> dict:
             "descarte_detalles": [],
         }
 
+    # Regex para detectar líneas que son inequívocamente metadata de Google Maps
+    # que aparecen justo después del nombre del revisor.
+    # IMPORTANTE: Solo usar indicadores unívocos (N opiniones, Local Guide).
+    # No incluir "Hace N tiempo" porque también aparece después de reseñas reales.
+    _NEXT_LINE_IS_METADATA = re.compile(
+        r"(?i)^(?:"
+        r"\d+\s+opini[o\u00f3]n(?:es)?"    # "1 opinión", "3 opiniones" (con/sin tilde)
+        r"|local\s+guide"                  # "Local Guide·..."
+        r")"
+    )
+
+    # Regex para detectar nombres de usuario con caracteres no convencionales
+    _USERNAME_PATTERN = re.compile(
+        r"(?i)(?:[:;]v|xd|uwu|[xX][dD]|_[a-z]|[a-z]_[a-z]|:\)|:p|:v)"
+    )
+
     unique_comments: list[str] = []
     seen: set[str] = set()
     descarte_detalles: list[tuple[str, str]] = []
     total_original = 0
 
-    for line in str(raw_text).splitlines():
-        cleaned = _strip_invisible_chars(line).strip()
-        cleaned = re.sub(r"\s+", " ", cleaned)
-        total_original += 1
+    lines = [_strip_invisible_chars(ln).strip() for ln in str(raw_text).splitlines()]
+    lines = [re.sub(r"\s+", " ", ln) for ln in lines]
+    total_original = len(lines)
 
+    for idx, cleaned in enumerate(lines):
         # Filtro 1: Longitud minima
         if len(cleaned) < min_chars:
             descarte_detalles.append(("longitud_insuficiente", cleaned))
@@ -573,7 +638,22 @@ def clean_raw_text(raw_text: str, *, min_chars: int = 4) -> dict:
             descarte_detalles.append(("boilerplate_plataforma", cleaned))
             continue
 
-        # Filtro 4: Duplicados exactos
+        # Filtro 4 (look-ahead): Si la siguiente línea no vacía es metadata,
+        # esta línea es un nombre de revisor → descartar.
+        next_non_empty = next(
+            (lines[j] for j in range(idx + 1, min(idx + 4, len(lines))) if lines[j].strip()),
+            None,
+        )
+        if next_non_empty and _NEXT_LINE_IS_METADATA.match(next_non_empty):
+            descarte_detalles.append(("nombre_perfil_lookahead", cleaned))
+            continue
+
+        # Filtro 5: Nombre de usuario con caracteres especiales de internet
+        if _USERNAME_PATTERN.search(cleaned) and len(cleaned.split()) <= 5:
+            descarte_detalles.append(("username_especial", cleaned))
+            continue
+
+        # Filtro 6: Duplicados exactos
         if cleaned in seen:
             descarte_detalles.append(("duplicado_exacto", cleaned))
             continue
@@ -650,7 +730,10 @@ def classify_sentiment(comment: str) -> tuple[str, int]:
 
     # Si hay contraste adversativo ("pero", "aunque") y señales negativas,
     # reducimos el peso de lo positivo para evitar falsos "Muy Positivo".
-    if any(tok in ADVERSATIVE_WORDS for tok in tokens) and (very_negative_hits > 0 or negative_hits > 0):
+    # NOTA: tokens son filtrados de stopwords ("pero" es stopword), por eso
+    # verificamos en el texto normalizado directamente.
+    _has_adversative = any(f" {adv} " in f" {normalized} " for adv in ADVERSATIVE_WORDS)
+    if _has_adversative and (very_negative_hits > 0 or negative_hits > 0):
         positive_hits = max(0, positive_hits - 1)
         very_positive_hits = max(0, very_positive_hits - 1)
 
