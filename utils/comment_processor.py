@@ -96,6 +96,7 @@ POSITIVE_WORDS = {
     "suculento", "apetecible", "artesanal", "cuidado", "detallista", "coherente", "diestro",
     "inteligente", "prudente", "cauteloso", "pulcro", "feliz", "alegria",
     "recibimiento", "convivir", "buenos", "buena", "bueno", "amables", "atencion", "recomienda",
+    "buen", "mejores", "buenisimo", "buenisima", "amplios", "adecuados", "capacitado", "capacitados",
 }
 
 POSITIVE_PHRASES = {
@@ -227,7 +228,20 @@ PLATFORM_BOILERPLATE = {
     "hace una semana",
     "hace un dia",
     "facebook",
+    "google review",
+    "foto de",
 }
+
+# Regex para patrones de boilerplate que no se pueden capturar con frases exactas.
+# Ejemplos: "Hace 2 años", "Hace 5 meses", "A. B.", "J. L. M."
+_BOILERPLATE_REGEX = re.compile(
+    r"(?i)^"
+    r"(?:"
+    r"hace\s+\d+\s+(?:ano|anos|mes|meses|semana|semanas|dia|dias|hora|horas|minuto|minutos)"  # Hace X años/meses...
+    r"|[A-ZÁÉÍÓÚÑ]\.(?:\s+[A-ZÁÉÍÓÚÑ]\.)+\s*$"  # Iniciales: A. B. / J. L. M.
+    r"|[A-ZÁÉÍÓÚÑ][a-záéíóúñ]*\.\s+[A-ZÁÉÍÓÚÑ]\.\s*$"  # Nombre inicial: Juan A.
+    r")"
+)
 
 # Prioridad de categorias multisectoriales: especificas primero, genericas al final.
 # Diseñado para instituciones educativas mexicanas con metricas sociales.
@@ -360,13 +374,17 @@ def _detect_system_noise(text: str) -> bool:
 
 def _detect_platform_boilerplate(text: str) -> bool:
     """Detecta frases boilerplate de Google Maps/Facebook/Instagram.
-    
-    Descarta frases como: 'recomienda a X', 'estrellas', 'hace un momento'.
+
+    Descarta:
+    - Frases de la lista PLATFORM_BOILERPLATE (exactas, normalizadas)
+    - Patrones regex: 'Hace X años/meses', iniciales 'A. B.', 'J. L. M.'
     """
     normalized = normalize_text(text)
     for phrase in PLATFORM_BOILERPLATE:
         if phrase in normalized:
             return True
+    if _BOILERPLATE_REGEX.match(normalized):
+        return True
     return False
 
 
