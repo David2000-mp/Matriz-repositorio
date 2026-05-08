@@ -15,6 +15,12 @@ import plotly.express as px
 import streamlit as st
 
 from components import PLOTLY_CONFIG, PLOTLY_LAYOUT_DEFAULTS
+from utils.comment_processor import (
+    clean_raw_text,
+    create_dataframe_from_comments,
+    export_full_csv,
+    export_manual_load_csv,
+)
 from utils.data_provider import data_provider
 from utils.text_mining import (
     TEXT_COLUMNS_DEFAULT,
@@ -38,6 +44,28 @@ SENTIMENT_COLORS = {
     "positivo": "#0A7D35",
     "neutral": "#CC7000",
     "negativo": "#B42318",
+}
+
+IMPORTER_MASTER_HEADERS = {
+    "fecha_carga": "fecha_carga",
+    "fuente": "fuente",
+    "comentario_original": "Comentarios de la seccion de opinion",
+    "sentimiento_etiqueta": "sentimiento_etiqueta",
+    "sentimiento_score": "sentimiento_score",
+    "categoria": "categoria",
+}
+
+IMPORTER_MANUAL_HEADERS = {
+    "comentario_original": "Comentarios de la seccion de opinion",
+    "fuente": "fuente",
+}
+
+SENTIMENT_SCORE_COLORS = {
+    1: "#B42318",
+    2: "#F04438",
+    3: "#9CA3AF",
+    4: "#12B76A",
+    5: "#039855",
 }
 
 
@@ -102,9 +130,175 @@ def _global_sentiment(df: pd.DataFrame, selected_cols: list[str]) -> pd.DataFram
     return merged.groupby("sentimiento", as_index=False)["total"].sum()
 
 
+def _score_to_stars(value: int) -> str:
+    score = int(value) if pd.notna(value) else 0
+    score = max(1, min(5, score))
+    return "★" * score + "☆" * (5 - score)
+
+
+def _render_comment_importer() -> None:
+    st.subheader("Importador de comentarios")
+    st.caption(
+        "Pega todos los comentarios de una sola vez, procesa en lote y descarga CSV para carga manual."
+    )
+
+    source_col, info_col = st.columns([2, 3])
+    with source_col:
+        source = st.selectbox(
+            "Fuente",
+            options=["Google Maps", "Facebook", "Instagram", "TikTok", "Otra"],
+            key="comment_import_source",
+        )
+    with info_col:
+        st.info(
+            "Flujo recomendado: pegar bloque completo -> procesar -> descargar archivo maestro y/o archivo de carga manual."
+        )
+
+    raw_text = st.text_area(
+        "Pega aqui los comentarios (uno por linea)",
+        key="comment_import_raw_text",
+        height=180,
+        placeholder="Excelente servicio\nMuy caro para lo que ofrecen\nEl lugar estaba limpio",
+    )
+
+    if st.button("Procesar comentarios", key="comment_import_process"):
+        cleanup_result = clean_raw_text(raw_text)
+        cleaned = cleanup_result["comentarios_validos"]
+        if not cleaned:
+            st.warning("No se detectaron comentarios validos despues de limpiar el texto.")
+            st.info(
+                f"Analisis: {cleanup_result['total_original']} lineas originales, "
+                f"{cleanup_result['total_descartados']} descartadas por ruido/duplicados."
+            )
+            return
+
+        processed_df = create_dataframe_from_comments(cleaned, source)
+        st.session_state["comment_import_processed_df"] = processed_df
+        st.session_state["comment_import_cleanup_result"] = cleanup_result
+        
+        # Mostrar metricas de limpieza
+        st.success(
+            f"Se procesaron {cleanup_result['total_original']} lineas: "
+            f"{len(cleaned)} validas y {cleanup_result['total_descartados']} descartadas."
+        )
+
+    processed_df = st.session_state.get("comment_import_processed_df")
+    if processed_df is None or processed_df.empty:
+        return
+
+    summary = (
+        processed_df["sentimiento_etiqueta"]
+        .value_counts()
+        .reindex(["Muy Positivo", "Positivo", "Neutral", "Negativo", "Muy Negativo"], fill_value=0)
+    )
+
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Comentarios procesados", f"{len(processed_df):,}")
+    c2.metric("Promedio sentimiento", f"{processed_df['sentimiento_score'].mean():.2f}/5")
+    c3.metric("Alertas criticas", int(summary["Muy Negativo"]))
+
+    st.caption(
+        " | ".join(
+            [
+                f"Muy Positivo: {int(summary['Muy Positivo'])}",
+                f"Positivo: {int(summary['Positivo'])}",
+                f"Neutral: {int(summary['Neutral'])}",
+                f"Negativo: {int(summary['Negativo'])}",
+                f"Muy Negativo: {int(summary['Muy Negativo'])}",
+            ]
+        )
+    )
+
+    if int(summary["Muy Negativo"]) > 0:
+        st.error(f"Se detectaron {int(summary['Muy Negativo'])} alertas criticas Muy Negativas.")
+
+    st.markdown("**Opciones de exportacion manual**")
+    option_col_1, option_col_2 = st.columns(2)
+    with option_col_1:
+        include_source_in_manual = st.toggle(
+            "Incluir columna fuente en CSV manual",
+            value=False,
+            key="comment_import_include_source_manual",
+            help="Si se activa, el archivo manual incluye comentario_original y fuente.",
+        )
+    with option_col_2:
+        manual_comment_header = st.text_input(
+            "Nombre de columna para comentarios (CSV manual)",
+            value="Comentarios de la seccion de opinion",
+            key="comment_import_manual_header_name",
+        ).strip()
+        if not manual_comment_header:
+            manual_comment_header = "Comentarios de la seccion de opinion"
+
+    preview_df = processed_df.copy()
+    preview_df["sentimiento_estrellas"] = preview_df["sentimiento_score"].map(_score_to_stars)
+
+    st.dataframe(
+        preview_df[["comentario_original", "sentimiento_etiqueta", "sentimiento_score", "sentimiento_estrellas", "categoria"]],
+        width="stretch",
+        column_config={
+            "comentario_original": st.column_config.TextColumn("Comentario", width="large"),
+            "sentimiento_etiqueta": st.column_config.TextColumn("Sentimiento"),
+            "sentimiento_score": st.column_config.NumberColumn("Score", min_value=1, max_value=5),
+            "sentimiento_estrellas": st.column_config.TextColumn("Escala"),
+            "categoria": st.column_config.TextColumn("Categoria"),
+        },
+        hide_index=True,
+    )
+
+    legend_html = "".join(
+        [
+            f"<span style='display:inline-block;margin-right:10px;color:{color};font-weight:700'>{score}</span>"
+            for score, color in SENTIMENT_SCORE_COLORS.items()
+        ]
+    )
+    st.markdown(f"Colores de severidad: {legend_html}", unsafe_allow_html=True)
+
+    try:
+        full_csv_bytes = export_full_csv(
+            processed_df,
+            header_mapping=IMPORTER_MASTER_HEADERS,
+        )
+        manual_headers = dict(IMPORTER_MANUAL_HEADERS)
+        manual_headers["comentario_original"] = manual_comment_header
+
+        manual_csv_bytes = export_manual_load_csv(
+            processed_df,
+            include_source=include_source_in_manual,
+            header_mapping=manual_headers,
+        )
+
+        d1, d2 = st.columns(2)
+        with d1:
+            st.download_button(
+                "Descargar CSV completo",
+                data=full_csv_bytes,
+                file_name="comentarios_procesados_completo.csv",
+                mime="text/csv",
+                key="comment_import_download_full_csv",
+            )
+        with d2:
+            st.download_button(
+                "Descargar CSV solo carga manual",
+                data=manual_csv_bytes,
+                file_name="comentarios_carga_manual.csv",
+                mime="text/csv",
+                key="comment_import_download_manual_csv",
+            )
+
+        st.caption(
+            "CSV completo: respaldo historico y analitica. "
+            "CSV solo carga manual: listo para copiar/pegar en la hoja y columna que definas."
+        )
+    except ValueError as exc:
+        st.error(f"No se pudo preparar el CSV: {exc}")
+
+
 def render_text_analysis_dashboard() -> None:
     st.title("Analisis de textos")
     st.caption("Mineria de textos local y gratuita sobre columnas textuales del formulario.")
+    _render_comment_importer()
+    st.divider()
 
     df = data_provider.get_merged_data(force_reload=False)
     if df is None or df.empty:

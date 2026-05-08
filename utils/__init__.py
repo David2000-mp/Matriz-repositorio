@@ -33,6 +33,8 @@ from .helpers import (
     generar_reporte_html,
 )
 
+from . import comment_processor
+
 __all__ = [
     # Data manager
     "conectar_sheets",
@@ -63,4 +65,5 @@ __all__ = [
     "get_banner_css",
     "simular",
     "generar_reporte_html",
+    "comment_processor",
 ]
