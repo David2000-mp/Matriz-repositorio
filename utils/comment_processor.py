@@ -118,6 +118,7 @@ POSITIVE_PHRASES = {
     "buen balance entre estudio y deporte",
     "recomienda colegio",
     "recomienda jacona",
+    "muy buen nivel academico",
 }
 
 NEGATIVE_WORDS = {
@@ -156,6 +157,12 @@ NEGATIVE_PHRASES = {
     "servicio regular",
     "atencion deficiente",
     "instalaciones viejas",
+    "deja mucho que desear",
+    "no es la escuela para ustedes",
+    "no funciona",
+    "favoritismo evidente",
+    "da mal la informacion",
+    "solo son amables mientras",
 }
 
 VERY_NEGATIVE_WORDS = {
@@ -230,6 +237,10 @@ PLATFORM_BOILERPLATE = {
     "facebook",
     "google review",
     "foto de",
+    "universidad marista (propietario)",
+    "editado hace",
+    "opinion",
+    "opiniones",
 }
 
 # Regex para patrones de boilerplate que no se pueden capturar con frases exactas.
@@ -238,10 +249,32 @@ _BOILERPLATE_REGEX = re.compile(
     r"(?i)^"
     r"(?:"
     r"hace\s+\d+\s+(?:ano|anos|mes|meses|semana|semanas|dia|dias|hora|horas|minuto|minutos)"  # Hace X años/meses...
-    r"|[A-ZÁÉÍÓÚÑ]\.(?:\s+[A-ZÁÉÍÓÚÑ]\.)+\s*$"  # Iniciales: A. B. / J. L. M.
-    r"|[A-ZÁÉÍÓÚÑ][a-záéíóúñ]*\.\s+[A-ZÁÉÍÓÚÑ]\.\s*$"  # Nombre inicial: Juan A.
+    r"|editado\s+hace\s+\d+\s+(?:ano|anos|mes|meses|semana|semanas|dia|dias)"
+    r"|foto\s+\d+\s+de\s+la\s+opinion\s+de.*"
+    r"|\d+\s+opinion(?:es)?(?:\s*·\s*\d+\s+foto(?:s)?)?"
+    r"|[a-z]\.(?:\s+[a-z]\.)+\s*$"  # Iniciales normalizadas: a. b. / j. l. m.
+    r"|(?:❤️|🙏|🔥|👍|👏|💯|😀|😍|🥰|😡|😢|😂|🤣|😭|😎|😮|😱)+\d*"
+    r"|(?:\d+)?(?:❤️|🙏|🔥|👍|👏|💯|😀|😍|🥰|😡|😢|😂|🤣|😭|😎|😮|😱)+"
+    r"|(?:&#\d+;){2,}\d*"
     r")"
 )
+
+# Nombre simple de perfil: "Pedro Is", "Lenin Tonatiuh Carbajal Ortega", "Manuel"
+_PROFILE_NAME_REGEX = re.compile(r"^[A-ZÁÉÍÓÚÑ][A-Za-zÁÉÍÓÚÑáéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][A-Za-zÁÉÍÓÚÑáéíóúñ]+){0,4}$")
+
+# Respuestas institucionales del propietario/escuela.
+INSTITUTIONAL_RESPONSE_PHRASES = {
+    "agradecemos tus comentarios",
+    "seguimos a tus ordenes",
+    "saludos cordiales",
+    "quedamos a tus ordenes",
+    "lamentamos leer tu comentario",
+    "lamentamos que tu experiencia",
+    "nos preocupa tu situacion",
+    "recibe un cordial saludo",
+    "gracias por tu comentario y calificacion",
+    "hola ",
+}
 
 # Prioridad de categorias multisectoriales: especificas primero, genericas al final.
 # Diseñado para instituciones educativas mexicanas con metricas sociales.
@@ -352,6 +385,19 @@ CATEGORY_KEYWORDS = [
     ),
 ]
 
+CATEGORY_KEYWORDS_MAP = {category_name: set(keywords) for category_name, keywords in CATEGORY_KEYWORDS}
+
+PRICE_TRIGGER_WORDS = {
+    "costo", "costos", "precio", "precios", "caro", "cara", "carisimo", "carisima",
+    "cuota", "cuotas", "mensualidad", "mensualidades", "colegiatura", "colegiaturas",
+    "pago", "pagos", "cobro", "cobros", "descuento", "descuentos", "beca", "becas",
+    "dinero", "economico", "economica", "recargo", "recargos", "tarifa", "tarifas",
+    "inversion", "inversiones", "barato", "barata", "gasto", "gastos",
+}
+
+ADVERSATIVE_WORDS = {"pero", "aunque", "sin", "embargo"}
+NEGATION_WORDS = {"no", "tampoco", "nunca", "jamas"}
+
 TOKEN_RE = re.compile(r"[a-zA-Z0-9_]+", re.UNICODE)
 SYSTEM_ID_PATTERN = re.compile(r"\b[a-z0-9]{5,}\b")
 
@@ -380,11 +426,31 @@ def _detect_platform_boilerplate(text: str) -> bool:
     - Patrones regex: 'Hace X años/meses', iniciales 'A. B.', 'J. L. M.'
     """
     normalized = normalize_text(text)
+    stripped = text.strip()
+
+    if not normalized:
+        return False
+
     for phrase in PLATFORM_BOILERPLATE:
         if phrase in normalized:
             return True
+
+    for phrase in INSTITUTIONAL_RESPONSE_PHRASES:
+        if phrase in normalized:
+            return True
+
     if _BOILERPLATE_REGEX.match(normalized):
         return True
+
+    # Reacciones puras tipo "❤️🙏10" (simbolos + digitos, sin letras).
+    only_symbols_and_digits = re.fullmatch(r"[^A-Za-zÁÉÍÓÚáéíóúÑñ]*", stripped) is not None
+    has_reaction_signal = any(ch.isdigit() for ch in stripped) and any(not ch.isalnum() and not ch.isspace() for ch in stripped)
+    if only_symbols_and_digits and has_reaction_signal:
+        return True
+
+    if _PROFILE_NAME_REGEX.match(stripped):
+        return True
+
     return False
 
 
@@ -418,16 +484,24 @@ def tokenize_spanish(text: str) -> list[str]:
     return [tok for tok in tokens if tok not in SPANISH_STOPWORDS]
 
 
-def _detect_negation(text: str, pos: int) -> bool:
-    """Detecta si hay negacion (no, tampoco, nunca, jamas) antes de una palabra positiva.
-    
-    Busca negaciones en una ventana de 15 caracteres antes de la posición actual.
-    """
-    start = max(0, pos - 15)
-    prefix = text[start:pos]
-    negation_words = {"no", "tampoco", "nunca", "jamas"}
-    tokens_prefix = prefix.split()
-    return len(tokens_prefix) > 0 and tokens_prefix[-1] in negation_words
+def _find_subsequence_start(tokens: list[str], subsequence: list[str]) -> int | None:
+    """Devuelve indice inicial de una subsecuencia exacta de tokens."""
+    if not subsequence or len(subsequence) > len(tokens):
+        return None
+    limit = len(tokens) - len(subsequence) + 1
+    for idx in range(limit):
+        if tokens[idx: idx + len(subsequence)] == subsequence:
+            return idx
+    return None
+
+
+def _has_negation_before(tokens: list[str], index: int, *, window: int = 5) -> bool:
+    """Detecta negacion en una ventana de tokens previa a un indice."""
+    start = max(0, index - window)
+    for tok in tokens[start:index]:
+        if tok in NEGATION_WORDS:
+            return True
+    return False
 
 
 def clean_raw_text(raw_text: str, *, min_chars: int = 4) -> dict:
@@ -516,6 +590,8 @@ def classify_sentiment(comment: str) -> tuple[str, int]:
     if not normalized:
         return "Neutral", 3
 
+    tokens = tokenize_spanish(normalized)
+
     # PASO 1: Buscar frases muy negativas (mas precisas que palabras)
     for phrase in VERY_NEGATIVE_PHRASES:
         if phrase in normalized:
@@ -530,20 +606,21 @@ def classify_sentiment(comment: str) -> tuple[str, int]:
     for phrase in NEGATIVE_PHRASES:
         if phrase in normalized:
             # Puede ser negado ("no le falta mucho" = positivo)
-            pos = normalized.find(phrase)
-            if not _detect_negation(normalized, pos):
+            phrase_tokens = tokenize_spanish(normalize_text(phrase))
+            phrase_start = _find_subsequence_start(tokens, phrase_tokens)
+            if phrase_start is None or not _has_negation_before(tokens, phrase_start):
                 return "Negativo", 2
     
     # PASO 4: Buscar frases positivas
     for phrase in POSITIVE_PHRASES:
         if phrase in normalized:
             # Puede ser negado
-            pos = normalized.find(phrase)
-            if not _detect_negation(normalized, pos):
+            phrase_tokens = tokenize_spanish(normalize_text(phrase))
+            phrase_start = _find_subsequence_start(tokens, phrase_tokens)
+            if phrase_start is None or not _has_negation_before(tokens, phrase_start):
                 return "Positivo", 4
 
     # PASO 5: Scoring basado en palabras individuales
-    tokens = tokenize_spanish(normalized)
     if not tokens:
         return "Neutral", 3
 
@@ -556,9 +633,14 @@ def classify_sentiment(comment: str) -> tuple[str, int]:
     negation_penalty = 0
     for pos, tok in enumerate(tokens):
         if tok in POSITIVE_WORDS or tok in VERY_POSITIVE_WORDS:
-            # Reconstruir posición en texto normalizado
-            if _detect_negation(normalized, pos * 10):
+            if _has_negation_before(tokens, pos):
                 negation_penalty += 1
+
+    # Si hay contraste adversativo ("pero", "aunque") y señales negativas,
+    # reducimos el peso de lo positivo para evitar falsos "Muy Positivo".
+    if any(tok in ADVERSATIVE_WORDS for tok in tokens) and (very_negative_hits > 0 or negative_hits > 0):
+        positive_hits = max(0, positive_hits - 1)
+        very_positive_hits = max(0, very_positive_hits - 1)
 
     weighted_score = (2 * very_positive_hits + positive_hits) - (2 * very_negative_hits + negative_hits) - negation_penalty
 
@@ -580,10 +662,27 @@ def detect_categories(comment: str) -> str:
         return "Otro"
 
     tokens = set(tokenize_spanish(normalized))
+    if not tokens:
+        return "Otro"
 
-    for category_name, keywords in CATEGORY_KEYWORDS:
-        if tokens.intersection(keywords):
-            return category_name
+    if tokens.intersection(CATEGORY_KEYWORDS_MAP["Academico/Calidad"]):
+        return "Academico/Calidad"
+
+    if tokens.intersection(CATEGORY_KEYWORDS_MAP["Infraestructura"]):
+        return "Infraestructura"
+
+    # Precio/Valor requiere contexto economico explicito para evitar falsos positivos
+    # por palabras ambiguas como "eventos", "ruta" o "tramites".
+    if tokens.intersection(CATEGORY_KEYWORDS_MAP["Precio/Valor"]) and (
+        tokens.intersection(PRICE_TRIGGER_WORDS) or "vale la pena" in normalized
+    ):
+        return "Precio/Valor"
+
+    if tokens.intersection(CATEGORY_KEYWORDS_MAP["Servicio/Atencion"]):
+        return "Servicio/Atencion"
+
+    if tokens.intersection(CATEGORY_KEYWORDS_MAP["Ambiente/Comunidad"]):
+        return "Ambiente/Comunidad"
 
     return "Otro"
 

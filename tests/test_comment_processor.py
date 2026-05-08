@@ -49,7 +49,7 @@ def test_clean_raw_text_filters_platform_boilerplate():
     """Filtra frases boilerplate: 'recomienda a', 'estrellas', 'hace un momento', etc."""
     raw = (
         "recomienda a Juan\n"
-        "estrellas y mas estrellas\n"
+        "Google Review\n"
         "hace un momento publique\n"
         "ver traduccion aqui\n"
         "Pero este comentario real si vale\n"
@@ -313,3 +313,46 @@ def test_multi_phrase_detection():
     assert label == "Muy Negativo", (
         f"Frase muy negativa no detectada. Esperado 'Muy Negativo', obtuve '{label}'"
     )
+
+
+def test_sentiment_detects_structural_negation_real_case():
+    """Caso real: negacion estructural no debe salir positiva por palabras academicas."""
+    comment = (
+        "Si estan buscando educacion de calidad, trato digno y buen ambiente escolar, "
+        "esta no es la escuela para ustedes."
+    )
+    label, score = comment_processor.classify_sentiment(comment)
+    assert label in {"Negativo", "Muy Negativo"}
+    assert score <= 2
+
+
+def test_sentiment_detects_negative_clause_after_positive_words():
+    """Caso real: frase con 'solo son amables mientras...' debe clasificarse negativa."""
+    comment = "Solo son amables mientras estas interesado en hacer la inscripcion de ahi en fuera se acabo"
+    label, score = comment_processor.classify_sentiment(comment)
+    assert label in {"Negativo", "Muy Negativo"}
+    assert score <= 2
+
+
+def test_clean_raw_text_filters_google_maps_metadata_and_profile_rows():
+    """Filtra metadatos de Google Maps: fotos, editado hace, nombres y reacciones."""
+    raw = (
+        "Foto 1 de la opinion de Mario Velazquez\n"
+        "Editado Hace 6 meses\n"
+        "1 opinion·3 fotos\n"
+        "Lenin Tonatiuh Carbajal Ortega\n"
+        "❤️🙏10\n"
+        "Excelente universidad para la buena formacion personal y academica\n"
+    )
+    result = comment_processor.clean_raw_text(raw)
+    cleaned = result["comentarios_validos"]
+
+    assert cleaned == ["Excelente universidad para la buena formacion personal y academica"]
+    assert result["total_descartados"] == 5
+
+
+def test_detect_categories_price_is_contextual_not_triggered_by_event_or_route():
+    """Precio/Valor no debe activarse solo por palabras ambiguas como evento/ruta."""
+    comment = "Vine como expositor en el evento de la ruta de los muertos, el lugar es amplio"
+    detected = comment_processor.detect_categories(comment)
+    assert detected != "Precio/Valor"
