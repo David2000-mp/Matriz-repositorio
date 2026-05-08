@@ -97,6 +97,7 @@ POSITIVE_WORDS = {
     "inteligente", "prudente", "cauteloso", "pulcro", "feliz", "alegria",
     "recibimiento", "convivir", "buenos", "buena", "bueno", "amables", "atencion", "recomienda",
     "buen", "mejores", "buenisimo", "buenisima", "amplios", "adecuados", "capacitado", "capacitados",
+    "bonitas", "amplia", "amplio", "cordial", "respetuoso", "incluyente", "apoyo",
 }
 
 POSITIVE_PHRASES = {
@@ -119,6 +120,10 @@ POSITIVE_PHRASES = {
     "recomienda colegio",
     "recomienda jacona",
     "muy buen nivel academico",
+    "mucho espacio verde",
+    "gran cantidad de salones",
+    "son bienvenidos siempre",
+    "universidad con valores",
 }
 
 NEGATIVE_WORDS = {
@@ -163,6 +168,10 @@ NEGATIVE_PHRASES = {
     "favoritismo evidente",
     "da mal la informacion",
     "solo son amables mientras",
+    "no le permiten bajar",
+    "no puede hacer nada",
+    "otros lugares con mas accesibilidad",
+    "otros lugares con mas accecibilidad",
 }
 
 VERY_NEGATIVE_WORDS = {
@@ -274,6 +283,7 @@ INSTITUTIONAL_RESPONSE_PHRASES = {
     "recibe un cordial saludo",
     "gracias por tu comentario y calificacion",
     "hola ",
+    "son bienvenidos siempre a esta su casa",
 }
 
 # Prioridad de categorias multisectoriales: especificas primero, genericas al final.
@@ -316,6 +326,7 @@ CATEGORY_KEYWORDS = [
             "aire acondicionado", "calefaccion", "luz", "electricidad", "impermeabilizante", "techo",
             "piso", "ventanas", "cortinas", "persianas", "areas verdes", "plantas", "arboles", "sombra",
             "diseno", "arquitectura", "renovado", "moderno", "funcional",
+            "accesibilidad", "accecibilidad",
         },
     ),
     (
@@ -358,6 +369,7 @@ CATEGORY_KEYWORDS = [
             "disposicion", "voluntad", "compromiso", "etica", "profesionalismo", "vocacion",
             "paciencia", "tolerancia", "asertividad", "calidez", "trato humano", "personalizado",
             "escucha", "empatia", "solucion", "problemas", "agilidad", "prontitud", "velocidad",
+            "permiso", "permiten", "permitir", "autorizar", "autorizan",
         },
     ),
     (

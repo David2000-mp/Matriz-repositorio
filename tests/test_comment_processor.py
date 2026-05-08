@@ -378,3 +378,47 @@ def test_detect_categories_price_is_contextual_not_triggered_by_event_or_route()
     comment = "Vine como expositor en el evento de la ruta de los muertos, el lugar es amplio"
     detected = comment_processor.detect_categories(comment)
     assert detected != "Precio/Valor"
+
+
+def test_real_case_bonitas_instalaciones_should_be_positive_infra():
+    comment = "Bonitas instalaciones, mucho espacio verde, estacionamiento muy amplio, gran cantidad de salones"
+    label, score = comment_processor.classify_sentiment(comment)
+    category = comment_processor.detect_categories(comment)
+    assert label in {"Positivo", "Muy Positivo"}
+    assert score >= 4
+    assert category == "Infraestructura"
+
+
+def test_real_case_restriction_should_be_negative_service_or_other():
+    comment = (
+        "Si a mi hijo no le gana del bano en 10 minutos no puede hacer nada por q su cuerpo "
+        "no quiere y no le permiten bajar por q esta haciendo grabaciones"
+    )
+    label, score = comment_processor.classify_sentiment(comment)
+    category = comment_processor.detect_categories(comment)
+    assert label in {"Negativo", "Muy Negativo"}
+    assert score <= 2
+    assert category in {"Servicio/Atencion", "Otro"}
+
+
+def test_real_case_accessibility_comparison_should_be_negative_infra():
+    comment = "Existen otros lugares con mas accecibilidad que esta Universidad para poner la vacuna de prevencion de Covid"
+    label, score = comment_processor.classify_sentiment(comment)
+    category = comment_processor.detect_categories(comment)
+    assert label in {"Negativo", "Muy Negativo"}
+    assert score <= 2
+    assert category == "Infraestructura"
+
+
+def test_real_case_values_and_cordial_should_be_positive():
+    comment = "Es una universidad con valores en la que el trato es cordial, respetuoso e incluyente"
+    label, score = comment_processor.classify_sentiment(comment)
+    assert label in {"Positivo", "Muy Positivo"}
+    assert score >= 4
+
+
+def test_real_case_institutional_phrase_gets_filtered():
+    raw = "Son bienvenidos siempre a esta su casa.\n"
+    result = comment_processor.clean_raw_text(raw)
+    assert result["comentarios_validos"] == []
+    assert result["total_descartados"] == 1
