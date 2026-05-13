@@ -250,6 +250,13 @@ VERY_NEGATIVE_PHRASES = {
     "me quisieron tirar",
 }
 
+# Terminos de riesgo critico: si aparecen, priorizar severidad maxima.
+CRITICAL_ALERT_WORDS = {
+    "abuso", "abusos", "abusaron", "abusador", "violacion", "violencia", "acoso",
+    "maltrato", "negligencia", "corrupcion", "impune", "encubren", "encubrimiento",
+    "clausurado", "clausurados", "clausura",
+}
+
 # Frases boilerplate de plataformas (Google Maps, Facebook, etc) + escuelas
 PLATFORM_BOILERPLATE = {
     "recomienda a",
@@ -701,6 +708,10 @@ def classify_sentiment(comment: str) -> tuple[str, int]:
         return "Neutral", 3
 
     tokens = tokenize_spanish(normalized)
+
+    # Regla de seguridad: cualquier termino critico debe escalar a muy negativo.
+    if any(term in normalized for term in CRITICAL_ALERT_WORDS):
+        return "Muy Negativo", 1
 
     # PASO 1: Buscar frases muy negativas (mas precisas que palabras)
     for phrase in VERY_NEGATIVE_PHRASES:

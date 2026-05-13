@@ -173,6 +173,20 @@ def test_sentiment_classification_with_extended_education_lexicon():
         assert score == expected_score, f"Fallo score para '{comment}': esperado {expected_score}, obtuve {score}"
 
 
+def test_sentiment_classification_marks_abuso_as_critical():
+    """Comentarios con abuso deben clasificarse como Muy Negativo por riesgo critico."""
+    comment = (
+        "No es un colegio que respondan a alguna incidencia que pueda ocurrir al interior del inmueble, "
+        "la prueba esta el abuso de un niño, donde ya fueron clausurados, y con influencias, "
+        "lograron reabrir el colegio."
+    )
+
+    label, score = comment_processor.classify_sentiment(comment)
+
+    assert label == "Muy Negativo"
+    assert score == 1
+
+
 def test_create_dataframe_from_comments_has_expected_columns_and_iso_date():
     load_date = datetime(2026, 5, 8, tzinfo=timezone.utc)
     df = comment_processor.create_dataframe_from_comments(
