@@ -45,6 +45,21 @@ def test_clean_raw_text_filters_system_ids_entropy():
     assert result["total_descartados"] >= 3
 
 
+def test_clean_raw_text_keeps_real_spanish_sentences_not_system_noise():
+    """Evita falsos positivos de ruido_sistema en frases reales largas."""
+    raw = (
+        "No es un colegio que respondan a alguna incidencia que pueda ocurrir al interior del inmueble\n"
+        "Sus principios, sus valores y su nivel academico son muy buenos\n"
+        "Muchas gracias por eso y por tooodo\n"
+    )
+
+    result = comment_processor.clean_raw_text(raw)
+    cleaned = result["comentarios_validos"]
+
+    assert len(cleaned) == 3
+    assert not any(motivo == "ruido_sistema" for motivo, _ in result["descarte_detalles"])
+
+
 def test_clean_raw_text_filters_platform_boilerplate():
     """Filtra frases boilerplate: 'recomienda a', 'estrellas', 'hace un momento', etc."""
     raw = (

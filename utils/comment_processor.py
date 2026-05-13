@@ -461,17 +461,35 @@ SYSTEM_ID_PATTERN = re.compile(r"\b[a-z0-9]{5,}\b")
 
 def _detect_system_noise(text: str) -> bool:
     """Detecta ruido de sistema: IDs aleatorios sin suficientes vocales.
-    
-    Patrones: m63gi9, 606ga6, 7ia4t, rnpSostdeol
-    Logica: palabras alphanumericas con <35% vocales = probable ID de sistema.
+
+    Esta heuristica solo se aplica a lineas de una sola palabra (tipo token),
+    para evitar falsos positivos en frases reales en espanol.
+
+    Patrones esperados: m63gi9, 606ga6, rnpSostdeol.
     """
-    words = text.split()
-    for word in words:
-        if len(word) >= 5 and word.isalnum():
-            vowels = sum(1 for c in word.lower() if c in "aeiouáéíóú")
-            vowel_ratio = vowels / len(word)
-            if vowel_ratio < 0.35:  # Menos del 35% vocales
-                return True
+    candidate = text.strip().strip(".,;:!?()[]{}\"'")
+    if not candidate:
+        return False
+
+    # Si hay espacios, es casi seguro que es un comentario real.
+    if " " in candidate:
+        return False
+
+    if not candidate.isalnum() or len(candidate) < 5:
+        return False
+
+    vowels = sum(1 for c in candidate.lower() if c in "aeiouáéíóú")
+    vowel_ratio = vowels / len(candidate)
+    has_digit = any(ch.isdigit() for ch in candidate)
+
+    # IDs alfanumericos con digitos y baja proporcion de vocales.
+    if has_digit and vowel_ratio < 0.35:
+        return True
+
+    # Tokens largos sin digitos pero muy poco pronunciables.
+    if not has_digit and vowel_ratio < 0.30:
+        return True
+
     return False
 
 
