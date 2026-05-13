@@ -176,50 +176,44 @@ def build_followers_growth_ranking(
     ranking_rows = []
 
     if mode == "monthly":
+        # Modo mejorado: cada entidad/plataforma compara sus últimos 2 meses disponibles
         dfc["Mes"] = dfc["fecha"].dt.to_period("M").dt.to_timestamp()
+        
+        # Obtener última medición por mes para cada entidad/plataforma
         monthly_latest = (
             dfc.groupby(["entidad", "plataforma", "Mes"], as_index=False)
             .tail(1)
             .copy()
         )
-
-        months = sorted(monthly_latest["Mes"].dropna().unique())
-        if len(months) < 2:
-            return pd.DataFrame(columns=base_cols)
-
-        latest_month = months[-1]
-        previous_month = months[-2]
-
-        current_rows = (
-            monthly_latest[monthly_latest["Mes"] == latest_month]
-            [["entidad", "plataforma", "fecha", "seguidores"]]
-            .rename(
-                columns={
-                    "fecha": "fecha_mas_reciente",
-                    "seguidores": "seguidores_mas_reciente",
-                }
-            )
-        )
-
-        previous_rows = (
-            monthly_latest[monthly_latest["Mes"] == previous_month]
-            [["entidad", "plataforma", "fecha", "seguidores"]]
-            .rename(
-                columns={
-                    "fecha": "fecha_anterior",
-                    "seguidores": "seguidores_anterior",
-                }
-            )
-        )
-
-        merged = pd.merge(
-            current_rows,
-            previous_rows,
-            on=["entidad", "plataforma"],
-            how="inner",
-        )
-
-        ranking_rows = merged.to_dict("records")
+        
+        # Para cada entidad/plataforma, obtener sus últimos 2 meses
+        for (entidad, plataforma), group in monthly_latest.groupby(["entidad", "plataforma"]):
+            meses_unicos = sorted(group["Mes"].dropna().unique())
+            
+            # Necesita al menos 2 meses distintos
+            if len(meses_unicos) < 2:
+                continue
+            
+            # Últimos 2 meses para esta entidad/plataforma
+            latest_month = meses_unicos[-1]
+            previous_month = meses_unicos[-2]
+            
+            # Obtener datos de ambos meses
+            latest_data = group[group["Mes"] == latest_month]
+            previous_data = group[group["Mes"] == previous_month]
+            
+            if not latest_data.empty and not previous_data.empty:
+                latest_row = latest_data.iloc[0]
+                previous_row = previous_data.iloc[0]
+                
+                ranking_rows.append({
+                    "entidad": entidad,
+                    "plataforma": plataforma,
+                    "fecha_mas_reciente": latest_row["fecha"],
+                    "seguidores_mas_reciente": latest_row["seguidores"],
+                    "fecha_anterior": previous_row["fecha"],
+                    "seguidores_anterior": previous_row["seguidores"],
+                })
     else:
         for (entidad, plataforma), group in dfc.groupby(["entidad", "plataforma"]):
             group_sorted = group.sort_values("fecha", ascending=False)
