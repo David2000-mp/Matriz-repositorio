@@ -60,20 +60,20 @@ SPANISH_STOPWORDS = {
 
 # NIVEL 5: MUY POSITIVO (Embajadores de Marca)
 VERY_POSITIVE_WORDS = {
-    "excelente", "increible", "maravilloso", "espectacular", "perfecto", "extraordinario", "brutal",
-    "impresionante", "fascinante", "top", "integral", "excelencia", "pedagogico", "calidez",
+    "excelente", "maravilloso", "espectacular", "perfecto", "extraordinario", "brutal",
+    "impresionante", "fascinante", "top", "excelencia", "pedagogico", "calidez",
     "profesionalismo", "joya", "impecable", "recomendadisimo", "pedagogia", "supremo",
     "inmejorable", "asombroso", "ejemplar", "transformador", "humanista", "inspirador", "unico",
     "sobresaliente", "gratitud", "bendicion", "exito", "orgullo", "tradicion", "prestigio", "solido",
     "honesto", "seguro", "confiable", "amor", "dedicacion", "pasion", "entrega", "vocacion",
-    "sabiduria", "luz", "guia", "armonia", "plenitud", "crecimiento", "vida", "futuro",
+    "sabiduria", "luz", "guia", "armonia", "plenitud", "crecimiento", "futuro",
     "esperanza", "impacto", "genial", "epico", "inolvidable", "premium", "elite", "brillante",
-    "experto", "dedicado", "carismatico", "empatico", "transparente", "autentico", "leal", "fiel",
+    "experto", "dedicado", "carismatico", "empatico", "transparente", "autentico", "leal",
     "resiliente", "valiente", "audaz", "creativo", "innovador", "visionario", "culto", "preparado",
     "capaz", "eficiente", "responsable", "comprometido", "moral", "justo", "noble", "bondadoso",
     "generoso", "altruista", "solidario", "inigualable", "extraordinario", "magnifico", "imbatible",
     "insuperable", "sublime", "glorioso", "virtuoso", "humano", "corazon",
-    "amo", "adoro", "encanta", "encanto",
+    "amo", "adoro", "adore", "extraordinaria", "extraordinario",
 }
 
 VERY_POSITIVE_PHRASES = {
@@ -103,7 +103,7 @@ POSITIVE_WORDS = {
     "recibimiento", "convivir", "buenos", "buena", "bueno", "amables", "atencion", "recomienda",
     "buen", "mejores", "buenisimo", "buenisima", "amplios", "adecuados", "capacitado", "capacitados",
     "bonitas", "amplia", "amplio", "cordial", "respetuoso", "incluyente", "apoyo",
-    "contento", "contenta", "recomendada", "orgullosa", "alegre", "encantada", "encantado",
+    "contento", "contenta", "recomendada", "orgullosa", "alegre",
     "maravillosa", "maravilloso", "gratitud", "agradecido", "agradecida",
 }
 
@@ -133,7 +133,6 @@ POSITIVE_PHRASES = {
     "universidad con valores",
     "muy bonito todo",
     "experiencia muy bonita",
-    "experiencia increible",
     "siempre al pendiente",
     "extrano mucho",
 }
@@ -151,7 +150,7 @@ NEGATIVE_WORDS = {
     "cansado", "agobiante", "estresante", "presionado", "apurado", "insuficiente", "desorganizado",
     "tedioso", "impersonal", "burocratico", "viejo",
     "grosero", "grosera", "malos", "malas", "malisimo", "malisima", "triste", "decepciona",
-    "ineficiente", "incumple",
+    "ineficiente", "incumple", "peor", "molestias", "molesto", "problemas", "pagar",
 }
 
 NEGATIVE_PHRASES = {
@@ -207,7 +206,8 @@ VERY_NEGATIVE_WORDS = {
     "reclamo", "maltrato", "humillacion", "discriminacion", "racismo", "clasismo", "machismo",
     "acoso", "violencia", "panico", "intoxicacion", "crudo", "quemado", "desastroso",
     "catastrofico", "patetico", "lamentable", "indignacion", "traumatico", "cloaca", "ratero",
-    "nefasto", "impune", "corrupto", "indignante", "terror", "abusos",
+    "nefasto", "nefasta", "impune", "corrupto", "indignante", "terror", "abusos",
+    "arrogancia", "soberbia", "antivalores", "decepcion",
 }
 
 VERY_NEGATIVE_PHRASES = {
