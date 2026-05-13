@@ -14,6 +14,9 @@ from typing import Iterable
 
 import pandas as pd
 
+# Sistema automático de retroalimentación
+from . import feedback_system
+
 # Orden de exportacion completa (archivo maestro).
 CSV_COLUMN_ORDER = [
     "fecha_carga",
@@ -1011,3 +1014,80 @@ def export_manual_load_csv(
         required_order=required_order,
         header_mapping=header_mapping,
     )
+
+
+# ============================================================================
+# WRAPPERS PARA SISTEMA AUTOMÁTICO DE RETROALIMENTACIÓN
+# ============================================================================
+
+
+def record_comment_feedback(
+    comment: str,
+    predicted_label: str,
+    predicted_score: int,
+    correct_label: str,
+    correct_score: int,
+) -> None:
+    """Registra feedback sobre clasificación de sentimiento.
+
+    El sistema automáticamente aprende de los comentarios marcados como
+    incorrectos y mejora con el tiempo.
+
+    Ejemplo:
+    --------
+    >>> record_comment_feedback(
+    ...     comment="Que decepción de escuela",
+    ...     predicted_label="Neutral",
+    ...     predicted_score=3,
+    ...     correct_label="Muy Negativo",
+    ...     correct_score=1
+    ... )
+    """
+    feedback_system.record_feedback(
+        comment, predicted_label, predicted_score, correct_label, correct_score
+    )
+
+
+def get_feedback_stats() -> dict:
+    """Retorna estadísticas del sistema de feedback.
+
+    Returns
+    -------
+    dict
+        Accuracy, total de comentarios, etc.
+    """
+    return feedback_system.get_feedback_stats()
+
+
+def get_mispredictions_by_type() -> dict:
+    """Retorna mispredictions agrupadas por tipo de error."""
+    return feedback_system.get_mispredictions_by_type()
+
+
+def get_improvement_suggestions() -> dict:
+    """Genera sugerencias automáticas de mejora basadas en feedback.
+
+    El sistema analiza los comentarios mal clasificados e identifica
+    palabras/frases que deberían agregarse a los diccionarios.
+
+    Returns
+    -------
+    dict
+        Sugerencias por categoría con palabras candidatas
+    """
+    return feedback_system.get_improvement_suggestions()
+
+
+def apply_suggestions() -> None:
+    """Aplica sugerencias automáticamente al sistema.
+
+    Actualiza VERY_POSITIVE_WORDS y VERY_NEGATIVE_WORDS
+    con palabras sugeridas automáticamente.
+    """
+    suggestions = feedback_system.get_improvement_suggestions()
+    feedback_system.apply_suggestions_to_processor(suggestions)
+
+
+def get_feedback_report() -> str:
+    """Genera reporte human-readable del feedback acumulado."""
+    return feedback_system.get_feedback_report()
