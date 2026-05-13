@@ -170,6 +170,42 @@ def scroll_to_top_on_nav_change(nav_state_key: str = "page_selection", tracker_k
         )
 
 
+def inject_clipboard_shortcut_guard():
+        """Evita que Ctrl/Cmd+C/V/X propaguen a atajos globales de la app."""
+        components.html(
+                """
+                <script>
+                (() => {
+                    const installGuard = (doc) => {
+                        if (!doc || doc.__champiClipboardGuardInstalled) return;
+                        doc.__champiClipboardGuardInstalled = true;
+
+                        doc.addEventListener(
+                            "keydown",
+                            (event) => {
+                                const key = (event.key || "").toLowerCase();
+                                const isClipboardShortcut = (event.ctrlKey || event.metaKey) && ["c", "v", "x"].includes(key);
+                                if (!isClipboardShortcut) return;
+
+                                // Bloqueamos la propagación para no activar shortcuts globales de Streamlit.
+                                event.stopPropagation();
+                            },
+                            true
+                        );
+                    };
+
+                    installGuard(document);
+                    try {
+                        installGuard(parent.document);
+                    } catch (_) {}
+                })();
+                </script>
+                """,
+                height=0,
+                width=0,
+        )
+
+
 def inject_custom_css():
     # Selector ultra específico para forzar estilos de glass-box
     st.markdown(

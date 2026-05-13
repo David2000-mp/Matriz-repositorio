@@ -1,11 +1,10 @@
 import math
-from datetime import datetime
 
 import numpy as np
 import pandas as pd
 import pytest
 
-from utils.analytics import calculate_growth_metrics
+from utils.analytics import calculate_growth_metrics, build_followers_growth_ranking
 
 
 def make_df(rows):
@@ -185,3 +184,54 @@ def test_calculate_growth_handles_nans_gracefully():
     assert list(res["Mes"]) == ["2024-01", "2024-02", "2024-03"]
     # Los NaN no deben provocar valores infinitos en deltas
     assert all((pd.isna(x) or np.isfinite(x)) for x in res["Delta_Seguidores"]) 
+
+
+def test_build_followers_growth_ranking_monthly_mode_uses_last_two_months():
+    df = pd.DataFrame(
+        [
+            {"entidad": "A", "plataforma": "Instagram", "fecha": "2026-01-10", "seguidores": 100},
+            {"entidad": "A", "plataforma": "Instagram", "fecha": "2026-02-10", "seguidores": 130},
+            {"entidad": "B", "plataforma": "Facebook", "fecha": "2026-01-10", "seguidores": 1000},
+            {"entidad": "B", "plataforma": "Facebook", "fecha": "2026-02-10", "seguidores": 1050},
+        ]
+    )
+
+    ranking = build_followers_growth_ranking(df, mode="monthly", top_n=15)
+
+    assert not ranking.empty
+    assert set(["crecimiento_abs", "crecimiento_pct", "score_hibrido"]).issubset(ranking.columns)
+    assert (ranking["crecimiento_abs"] > 0).all()
+    assert ranking.iloc[0]["entidad"] == "B"
+
+
+def test_build_followers_growth_ranking_latest_two_mode_handles_irregular_dates():
+    df = pd.DataFrame(
+        [
+            {"entidad": "A", "plataforma": "Instagram", "fecha": "2026-01-01", "seguidores": 400},
+            {"entidad": "A", "plataforma": "Instagram", "fecha": "2026-03-20", "seguidores": 460},
+            {"entidad": "C", "plataforma": "TikTok", "fecha": "2026-01-03", "seguidores": 50},
+            {"entidad": "C", "plataforma": "TikTok", "fecha": "2026-02-03", "seguidores": 65},
+        ]
+    )
+
+    ranking = build_followers_growth_ranking(df, mode="latest_two", top_n=15)
+
+    assert len(ranking) == 2
+    assert ranking["fecha_mas_reciente"].notna().all()
+    assert ranking["fecha_anterior"].notna().all()
+
+
+def test_build_followers_growth_ranking_excludes_low_base_pct_outliers():
+    df = pd.DataFrame(
+        [
+            {"entidad": "Outlier", "plataforma": "Instagram", "fecha": "2026-01-10", "seguidores": 1},
+            {"entidad": "Outlier", "plataforma": "Instagram", "fecha": "2026-02-10", "seguidores": 1000},
+            {"entidad": "Stable", "plataforma": "Facebook", "fecha": "2026-01-10", "seguidores": 1000},
+            {"entidad": "Stable", "plataforma": "Facebook", "fecha": "2026-02-10", "seguidores": 1080},
+        ]
+    )
+
+    ranking = build_followers_growth_ranking(df, mode="monthly", top_n=15)
+
+    assert "Outlier" not in ranking["entidad"].tolist()
+    assert "Stable" in ranking["entidad"].tolist()

@@ -7,6 +7,7 @@ import pandas as pd
 from components import (
     inject_custom_css,
     inject_layout_compact_css,
+    inject_clipboard_shortcut_guard,
     scroll_to_top_on_nav_change,
     render_custom_header,
 )
@@ -46,6 +47,7 @@ def main():
     try:
         inject_custom_css()
         inject_layout_compact_css(hide_streamlit_header=False)
+        inject_clipboard_shortcut_guard()
     except Exception as e:
         try:
             st.warning(f"No se pudo aplicar CSS personalizado: {e}")

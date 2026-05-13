@@ -120,6 +120,201 @@ def summarize_followers_growth(df_metricas: pd.DataFrame) -> dict:
     }
 
 
+def build_followers_growth_ranking(
+    df_metricas: pd.DataFrame,
+    mode: str = "monthly",
+    top_n: int = 15,
+    min_prev_followers: int = 50,
+    max_growth_pct: float = 500.0,
+) -> pd.DataFrame:
+    """Construye ranking híbrido de crecimiento de seguidores por institución/plataforma.
+
+    Args:
+        df_metricas: DataFrame con al menos entidad, plataforma, fecha, seguidores.
+        mode: "monthly" (último mes vs mes anterior) o "latest_two" (últimas 2 mediciones).
+        top_n: Número máximo de filas a devolver.
+        min_prev_followers: Umbral mínimo para considerar robusto el porcentaje.
+        max_growth_pct: Tope para considerar porcentaje como potencial outlier.
+
+    Returns:
+        DataFrame ordenado por score híbrido, con columnas de trazabilidad.
+    """
+    base_cols = [
+        "entidad",
+        "plataforma",
+        "fecha_mas_reciente",
+        "fecha_anterior",
+        "seguidores_mas_reciente",
+        "seguidores_anterior",
+        "crecimiento_abs",
+        "crecimiento_pct",
+        "score_hibrido",
+        "quality_flag",
+    ]
+
+    if df_metricas is None or df_metricas.empty:
+        return pd.DataFrame(columns=base_cols)
+
+    required = {"entidad", "plataforma", "fecha", "seguidores"}
+    if not required.issubset(df_metricas.columns):
+        return pd.DataFrame(columns=base_cols)
+
+    dfc = df_metricas.copy()
+    dfc["fecha"] = pd.to_datetime(dfc["fecha"], errors="coerce")
+    dfc["seguidores"] = pd.to_numeric(dfc["seguidores"], errors="coerce").fillna(0)
+    dfc = dfc.dropna(subset=["entidad", "plataforma", "fecha"])
+    dfc = dfc[dfc["entidad"].astype(str).str.strip() != ""]
+    dfc = dfc[dfc["plataforma"].astype(str).str.strip() != ""]
+    dfc = dfc.sort_values(["entidad", "plataforma", "fecha"])
+
+    if dfc.empty:
+        return pd.DataFrame(columns=base_cols)
+
+    if mode not in ("monthly", "latest_two"):
+        mode = "monthly"
+
+    ranking_rows = []
+
+    if mode == "monthly":
+        dfc["Mes"] = dfc["fecha"].dt.to_period("M").dt.to_timestamp()
+        monthly_latest = (
+            dfc.groupby(["entidad", "plataforma", "Mes"], as_index=False)
+            .tail(1)
+            .copy()
+        )
+
+        months = sorted(monthly_latest["Mes"].dropna().unique())
+        if len(months) < 2:
+            return pd.DataFrame(columns=base_cols)
+
+        latest_month = months[-1]
+        previous_month = months[-2]
+
+        current_rows = (
+            monthly_latest[monthly_latest["Mes"] == latest_month]
+            [["entidad", "plataforma", "fecha", "seguidores"]]
+            .rename(
+                columns={
+                    "fecha": "fecha_mas_reciente",
+                    "seguidores": "seguidores_mas_reciente",
+                }
+            )
+        )
+
+        previous_rows = (
+            monthly_latest[monthly_latest["Mes"] == previous_month]
+            [["entidad", "plataforma", "fecha", "seguidores"]]
+            .rename(
+                columns={
+                    "fecha": "fecha_anterior",
+                    "seguidores": "seguidores_anterior",
+                }
+            )
+        )
+
+        merged = pd.merge(
+            current_rows,
+            previous_rows,
+            on=["entidad", "plataforma"],
+            how="inner",
+        )
+
+        ranking_rows = merged.to_dict("records")
+    else:
+        for (entidad, plataforma), group in dfc.groupby(["entidad", "plataforma"]):
+            group_sorted = group.sort_values("fecha", ascending=False)
+            if len(group_sorted) < 2:
+                continue
+
+            latest = group_sorted.iloc[0]
+            previous = group_sorted.iloc[1]
+            ranking_rows.append(
+                {
+                    "entidad": entidad,
+                    "plataforma": plataforma,
+                    "fecha_mas_reciente": latest["fecha"],
+                    "seguidores_mas_reciente": latest["seguidores"],
+                    "fecha_anterior": previous["fecha"],
+                    "seguidores_anterior": previous["seguidores"],
+                }
+            )
+
+    growth_df = pd.DataFrame(ranking_rows)
+    if growth_df.empty:
+        return pd.DataFrame(columns=base_cols)
+
+    growth_df["seguidores_mas_reciente"] = pd.to_numeric(
+        growth_df["seguidores_mas_reciente"], errors="coerce"
+    ).fillna(0)
+    growth_df["seguidores_anterior"] = pd.to_numeric(
+        growth_df["seguidores_anterior"], errors="coerce"
+    ).fillna(0)
+
+    growth_df["crecimiento_abs"] = (
+        growth_df["seguidores_mas_reciente"] - growth_df["seguidores_anterior"]
+    )
+    growth_df = growth_df[growth_df["crecimiento_abs"] > 0].copy()
+
+    if growth_df.empty:
+        return pd.DataFrame(columns=base_cols)
+
+    growth_df["crecimiento_pct"] = np.where(
+        growth_df["seguidores_anterior"] > 0,
+        (growth_df["crecimiento_abs"] / growth_df["seguidores_anterior"]) * 100.0,
+        np.nan,
+    )
+
+    prev_low = growth_df["seguidores_anterior"] < float(min_prev_followers)
+    pct_outlier = growth_df["crecimiento_pct"] > float(max_growth_pct)
+    exclude_mask = prev_low & pct_outlier
+
+    quality_flag = np.where(exclude_mask, "excluded_low_base_outlier", "ok")
+    growth_df["quality_flag"] = quality_flag
+    growth_df = growth_df[~exclude_mask].copy()
+
+    if growth_df.empty:
+        return pd.DataFrame(columns=base_cols)
+
+    abs_rank = growth_df["crecimiento_abs"].rank(method="average", pct=True)
+    pct_rank = (
+        growth_df["crecimiento_pct"]
+        .clip(upper=float(max_growth_pct))
+        .fillna(0)
+        .rank(method="average", pct=True)
+    )
+
+    # Priorizamos el crecimiento absoluto para estabilidad y usamos % como ajuste.
+    growth_df["score_hibrido"] = (abs_rank * 0.70) + (pct_rank * 0.30)
+
+    growth_df = growth_df.sort_values(
+        ["score_hibrido", "crecimiento_abs", "crecimiento_pct"],
+        ascending=False,
+    ).head(int(top_n))
+
+    growth_df = growth_df.reset_index(drop=True)
+    growth_df["ranking_posicion"] = growth_df.index + 1
+
+    ordered_cols = [
+        "ranking_posicion",
+        "entidad",
+        "plataforma",
+        "fecha_mas_reciente",
+        "fecha_anterior",
+        "seguidores_mas_reciente",
+        "seguidores_anterior",
+        "crecimiento_abs",
+        "crecimiento_pct",
+        "score_hibrido",
+        "quality_flag",
+    ]
+
+    for col in ordered_cols:
+        if col not in growth_df.columns:
+            growth_df[col] = np.nan
+
+    return growth_df[ordered_cols].copy()
+
+
 def calculate_likes_promedio(engagement_rate: float, seguidores: int) -> float:
     """Calcula likes_promedio automáticamente basado en engagement_rate.
 

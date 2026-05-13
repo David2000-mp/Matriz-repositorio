@@ -28,6 +28,7 @@ from utils.analytics import (
     detect_anomalies,
     normalize_monthly_latest,
     summarize_followers_growth,
+    build_followers_growth_ranking,
 )
 from utils.reports import generate_pdf_report
 from utils.app_state import get_app_state
@@ -1296,57 +1297,50 @@ def render(df=None):
 
     # --- Ranking de Crecimiento de Seguidores ---
     st.markdown("### 🚀 Top 15: Crecimiento de Seguidores por Institución")
-    st.markdown("*Comparación entre las últimas 2 mediciones disponibles*")
+    growth_mode_label = st.radio(
+        "Modo de comparación temporal",
+        options=[
+            "Mensual (último mes vs mes anterior)",
+            "Últimas 2 mediciones",
+        ],
+        horizontal=True,
+        key="dashboard_growth_mode",
+    )
+
+    growth_mode = "monthly" if growth_mode_label.startswith("Mensual") else "latest_two"
+    st.caption("Ranking híbrido: combina crecimiento absoluto y porcentual para mayor precisión.")
 
     try:
-        # Calcular crecimiento entre las dos últimas mediciones por institución y plataforma
-        growth_data = []
-        
-        for (entidad, plataforma), group in df_full.groupby(['entidad', 'plataforma']):
-            # Ordenar por fecha descendente para obtener las mediciones más recientes
-            group_sorted = group.sort_values('fecha', ascending=False)
-            
-            if len(group_sorted) >= 2:
-                # Tomar las dos mediciones más recientes
-                latest = group_sorted.iloc[0]  # Más reciente
-                previous = group_sorted.iloc[1]  # Anterior
-                
-                crecimiento = latest['seguidores'] - previous['seguidores']
-                
-                if crecimiento > 0:  # Solo incluir crecimiento positivo
-                    growth_data.append({
-                        'entidad': entidad,
-                        'plataforma': plataforma,
-                        'fecha_mas_reciente': latest['fecha'],
-                        'seguidores_mas_reciente': latest['seguidores'],
-                        'fecha_anterior': previous['fecha'],
-                        'seguidores_anterior': previous['seguidores'],
-                        'crecimiento': crecimiento
-                    })
-        
-        growth_df = pd.DataFrame(growth_data)
-        
-        # Ordenar por crecimiento descendente y tomar top 15
-        if not growth_df.empty:
-            growth_df = growth_df.sort_values('crecimiento', ascending=False).head(15)
+        growth_df = build_followers_growth_ranking(
+            df_full,
+            mode=growth_mode,
+            top_n=15,
+        )
 
         if not growth_df.empty:
             # Crear gráfica bonita de crecimiento
             if px is not None:
+                subtitle = (
+                    "Último mes vs mes anterior"
+                    if growth_mode == "monthly"
+                    else "Entre las últimas 2 mediciones"
+                )
+
                 # Crear gráfica de barras verticales más visual
                 fig_growth = px.bar(
                     growth_df,
                     x='entidad',
-                    y='crecimiento',
+                    y='crecimiento_abs',
                     color='plataforma',
-                    title='🚀 Crecimiento de Seguidores por Institución<br><sup style="font-size:12px;">Entre las últimas 2 mediciones disponibles</sup>',
+                    title=f'🚀 Crecimiento de Seguidores por Institución<br><sup style="font-size:12px;">{subtitle}</sup>',
                     labels={
-                        'crecimiento': '📈 Crecimiento de Seguidores',
+                        'crecimiento_abs': '📈 Crecimiento de Seguidores',
                         'entidad': '🏫 Institución',
                         'plataforma': '📱 Plataforma'
                     },
                     color_discrete_map=COLOR_MAP,
-                    text='crecimiento'
+                    text='crecimiento_abs',
+                    custom_data=['crecimiento_pct', 'seguidores_anterior', 'seguidores_mas_reciente', 'score_hibrido']
                 )
 
                 # Personalizar la gráfica para que sea más bonita
@@ -1374,7 +1368,11 @@ def render(df=None):
                     marker_line_color='rgba(0,0,0,0.3)',
                     hovertemplate='<b>%{x}</b><br>' +
                                  '📱 %{fullData.name}<br>' +
-                                 '📈 Crecimiento: <b>%{y:,}</b> seguidores<br>' +
+                                 '📈 Crecimiento abs: <b>%{y:,}</b> seguidores<br>' +
+                                 '📊 Crecimiento %: <b>%{customdata[0]:.2f}%</b><br>' +
+                                 '👥 Seguidores previos: %{customdata[1]:,.0f}<br>' +
+                                 '👥 Seguidores actuales: %{customdata[2]:,.0f}<br>' +
+                                 '🎯 Score híbrido: %{customdata[3]:.2f}<br>' +
                                  '<extra></extra>'
                 )
 
@@ -1403,15 +1401,18 @@ def render(df=None):
                 with col1:
                     st.metric("🏆 Mayor Crecimiento", 
                              f"{growth_df.iloc[0]['entidad'][:20]}...", 
-                             f"+{growth_df.iloc[0]['crecimiento']:,}")
+                             f"+{growth_df.iloc[0]['crecimiento_abs']:,}")
                 with col2:
                     st.metric("📱 Plataforma Líder", 
-                             growth_df.groupby('plataforma')['crecimiento'].sum().idxmax(),
-                             f"{growth_df.groupby('plataforma')['crecimiento'].sum().max():,}")
+                             growth_df.groupby('plataforma')['crecimiento_abs'].sum().idxmax(),
+                             f"{growth_df.groupby('plataforma')['crecimiento_abs'].sum().max():,}")
                 with col3:
+                    avg_pct = growth_df['crecimiento_pct'].fillna(0).mean()
                     st.metric("📊 Total Crecimiento", 
-                             f"{growth_df['crecimiento'].sum():,}",
-                             f"{len(growth_df)} instituciones")
+                             f"{growth_df['crecimiento_abs'].sum():,}",
+                             f"Promedio {avg_pct:.2f}%")
+
+                st.caption("Se excluyen incrementos extremos con base previa muy baja para reducir falsos positivos.")
 
             else:
                 st.warning("Plotly no disponible - no se puede mostrar la gráfica")
