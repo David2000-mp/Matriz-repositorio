@@ -70,6 +70,7 @@ VERY_POSITIVE_WORDS = {
     "capaz", "eficiente", "responsable", "comprometido", "moral", "justo", "noble", "bondadoso",
     "generoso", "altruista", "solidario", "inigualable", "extraordinario", "magnifico", "imbatible",
     "insuperable", "sublime", "glorioso", "virtuoso", "humano", "corazon",
+    "amo", "adoro", "encanta", "encanto",
 }
 
 VERY_POSITIVE_PHRASES = {
