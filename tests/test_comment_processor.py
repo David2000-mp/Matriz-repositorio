@@ -173,6 +173,18 @@ def test_sentiment_classification_with_extended_education_lexicon():
         assert score == expected_score, f"Fallo score para '{comment}': esperado {expected_score}, obtuve {score}"
 
 
+def test_sentiment_classification_positive_nostalgia_and_stars():
+    """Comentarios de nostalgia marista y 5 estrellas deben clasificarse como positivos."""
+    cases = [
+        ("mi casa extraño mucho #marista México", "Positivo", 4),
+        ("5 estrellas", "Muy Positivo", 5),
+    ]
+    for comment, expected_label, expected_score in cases:
+        label, score = comment_processor.classify_sentiment(comment)
+        assert label == expected_label, f"Fallo para '{comment}': esperado {expected_label}, obtuve {label}"
+        assert score == expected_score
+
+
 def test_sentiment_classification_marks_abuso_as_critical():
     """Comentarios con abuso deben clasificarse como Muy Negativo por riesgo critico."""
     comment = (

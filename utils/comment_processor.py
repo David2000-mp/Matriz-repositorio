@@ -82,6 +82,7 @@ VERY_POSITIVE_PHRASES = {
     "humanismo puro", "los mejores anos", "gratitud infinita a los docentes",
     "formacion integral real", "comunidad muy unida", "semillero de lideres",
     "buen recibimiento", "buena educacion", "buenos maestros", "convivir con los papas",
+    "5 estrellas",
 }
 
 POSITIVE_WORDS = {
@@ -130,6 +131,7 @@ POSITIVE_PHRASES = {
     "experiencia muy bonita",
     "experiencia increible",
     "siempre al pendiente",
+    "extrano mucho",
 }
 
 NEGATIVE_WORDS = {
