@@ -14,7 +14,7 @@ from typing import Iterable
 
 import pandas as pd
 
-# Sistema automático de retroalimentación
+# Sistema automÃ¡tico de retroalimentaciÃ³n
 from . import feedback_system
 
 # Orden de exportacion completa (archivo maestro).
@@ -199,7 +199,7 @@ NEGATIVE_PHRASES = {
 VERY_NEGATIVE_WORDS = {
     "pesimo", "asco", "horrible", "desastre", "terrible", "inaceptable", "sucio", "fatal",
     "estafa", "vergonzoso", "robo", "peligroso", "insultante", "insalubre",
-    "groseria", "fraude", "mentira", "engano", "negligencia", "peligro", "riesgo", "inseguro",
+    "groseria", "fraude", "fraudulento", "fraudulenta", "mentira", "engano", "negligencia", "peligro", "riesgo", "inseguro",
     "asqueroso", "podrido", "vencido", "prepotente", "despota", "abusivo", "injusto", "carisimo",
     "inaccesible", "ineficiente", "tortuoso", "caotico", "abandono", "ruina", "inservible",
     "basura", "porqueria", "cuidado", "alerta", "denuncia", "demanda", "abogado", "queja",
@@ -295,23 +295,23 @@ PLATFORM_BOILERPLATE = {
 }
 
 # Regex para patrones de boilerplate que no se pueden capturar con frases exactas.
-# Ejemplos: "Hace 2 años", "Hace 5 meses", "A. B.", "J. L. M."
+# Ejemplos: "Hace 2 aÃ±os", "Hace 5 meses", "A. B.", "J. L. M."
 _BOILERPLATE_REGEX = re.compile(
     r"(?i)^"
     r"(?:"
-    r"hace\s+\d+\s+(?:ano|anos|mes|meses|semana|semanas|dia|dias|hora|horas|minuto|minutos)"  # Hace X años/meses...
+    r"hace\s+\d+\s+(?:ano|anos|mes|meses|semana|semanas|dia|dias|hora|horas|minuto|minutos)"  # Hace X aÃ±os/meses...
     r"|editado\s+hace\s+\d+\s+(?:ano|anos|mes|meses|semana|semanas|dia|dias)"
     r"|foto\s+\d+\s+de\s+la\s+opinion\s+de.*"
-    r"|\d+\s+opinion(?:es)?(?:\s*·\s*\d+\s+foto(?:s)?)?"
+    r"|\d+\s+opinion(?:es)?(?:\s*Â·\s*\d+\s+foto(?:s)?)?"
     r"|[a-z]\.(?:\s+[a-z]\.)+\s*$"  # Iniciales normalizadas: a. b. / j. l. m.
-    r"|(?:❤️|🙏|🔥|👍|👏|💯|😀|😍|🥰|😡|😢|😂|🤣|😭|😎|😮|😱)+\d*"
-    r"|(?:\d+)?(?:❤️|🙏|🔥|👍|👏|💯|😀|😍|🥰|😡|😢|😂|🤣|😭|😎|😮|😱)+"
+    r"|(?:â¤ï¸|ðŸ™|ðŸ”¥|ðŸ‘|ðŸ‘|ðŸ’¯|ðŸ˜€|ðŸ˜|ðŸ¥°|ðŸ˜¡|ðŸ˜¢|ðŸ˜‚|ðŸ¤£|ðŸ˜­|ðŸ˜Ž|ðŸ˜®|ðŸ˜±)+\d*"
+    r"|(?:\d+)?(?:â¤ï¸|ðŸ™|ðŸ”¥|ðŸ‘|ðŸ‘|ðŸ’¯|ðŸ˜€|ðŸ˜|ðŸ¥°|ðŸ˜¡|ðŸ˜¢|ðŸ˜‚|ðŸ¤£|ðŸ˜­|ðŸ˜Ž|ðŸ˜®|ðŸ˜±)+"
     r"|(?:&#\d+;){2,}\d*"
     r")"
 )
 
 # Nombre simple de perfil: "Pedro Is", "Lenin Tonatiuh Carbajal Ortega", "Manuel"
-_PROFILE_NAME_REGEX = re.compile(r"^[A-ZÁÉÍÓÚÑ][A-Za-zÁÉÍÓÚÑáéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][A-Za-zÁÉÍÓÚÑáéíóúñ]+){0,4}$")
+_PROFILE_NAME_REGEX = re.compile(r"^[A-ZÃÃ‰ÃÃ“ÃšÃ‘][A-Za-zÃÃ‰ÃÃ“ÃšÃ‘Ã¡Ã©Ã­Ã³ÃºÃ±]+(?:\s+[A-ZÃÃ‰ÃÃ“ÃšÃ‘][A-Za-zÃÃ‰ÃÃ“ÃšÃ‘Ã¡Ã©Ã­Ã³ÃºÃ±]+){0,4}$")
 
 # Respuestas institucionales del propietario/escuela.
 INSTITUTIONAL_RESPONSE_PHRASES = {
@@ -345,8 +345,8 @@ INSTITUTIONAL_RESPONSE_PHRASES = {
 }
 
 # Prioridad de categorias multisectoriales: especificas primero, genericas al final.
-# Diseñado para instituciones educativas mexicanas con metricas sociales.
-# TIP: marista, humanista, valores → prioritarios en Ambiente/Comunidad
+# DiseÃ±ado para instituciones educativas mexicanas con metricas sociales.
+# TIP: marista, humanista, valores â†’ prioritarios en Ambiente/Comunidad
 CATEGORY_KEYWORDS = [
     (
         "Academico/Calidad",
@@ -434,17 +434,17 @@ CATEGORY_KEYWORDS = [
         "Ambiente/Comunidad",
         {
             "valores", "familia", "convivencia", "amigos", "marista", "seguridad", "respeto",
-            "social", "integracion", "comunidad", "ambiente", "amistad", "compañerismo", "union",
+            "social", "integracion", "comunidad", "ambiente", "amistad", "compaÃ±erismo", "union",
             "fraternidad marista", "pastoral juvenil", "retiros espirituales", "integracion familiar",
             "sana convivencia", "inclusion educativa", "diversidad cultural", "sentido de pertenencia",
-            "misiones de semana santa", "voluntariado estudiantil", "kermés anual", "olimpiadas familiares",
+            "misiones de semana santa", "voluntariado estudiantil", "kermÃ©s anual", "olimpiadas familiares",
             "sociedad de alumnos", "ex alumnos", "valores institucionales", "ambiente libre de acoso",
             "jesuita", "salesiano", "benedictino", "humanista", "jesuitas",
             "claustro", "carisma", "tradicion", "historia", "futuro", "esperanza", "fe", "religion",
             "espiritualidad", "luz", "guia", "armonia", "plenitud", "crecimiento", "vida", "corazon",
             "valores maristas", "corazon de marista", "relacion", "grupo", "equipo", "hermandad",
             "fraternidad", "apoyo mutuo", "inclusion", "diversidad", "equidad", "genero", "paz",
-            "alegria", "diversion", "recreacion", "socializacion", "fiestas", "eventos", "kermés",
+            "alegria", "diversion", "recreacion", "socializacion", "fiestas", "eventos", "kermÃ©s",
             "misa", "pastoral", "retiro", "misiones", "servicio social", "voluntariado", "ecologia",
             "sustentabilidad", "conciencia social", "civica", "patriotismo", "moral", "justicia",
             "libertad", "verdad", "integridad", "responsabilidad", "pertenencia", "red", "contactos",
@@ -491,7 +491,7 @@ def _detect_system_noise(text: str) -> bool:
     if not candidate.isalnum() or len(candidate) < 5:
         return False
 
-    vowels = sum(1 for c in candidate.lower() if c in "aeiouáéíóú")
+    vowels = sum(1 for c in candidate.lower() if c in "aeiouÃ¡Ã©Ã­Ã³Ãº")
     vowel_ratio = vowels / len(candidate)
     has_digit = any(ch.isdigit() for ch in candidate)
 
@@ -511,7 +511,7 @@ def _detect_platform_boilerplate(text: str) -> bool:
 
     Descarta:
     - Frases de la lista PLATFORM_BOILERPLATE (exactas, normalizadas)
-    - Patrones regex: 'Hace X años/meses', iniciales 'A. B.', 'J. L. M.'
+    - Patrones regex: 'Hace X aÃ±os/meses', iniciales 'A. B.', 'J. L. M.'
     """
     normalized = normalize_text(text)
     stripped = text.strip()
@@ -534,8 +534,8 @@ def _detect_platform_boilerplate(text: str) -> bool:
     if _BOILERPLATE_REGEX.match(normalized):
         return True
 
-    # Reacciones puras tipo "❤️🙏10" (simbolos + digitos, sin letras).
-    only_symbols_and_digits = re.fullmatch(r"[^A-Za-zÁÉÍÓÚáéíóúÑñ]*", stripped) is not None
+    # Reacciones puras tipo "â¤ï¸ðŸ™10" (simbolos + digitos, sin letras).
+    only_symbols_and_digits = re.fullmatch(r"[^A-Za-zÃÃ‰ÃÃ“ÃšÃ¡Ã©Ã­Ã³ÃºÃ‘Ã±]*", stripped) is not None
     has_reaction_signal = any(ch.isdigit() for ch in stripped) and any(not ch.isalnum() and not ch.isspace() for ch in stripped)
     if only_symbols_and_digits and has_reaction_signal:
         return True
@@ -628,14 +628,14 @@ def clean_raw_text(raw_text: str, *, min_chars: int = 4) -> dict:
             "descarte_detalles": [],
         }
 
-    # Regex para detectar líneas que son inequívocamente metadata de Google Maps
-    # que aparecen justo después del nombre del revisor.
-    # IMPORTANTE: Solo usar indicadores unívocos (N opiniones, Local Guide).
-    # No incluir "Hace N tiempo" porque también aparece después de reseñas reales.
+    # Regex para detectar lÃ­neas que son inequÃ­vocamente metadata de Google Maps
+    # que aparecen justo despuÃ©s del nombre del revisor.
+    # IMPORTANTE: Solo usar indicadores unÃ­vocos (N opiniones, Local Guide).
+    # No incluir "Hace N tiempo" porque tambiÃ©n aparece despuÃ©s de reseÃ±as reales.
     _NEXT_LINE_IS_METADATA = re.compile(
         r"(?i)^(?:"
-        r"\d+\s+opini[o\u00f3]n(?:es)?"    # "1 opinión", "3 opiniones" (con/sin tilde)
-        r"|local\s+guide"                  # "Local Guide·..."
+        r"\d+\s+opini[o\u00f3]n(?:es)?"    # "1 opiniÃ³n", "3 opiniones" (con/sin tilde)
+        r"|local\s+guide"                  # "Local GuideÂ·..."
         r")"
     )
 
@@ -669,8 +669,8 @@ def clean_raw_text(raw_text: str, *, min_chars: int = 4) -> dict:
             descarte_detalles.append(("boilerplate_plataforma", cleaned))
             continue
 
-        # Filtro 4 (look-ahead): Si la siguiente línea no vacía es metadata,
-        # esta línea es un nombre de revisor → descartar.
+        # Filtro 4 (look-ahead): Si la siguiente lÃ­nea no vacÃ­a es metadata,
+        # esta lÃ­nea es un nombre de revisor â†’ descartar.
         next_non_empty = next(
             (lines[j] for j in range(idx + 1, min(idx + 4, len(lines))) if lines[j].strip()),
             None,
@@ -725,10 +725,22 @@ def classify_sentiment(comment: str) -> tuple[str, int]:
             return "Muy Negativo", 1
     
     # PASO 2: Buscar frases muy positivas
+    # Si hay palabras muy negativas en el texto, no retornar automáticamente Muy Positivo
+    has_very_negative_word = any(word in normalized for word in VERY_NEGATIVE_WORDS)
+    
     for phrase in VERY_POSITIVE_PHRASES:
         if phrase in normalized:
-            return "Muy Positivo", 5
-    
+            # Verificar si hay adversativo + negativa después (sarcasmo)
+            phrase_pos = normalized.find(phrase)
+            text_after = normalized[phrase_pos + len(phrase):]
+            
+            has_adversative_after = any(f" {adv} " in f" {text_after} " for adv in ADVERSATIVE_WORDS)
+            has_very_neg_after = any(word in text_after for word in VERY_NEGATIVE_WORDS)
+            
+            # Si hay sarcasmo O hay palabras muy negativas en el texto, no retornar
+            if not (has_adversative_after and has_very_neg_after) and not has_very_negative_word:
+                return "Muy Positivo", 5
+
     # PASO 3: Buscar frases negativas
     for phrase in NEGATIVE_PHRASES:
         if phrase in normalized:
@@ -756,18 +768,56 @@ def classify_sentiment(comment: str) -> tuple[str, int]:
     positive_hits = sum(1 for tok in tokens if tok in POSITIVE_WORDS)
     very_positive_hits = sum(1 for tok in tokens if tok in VERY_POSITIVE_WORDS)
 
-    # Penalidad si hay negacion antes de palabra positiva
+        # ==================================================================================
+        # OPCIÃ“N 1: Detectar sarcasmo por estructura [POSITIVA] + [ADVERSATIVO] + [NEGATIVA]
+        # ==================================================================================
+    _has_adversative = any(f" {adv} " in f" {normalized} " for adv in ADVERSATIVE_WORDS)
+    
+    if _has_adversative and very_negative_hits > 0 and very_positive_hits > 0:
+            # Buscar la posiciÃ³n del adversativo mÃ¡s cercano
+        adversative_positions = []
+        for adv in ADVERSATIVE_WORDS:
+            idx = normalized.find(f" {adv} ")
+            if idx >= 0:
+                adversative_positions.append(idx)
+        
+            if adversative_positions:
+                first_adversative_pos = min(adversative_positions)
+                pre_text = normalized[:first_adversative_pos]
+                post_text = normalized[first_adversative_pos:]
+            
+                # Si hay palabras muy positivas ANTES del adversativo
+                # y palabras muy negativas DESPUÃ‰S â†’ estructura sarcÃ¡stica
+                has_very_pos_before = any(word in pre_text for word in VERY_POSITIVE_WORDS)
+                has_very_neg_after = any(word in post_text for word in VERY_NEGATIVE_WORDS)
+            
+                # OpciÃ³n 1: InversiÃ³n automÃ¡tica de sarcasmo
+                if has_very_pos_before and has_very_neg_after:
+                    very_positive_hits = 0
+                    positive_hits = 0
+
+        # ==================================================================================
+        # OPCIÃ“N 2: Si hay VERY_NEGATIVE en el texto, contexto de pÃ¡rrafo â†’ ignorar positivas
+        # ==================================================================================
+        if very_negative_hits > 0 and (positive_hits > 0 or very_positive_hits > 0):
+            # Las palabras positivas son sospechosas cuando hay muy_negativas en el contexto
+            # (tÃ­picamente sarcasmo o contraste: "encantÃ³ pero [problema]")
+            # Reducir el peso de las positivas proporcionalmente
+            reduction_factor = min(very_negative_hits, 2)  # Max 2x reducciÃ³n
+            very_positive_hits = max(0, very_positive_hits - reduction_factor)
+            positive_hits = max(0, positive_hits - reduction_factor)
+
+        # Penalidad por negaciÃ³n: AMPLIAR VENTANA de 5 a 20 tokens
     negation_penalty = 0
     for pos, tok in enumerate(tokens):
         if tok in POSITIVE_WORDS or tok in VERY_POSITIVE_WORDS:
-            if _has_negation_before(tokens, pos):
+            if _has_negation_before(tokens, pos, window=20):
                 negation_penalty += 1
 
-    # Si hay contraste adversativo ("pero", "aunque") y señales negativas,
+    # Si hay contraste adversativo ("pero", "aunque") y seÃ±ales negativas,
     # reducimos el peso de lo positivo para evitar falsos "Muy Positivo".
     # NOTA: tokens son filtrados de stopwords ("pero" es stopword), por eso
     # verificamos en el texto normalizado directamente.
-    _has_adversative = any(f" {adv} " in f" {normalized} " for adv in ADVERSATIVE_WORDS)
     if _has_adversative and (very_negative_hits > 0 or negative_hits > 0):
         positive_hits = max(0, positive_hits - 1)
         very_positive_hits = max(0, very_positive_hits - 1)
@@ -1017,7 +1067,7 @@ def export_manual_load_csv(
 
 
 # ============================================================================
-# WRAPPERS PARA SISTEMA AUTOMÁTICO DE RETROALIMENTACIÓN
+# WRAPPERS PARA SISTEMA AUTOMÃTICO DE RETROALIMENTACIÃ“N
 # ============================================================================
 
 
@@ -1028,15 +1078,15 @@ def record_comment_feedback(
     correct_label: str,
     correct_score: int,
 ) -> None:
-    """Registra feedback sobre clasificación de sentimiento.
+    """Registra feedback sobre clasificaciÃ³n de sentimiento.
 
-    El sistema automáticamente aprende de los comentarios marcados como
+    El sistema automÃ¡ticamente aprende de los comentarios marcados como
     incorrectos y mejora con el tiempo.
 
     Ejemplo:
     --------
     >>> record_comment_feedback(
-    ...     comment="Que decepción de escuela",
+    ...     comment="Que decepciÃ³n de escuela",
     ...     predicted_label="Neutral",
     ...     predicted_score=3,
     ...     correct_label="Muy Negativo",
@@ -1049,7 +1099,7 @@ def record_comment_feedback(
 
 
 def get_feedback_stats() -> dict:
-    """Retorna estadísticas del sistema de feedback.
+    """Retorna estadÃ­sticas del sistema de feedback.
 
     Returns
     -------
@@ -1065,24 +1115,24 @@ def get_mispredictions_by_type() -> dict:
 
 
 def get_improvement_suggestions() -> dict:
-    """Genera sugerencias automáticas de mejora basadas en feedback.
+    """Genera sugerencias automÃ¡ticas de mejora basadas en feedback.
 
     El sistema analiza los comentarios mal clasificados e identifica
-    palabras/frases que deberían agregarse a los diccionarios.
+    palabras/frases que deberÃ­an agregarse a los diccionarios.
 
     Returns
     -------
     dict
-        Sugerencias por categoría con palabras candidatas
+        Sugerencias por categorÃ­a con palabras candidatas
     """
     return feedback_system.get_improvement_suggestions()
 
 
 def apply_suggestions() -> None:
-    """Aplica sugerencias automáticamente al sistema.
+    """Aplica sugerencias automÃ¡ticamente al sistema.
 
     Actualiza VERY_POSITIVE_WORDS y VERY_NEGATIVE_WORDS
-    con palabras sugeridas automáticamente.
+    con palabras sugeridas automÃ¡ticamente.
     """
     suggestions = feedback_system.get_improvement_suggestions()
     feedback_system.apply_suggestions_to_processor(suggestions)
@@ -1091,3 +1141,4 @@ def apply_suggestions() -> None:
 def get_feedback_report() -> str:
     """Genera reporte human-readable del feedback acumulado."""
     return feedback_system.get_feedback_report()
+
