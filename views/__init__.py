@@ -11,6 +11,7 @@ from . import settings
 from . import changelog
 from . import new_data_dashboard
 from . import text_analysis_dashboard
+from . import statistical_registry_dashboard
 
 __all__ = [
 	"landing",
@@ -21,4 +22,5 @@ __all__ = [
 	"changelog",
 	"new_data_dashboard",
 	"text_analysis_dashboard",
+	"statistical_registry_dashboard",
 ]

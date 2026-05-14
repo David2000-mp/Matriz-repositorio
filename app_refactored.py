@@ -81,6 +81,7 @@ def main():
             "📈 Comparativas",
             "🆕 Tipo de contenidos",
             "🧠 Analisis de textos",
+            "📐 Registro Estadistico",
             "💡 Calc. Engagement",
             "📝 Captura",
             "🔍 Auditoría de Respuestas",
@@ -100,6 +101,7 @@ def main():
             "📈 Comparativas": "Comparativas",
             "🆕 Tipo de contenidos": "Tipo de contenidos",
             "🧠 Analisis de textos": "Analisis de textos",
+            "📐 Registro Estadistico": "Registro Estadistico",
             "💡 Calc. Engagement": "Calc. Engagement",
             "📝 Captura": "Captura",
             "🔍 Auditoría de Respuestas": "Auditoría de Respuestas",
@@ -278,6 +280,10 @@ def main():
         from views import text_analysis_dashboard
 
         text_analysis_dashboard.render_text_analysis_dashboard()
+    elif selected == "Registro Estadistico":
+        from views import statistical_registry_dashboard
+
+        statistical_registry_dashboard.render_statistical_registry_dashboard()
     elif selected == "Calc. Engagement":
         # Calculadora de Engagement para Facebook y TikTok
         from views import engagement_calculator_v2 as engagement_calculator
