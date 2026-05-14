@@ -1296,7 +1296,7 @@ def render(df=None):
             st.error(f"Error en gráfica de ranking: {str(e)}")
 
     # --- Ranking de Crecimiento de Seguidores ---
-    st.markdown("### 🚀 Top 15: Crecimiento de Seguidores por Institución")
+    st.markdown("### 🚀 Crecimiento de Seguidores por Institución")
     growth_mode_label = st.radio(
         "Modo de comparación temporal",
         options=[
@@ -1310,6 +1310,115 @@ def render(df=None):
     growth_mode = "monthly" if growth_mode_label.startswith("Mensual") else "latest_two"
     st.caption("Ranking híbrido: combina crecimiento absoluto y porcentual para mayor precisión.")
 
+    def render_growth_ranking_section(section_title: str, ranking_df: pd.DataFrame, subtitle: str):
+        st.markdown(f"#### {section_title}")
+
+        if ranking_df.empty:
+            st.info(f"No hay datos de crecimiento disponibles para {section_title.lower()}.")
+            return
+
+        if px is None:
+            st.warning("Plotly no disponible - no se puede mostrar la gráfica")
+            return
+
+        show_platform_legend = ranking_df["plataforma"].nunique() > 1
+        fig_growth = px.bar(
+            ranking_df,
+            x="entidad",
+            y="crecimiento_abs",
+            color="plataforma",
+            title=f"🚀 {section_title}<br><sup style=\"font-size:12px;\">{subtitle}</sup>",
+            labels={
+                "crecimiento_abs": "📈 Crecimiento de Seguidores",
+                "entidad": "🏫 Institución",
+                "plataforma": "📱 Plataforma",
+            },
+            color_discrete_map=COLOR_MAP,
+            text="crecimiento_abs",
+            custom_data=["crecimiento_pct", "seguidores_anterior", "seguidores_mas_reciente", "score_hibrido"],
+        )
+
+        fig_growth.update_layout(
+            height=600,
+            xaxis_title="",
+            yaxis_title="Crecimiento de Seguidores",
+            legend_title="Plataforma Social",
+            showlegend=show_platform_legend,
+            plot_bgcolor="rgba(0,0,0,0)",
+            paper_bgcolor="rgba(0,0,0,0)",
+            font=dict(size=12, color="#2c3e50"),
+            title_font=dict(size=20, color="#2c3e50", family="Arial Black"),
+            title_x=0.5,
+            title_y=0.95,
+        )
+
+        fig_growth.update_traces(
+            texttemplate="<b>%{text:,}</b>",
+            textposition="outside",
+            textfont_size=11,
+            textfont_color="#2c3e50",
+            marker_line_width=1,
+            marker_line_color="rgba(0,0,0,0.3)",
+            hovertemplate="<b>%{x}</b><br>"
+            + "📱 %{fullData.name}<br>"
+            + "📈 Crecimiento abs: <b>%{y:,}</b> seguidores<br>"
+            + "📊 Crecimiento %: <b>%{customdata[0]:.2f}%</b><br>"
+            + "👥 Seguidores previos: %{customdata[1]:,.0f}<br>"
+            + "👥 Seguidores actuales: %{customdata[2]:,.0f}<br>"
+            + "🎯 Score híbrido: %{customdata[3]:.2f}<br>"
+            + "<extra></extra>",
+        )
+
+        fig_growth.update_xaxes(
+            tickangle=45,
+            tickfont=dict(size=10, color="#34495e"),
+            showgrid=False,
+        )
+
+        fig_growth.update_yaxes(
+            tickfont=dict(size=10, color="#34495e"),
+            showgrid=True,
+            gridcolor="rgba(0,0,0,0.1)",
+        )
+
+        st.plotly_chart(
+            fig_growth,
+            width="stretch",
+            config=PLOTLY_CONFIG,
+        )
+
+        leader_row = ranking_df.iloc[0]
+        total_growth = ranking_df["crecimiento_abs"].sum()
+        avg_pct = ranking_df["crecimiento_pct"].fillna(0).mean()
+
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric(
+                "🏆 Mayor Crecimiento",
+                leader_row["entidad"],
+                f"+{leader_row['crecimiento_abs']:,}",
+            )
+        with col2:
+            if show_platform_legend:
+                platform_totals = ranking_df.groupby("plataforma")["crecimiento_abs"].sum()
+                st.metric(
+                    "📱 Plataforma Líder",
+                    platform_totals.idxmax(),
+                    f"{platform_totals.max():,}",
+                )
+            else:
+                st.metric(
+                    "📱 Plataforma",
+                    ranking_df.iloc[0]["plataforma"],
+                    f"{len(ranking_df)} instituciones",
+                )
+        with col3:
+            st.metric(
+                "📊 Total Crecimiento",
+                f"{total_growth:,}",
+                f"Promedio {avg_pct:.2f}%",
+            )
+
     try:
         growth_df = build_followers_growth_ranking(
             df_full,
@@ -1317,105 +1426,69 @@ def render(df=None):
             top_n=15,
         )
 
-        if not growth_df.empty:
-            # Crear gráfica bonita de crecimiento
-            if px is not None:
-                subtitle = (
-                    "Último mes vs mes anterior"
-                    if growth_mode == "monthly"
-                    else "Entre las últimas 2 mediciones"
-                )
+        platform_names = sorted(
+            {
+                str(platform).strip()
+                for platform in df_full.get("plataforma", pd.Series(dtype="object")).dropna().unique()
+                if str(platform).strip()
+            }
+        )
+        platform_rankings = []
 
-                # Crear gráfica de barras verticales más visual
-                fig_growth = px.bar(
-                    growth_df,
-                    x='entidad',
-                    y='crecimiento_abs',
-                    color='plataforma',
-                    title=f'🚀 Crecimiento de Seguidores por Institución<br><sup style="font-size:12px;">{subtitle}</sup>',
-                    labels={
-                        'crecimiento_abs': '📈 Crecimiento de Seguidores',
-                        'entidad': '🏫 Institución',
-                        'plataforma': '📱 Plataforma'
-                    },
-                    color_discrete_map=COLOR_MAP,
-                    text='crecimiento_abs',
-                    custom_data=['crecimiento_pct', 'seguidores_anterior', 'seguidores_mas_reciente', 'score_hibrido']
-                )
+        for platform_name in platform_names:
+            platform_growth_df = build_followers_growth_ranking(
+                df_full[df_full["plataforma"].astype(str).str.strip() == platform_name],
+                mode=growth_mode,
+                top_n=15,
+            )
+            if not platform_growth_df.empty:
+                platform_rankings.append((platform_name, platform_growth_df))
 
-                # Personalizar la gráfica para que sea más bonita
-                fig_growth.update_layout(
-                    height=600,
-                    xaxis_title="",
-                    yaxis_title="Crecimiento de Seguidores",
-                    legend_title="Plataforma Social",
-                    showlegend=True,
-                    plot_bgcolor='rgba(0,0,0,0)',
-                    paper_bgcolor='rgba(0,0,0,0)',
-                    font=dict(size=12, color='#2c3e50'),
-                    title_font=dict(size=20, color='#2c3e50', family='Arial Black'),
-                    title_x=0.5,
-                    title_y=0.95
-                )
+        if platform_rankings or not growth_df.empty:
+            subtitle = (
+                "Último mes vs mes anterior"
+                if growth_mode == "monthly"
+                else "Entre las últimas 2 mediciones"
+            )
 
-                # Mejorar las barras
-                fig_growth.update_traces(
-                    texttemplate='<b>%{text:,}</b>',
-                    textposition='outside',
-                    textfont_size=11,
-                    textfont_color='#2c3e50',
-                    marker_line_width=1,
-                    marker_line_color='rgba(0,0,0,0.3)',
-                    hovertemplate='<b>%{x}</b><br>' +
-                                 '📱 %{fullData.name}<br>' +
-                                 '📈 Crecimiento abs: <b>%{y:,}</b> seguidores<br>' +
-                                 '📊 Crecimiento %: <b>%{customdata[0]:.2f}%</b><br>' +
-                                 '👥 Seguidores previos: %{customdata[1]:,.0f}<br>' +
-                                 '👥 Seguidores actuales: %{customdata[2]:,.0f}<br>' +
-                                 '🎯 Score híbrido: %{customdata[3]:.2f}<br>' +
-                                 '<extra></extra>'
-                )
+            tab_labels = [f"{platform_name} Top 15" for platform_name, _ in platform_rankings]
+            if not growth_df.empty:
+                tab_labels.append("General")
 
-                # Mejorar ejes
-                fig_growth.update_xaxes(
-                    tickangle=45,
-                    tickfont=dict(size=10, color='#34495e'),
-                    showgrid=False
-                )
-
-                fig_growth.update_yaxes(
-                    tickfont=dict(size=10, color='#34495e'),
-                    showgrid=True,
-                    gridcolor='rgba(0,0,0,0.1)'
-                )
-
-                st.plotly_chart(
-                    fig_growth,
-                    width="stretch",
-                    config=PLOTLY_CONFIG,
-                )
-
-                # Agregar información adicional debajo de la gráfica
-                st.markdown("---")
-                col1, col2, col3 = st.columns(3)
-                with col1:
-                    st.metric("🏆 Mayor Crecimiento", 
-                             f"{growth_df.iloc[0]['entidad'][:20]}...", 
-                             f"+{growth_df.iloc[0]['crecimiento_abs']:,}")
-                with col2:
-                    st.metric("📱 Plataforma Líder", 
-                             growth_df.groupby('plataforma')['crecimiento_abs'].sum().idxmax(),
-                             f"{growth_df.groupby('plataforma')['crecimiento_abs'].sum().max():,}")
-                with col3:
-                    avg_pct = growth_df['crecimiento_pct'].fillna(0).mean()
-                    st.metric("📊 Total Crecimiento", 
-                             f"{growth_df['crecimiento_abs'].sum():,}",
-                             f"Promedio {avg_pct:.2f}%")
-
-                st.caption("Se excluyen incrementos extremos con base previa muy baja para reducir falsos positivos.")
-
+            if len(tab_labels) == 1:
+                if platform_rankings:
+                    platform_name, platform_growth_df = platform_rankings[0]
+                    render_growth_ranking_section(
+                        f"Top 15 {platform_name}",
+                        platform_growth_df,
+                        subtitle,
+                    )
+                else:
+                    render_growth_ranking_section(
+                        "Top 15 General",
+                        growth_df,
+                        subtitle,
+                    )
             else:
-                st.warning("Plotly no disponible - no se puede mostrar la gráfica")
+                growth_tabs = st.tabs(tab_labels)
+
+                for tab, (platform_name, platform_growth_df) in zip(growth_tabs, platform_rankings):
+                    with tab:
+                        render_growth_ranking_section(
+                            f"Top 15 {platform_name}",
+                            platform_growth_df,
+                            subtitle,
+                        )
+
+                if not growth_df.empty:
+                    with growth_tabs[-1]:
+                        render_growth_ranking_section(
+                            "Top 15 General",
+                            growth_df,
+                            subtitle,
+                        )
+
+            st.caption("Se excluyen incrementos extremos con base previa muy baja para reducir falsos positivos.")
         else:
             st.info("No hay datos de crecimiento de seguidores disponibles.")
 
