@@ -1387,6 +1387,77 @@ def render(df=None):
             config=PLOTLY_CONFIG,
         )
 
+        ranking_pct_df = ranking_df.copy()
+        ranking_pct_df["crecimiento_pct_plot"] = pd.to_numeric(
+            ranking_pct_df["crecimiento_pct"],
+            errors="coerce",
+        ).fillna(0)
+
+        fig_growth_pct = px.bar(
+            ranking_pct_df,
+            x="entidad",
+            y="crecimiento_pct_plot",
+            color="plataforma",
+            title=f"📊 % de Crecimiento por Institución<br><sup style=\"font-size:12px;\">{subtitle}</sup>",
+            labels={
+                "crecimiento_pct_plot": "% Crecimiento",
+                "entidad": "🏫 Institución",
+                "plataforma": "📱 Plataforma",
+            },
+            color_discrete_map=COLOR_MAP,
+            text="crecimiento_pct_plot",
+            custom_data=["crecimiento_abs", "seguidores_anterior", "seguidores_mas_reciente", "score_hibrido"],
+        )
+
+        fig_growth_pct.update_layout(
+            height=600,
+            xaxis_title="",
+            yaxis_title="Crecimiento porcentual (%)",
+            legend_title="Plataforma Social",
+            showlegend=show_platform_legend,
+            plot_bgcolor="rgba(0,0,0,0)",
+            paper_bgcolor="rgba(0,0,0,0)",
+            font=dict(size=12, color="#2c3e50"),
+            title_font=dict(size=20, color="#2c3e50", family="Arial Black"),
+            title_x=0.5,
+            title_y=0.95,
+        )
+
+        fig_growth_pct.update_traces(
+            texttemplate="<b>%{text:.2f}%</b>",
+            textposition="outside",
+            textfont_size=11,
+            textfont_color="#2c3e50",
+            marker_line_width=1,
+            marker_line_color="rgba(0,0,0,0.3)",
+            hovertemplate="<b>%{x}</b><br>"
+            + "📱 %{fullData.name}<br>"
+            + "📊 Crecimiento %: <b>%{y:.2f}%</b><br>"
+            + "📈 Crecimiento abs: <b>%{customdata[0]:,}</b> seguidores<br>"
+            + "👥 Seguidores previos: %{customdata[1]:,.0f}<br>"
+            + "👥 Seguidores actuales: %{customdata[2]:,.0f}<br>"
+            + "🎯 Score híbrido: %{customdata[3]:.2f}<br>"
+            + "<extra></extra>",
+        )
+
+        fig_growth_pct.update_xaxes(
+            tickangle=45,
+            tickfont=dict(size=10, color="#34495e"),
+            showgrid=False,
+        )
+
+        fig_growth_pct.update_yaxes(
+            tickfont=dict(size=10, color="#34495e"),
+            showgrid=True,
+            gridcolor="rgba(0,0,0,0.1)",
+        )
+
+        st.plotly_chart(
+            fig_growth_pct,
+            width="stretch",
+            config=PLOTLY_CONFIG,
+        )
+
         leader_row = ranking_df.iloc[0]
         total_growth = ranking_df["crecimiento_abs"].sum()
         avg_pct = ranking_df["crecimiento_pct"].fillna(0).mean()
