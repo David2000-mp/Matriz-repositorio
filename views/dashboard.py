@@ -1321,9 +1321,18 @@ def render(df=None):
             st.warning("Plotly no disponible - no se puede mostrar la gráfica")
             return
 
+        ranking_abs_df = ranking_df.sort_values(
+            "crecimiento_abs",
+            ascending=False,
+        ).head(15).reset_index(drop=True)
+
+        if ranking_abs_df.empty:
+            st.info(f"No hay datos de crecimiento disponibles para {section_title.lower()}.")
+            return
+
         show_platform_legend = ranking_df["plataforma"].nunique() > 1
         fig_growth = px.bar(
-            ranking_df,
+            ranking_abs_df,
             x="entidad",
             y="crecimiento_abs",
             color="plataforma",
@@ -1387,80 +1396,88 @@ def render(df=None):
             config=PLOTLY_CONFIG,
         )
 
-        ranking_pct_df = ranking_df.copy()
-        ranking_pct_df["crecimiento_pct_plot"] = pd.to_numeric(
-            ranking_pct_df["crecimiento_pct"],
-            errors="coerce",
-        ).fillna(0)
+        st.markdown("##### 📊 Ranking por % de crecimiento")
+        try:
+            ranking_pct_df = ranking_df.copy()
+            ranking_pct_df["crecimiento_pct_plot"] = pd.to_numeric(
+                ranking_pct_df["crecimiento_pct"],
+                errors="coerce",
+            ).fillna(0)
+            ranking_pct_df = ranking_pct_df.sort_values(
+                "crecimiento_pct_plot",
+                ascending=False,
+            ).head(15).reset_index(drop=True)
 
-        fig_growth_pct = px.bar(
-            ranking_pct_df,
-            x="entidad",
-            y="crecimiento_pct_plot",
-            color="plataforma",
-            title=f"📊 % de Crecimiento por Institución<br><sup style=\"font-size:12px;\">{subtitle}</sup>",
-            labels={
-                "crecimiento_pct_plot": "% Crecimiento",
-                "entidad": "🏫 Institución",
-                "plataforma": "📱 Plataforma",
-            },
-            color_discrete_map=COLOR_MAP,
-            text="crecimiento_pct_plot",
-            custom_data=["crecimiento_abs", "seguidores_anterior", "seguidores_mas_reciente", "score_hibrido"],
-        )
+            fig_growth_pct = px.bar(
+                ranking_pct_df,
+                x="entidad",
+                y="crecimiento_pct_plot",
+                color="plataforma",
+                title=f"📊 % de Crecimiento por Institución<br><sup style=\"font-size:12px;\">{subtitle}</sup>",
+                labels={
+                    "crecimiento_pct_plot": "% Crecimiento",
+                    "entidad": "🏫 Institución",
+                    "plataforma": "📱 Plataforma",
+                },
+                color_discrete_map=COLOR_MAP,
+                text="crecimiento_pct_plot",
+                custom_data=["crecimiento_abs", "seguidores_anterior", "seguidores_mas_reciente", "score_hibrido"],
+            )
 
-        fig_growth_pct.update_layout(
-            height=600,
-            xaxis_title="",
-            yaxis_title="Crecimiento porcentual (%)",
-            legend_title="Plataforma Social",
-            showlegend=show_platform_legend,
-            plot_bgcolor="rgba(0,0,0,0)",
-            paper_bgcolor="rgba(0,0,0,0)",
-            font=dict(size=12, color="#2c3e50"),
-            title_font=dict(size=20, color="#2c3e50", family="Arial Black"),
-            title_x=0.5,
-            title_y=0.95,
-        )
+            fig_growth_pct.update_layout(
+                height=600,
+                xaxis_title="",
+                yaxis_title="Crecimiento porcentual (%)",
+                legend_title="Plataforma Social",
+                showlegend=show_platform_legend,
+                plot_bgcolor="rgba(0,0,0,0)",
+                paper_bgcolor="rgba(0,0,0,0)",
+                font=dict(size=12, color="#2c3e50"),
+                title_font=dict(size=20, color="#2c3e50", family="Arial Black"),
+                title_x=0.5,
+                title_y=0.95,
+            )
 
-        fig_growth_pct.update_traces(
-            texttemplate="<b>%{text:.2f}%</b>",
-            textposition="outside",
-            textfont_size=11,
-            textfont_color="#2c3e50",
-            marker_line_width=1,
-            marker_line_color="rgba(0,0,0,0.3)",
-            hovertemplate="<b>%{x}</b><br>"
-            + "📱 %{fullData.name}<br>"
-            + "📊 Crecimiento %: <b>%{y:.2f}%</b><br>"
-            + "📈 Crecimiento abs: <b>%{customdata[0]:,}</b> seguidores<br>"
-            + "👥 Seguidores previos: %{customdata[1]:,.0f}<br>"
-            + "👥 Seguidores actuales: %{customdata[2]:,.0f}<br>"
-            + "🎯 Score híbrido: %{customdata[3]:.2f}<br>"
-            + "<extra></extra>",
-        )
+            fig_growth_pct.update_traces(
+                texttemplate="<b>%{text:.2f}%</b>",
+                textposition="outside",
+                textfont_size=11,
+                textfont_color="#2c3e50",
+                marker_line_width=1,
+                marker_line_color="rgba(0,0,0,0.3)",
+                hovertemplate="<b>%{x}</b><br>"
+                + "📱 %{fullData.name}<br>"
+                + "📊 Crecimiento %: <b>%{y:.2f}%</b><br>"
+                + "📈 Crecimiento abs: <b>%{customdata[0]:,}</b> seguidores<br>"
+                + "👥 Seguidores previos: %{customdata[1]:,.0f}<br>"
+                + "👥 Seguidores actuales: %{customdata[2]:,.0f}<br>"
+                + "🎯 Score híbrido: %{customdata[3]:.2f}<br>"
+                + "<extra></extra>",
+            )
 
-        fig_growth_pct.update_xaxes(
-            tickangle=45,
-            tickfont=dict(size=10, color="#34495e"),
-            showgrid=False,
-        )
+            fig_growth_pct.update_xaxes(
+                tickangle=45,
+                tickfont=dict(size=10, color="#34495e"),
+                showgrid=False,
+            )
 
-        fig_growth_pct.update_yaxes(
-            tickfont=dict(size=10, color="#34495e"),
-            showgrid=True,
-            gridcolor="rgba(0,0,0,0.1)",
-        )
+            fig_growth_pct.update_yaxes(
+                tickfont=dict(size=10, color="#34495e"),
+                showgrid=True,
+                gridcolor="rgba(0,0,0,0.1)",
+            )
 
-        st.plotly_chart(
-            fig_growth_pct,
-            width="stretch",
-            config=PLOTLY_CONFIG,
-        )
+            st.plotly_chart(
+                fig_growth_pct,
+                width="stretch",
+                config=PLOTLY_CONFIG,
+            )
+        except Exception as pct_error:
+            st.error(f"No se pudo renderizar la gráfica de % crecimiento: {pct_error}")
 
-        leader_row = ranking_df.iloc[0]
-        total_growth = ranking_df["crecimiento_abs"].sum()
-        avg_pct = ranking_df["crecimiento_pct"].fillna(0).mean()
+        leader_row = ranking_abs_df.iloc[0]
+        total_growth = ranking_abs_df["crecimiento_abs"].sum()
+        avg_pct = ranking_abs_df["crecimiento_pct"].fillna(0).mean()
 
         col1, col2, col3 = st.columns(3)
         with col1:
@@ -1471,7 +1488,7 @@ def render(df=None):
             )
         with col2:
             if show_platform_legend:
-                platform_totals = ranking_df.groupby("plataforma")["crecimiento_abs"].sum()
+                platform_totals = ranking_abs_df.groupby("plataforma")["crecimiento_abs"].sum()
                 st.metric(
                     "📱 Plataforma Líder",
                     platform_totals.idxmax(),
@@ -1480,8 +1497,8 @@ def render(df=None):
             else:
                 st.metric(
                     "📱 Plataforma",
-                    ranking_df.iloc[0]["plataforma"],
-                    f"{len(ranking_df)} instituciones",
+                    ranking_abs_df.iloc[0]["plataforma"],
+                    f"{len(ranking_abs_df)} instituciones",
                 )
         with col3:
             st.metric(
@@ -1491,10 +1508,11 @@ def render(df=None):
             )
 
     try:
+        full_top_n = max(15, int(len(df_full)))
         growth_df = build_followers_growth_ranking(
             df_full,
             mode=growth_mode,
-            top_n=15,
+            top_n=full_top_n,
         )
 
         platform_names = sorted(
@@ -1507,10 +1525,12 @@ def render(df=None):
         platform_rankings = []
 
         for platform_name in platform_names:
+            platform_source_df = df_full[df_full["plataforma"].astype(str).str.strip() == platform_name]
+            platform_top_n = max(15, int(len(platform_source_df)))
             platform_growth_df = build_followers_growth_ranking(
-                df_full[df_full["plataforma"].astype(str).str.strip() == platform_name],
+                platform_source_df,
                 mode=growth_mode,
-                top_n=15,
+                top_n=platform_top_n,
             )
             if not platform_growth_df.empty:
                 platform_rankings.append((platform_name, platform_growth_df))
