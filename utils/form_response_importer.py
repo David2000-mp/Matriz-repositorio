@@ -32,8 +32,10 @@ def _normalize_header_label(header: str) -> str:
     value = unicodedata.normalize("NFKD", value)
     value = "".join(ch for ch in value if not unicodedata.combining(ch))
     value = value.strip().lower()
+    # Elimina ruido de puntuacion para soportar encabezados con formatos variables.
+    value = re.sub(r"[^a-z0-9\s]", " ", value)
     value = re.sub(r"\s+", " ", value)
-    return value
+    return value.strip()
 
 
 def _canonical_alias_map() -> Dict[str, set]:
@@ -49,6 +51,8 @@ def _canonical_alias_map() -> Dict[str, set]:
         },
         "engagement_rate": {
             "engagement rate (%): validacion: es un numero > entre 0 y 100",
+            "engagement rate (): validacion: es un numero > entre 0 y 100",
+            "engagement rate ()",
             "engagement rate (%)",
             "engagement rate",
             "engagment rate",
@@ -57,11 +61,15 @@ def _canonical_alias_map() -> Dict[str, set]:
         "interacciones": {"interacciones totales", "interacciones"},
         "comentarios": {
             "comentarios contextuales",
+            "comentarios de la seccion de opinion",
             '"comentarios contextuales"',
             "comentarios",
         },
         "media_visualizaciones": {"media de visualizaciones"},
         "tema_mas_visto": {"tema mas visto"},
+        "calificacion_redes": {"calificacion en redes"},
+        "tipo_contenido_mas_viral": {"que tipo de contenido fue el mas viral"},
+        "publicacion_mas_viral_numeros": {"publicacion mas viral numeros"},
         "engagement_contenido_imagenes": {
             "engagement por contenido: imagenes",
             "engagment por contenido: imagenes",
@@ -84,11 +92,20 @@ def _canonical_alias_map() -> Dict[str, set]:
         },
         "publicaciones_por_semana": {"publicaciones por semana"},
         "tema_principal": {"tema principal del contenido del periodo"},
+        "calificacion_contenido": {"del 1 al 10 que calificacion le pones al contenido de la pagina"},
         "obs_engagement": {"observaciones de engagement del periodo"},
+        "plataforma_desglose_profundo": {"de que plataforma capturaras el desglose profundo"},
+        "comentarios_video_viral": {"comentarios del video viral"},
+        "media_interaccion": {"media de interaccion"},
+        "se_considera_viral_280": {"se considera viral 280 interacciones"},
+        "publicacion_mas_interacciones": {"publicacion con mas interacciones"},
+        "se_considera_viral_250": {"se considera viral 250 interacciones"},
+        "novedoso_video_viral": {"que es lo mas novedoso del video viral"},
+        "calificacion_diseno": {"del 1 al 10 que calificacion le pones al diseno de la pagina"},
         "notas_operacionales": {"notas operacionales relevantes"},
         "alertas_riesgos": {"alertas o riesgos detectados"},
         "tuvo_cambios_operacionales": {"¿hubo cambios operacionales durante este periodo?", "hubo cambios operacionales durante este periodo"},
-        "publicacion_destacada": {"publicacion destacada"},
+        "publicacion_destacada": {"publicacion destacada", "publicacion mas viral"},
     }
 
 
@@ -96,13 +113,24 @@ def _build_header_groups(headers: List[str]) -> Dict[str, List[int]]:
     """Devuelve índices por columna canónica tolerando variantes de texto."""
     alias_map = _canonical_alias_map()
     groups: Dict[str, List[int]] = {k: [] for k in alias_map}
+    normalized_alias_map = {
+        canonical: {_normalize_header_label(alias) for alias in aliases}
+        for canonical, aliases in alias_map.items()
+    }
 
     for idx, header in enumerate(headers):
         normalized = _normalize_header_label(header)
-        for canonical, aliases in alias_map.items():
+        matched = False
+        for canonical, aliases in normalized_alias_map.items():
             if normalized in aliases:
                 groups[canonical].append(idx)
+                matched = True
                 break
+
+        # Fallback defensivo para variantes de encabezados que incluyan texto extra.
+        if not matched:
+            if "engagement rate" in normalized or "engagment rate" in normalized:
+                groups["engagement_rate"].append(idx)
     return groups
 
 
@@ -306,6 +334,22 @@ def import_form_responses(spreadsheet) -> Tuple[pd.DataFrame, pd.DataFrame]:
                 comentarios_consolidados = _get_joined_values(row_data, header_groups.get("comentarios", []))
                 tema_principal = _get_first_value(row_data, header_groups.get("tema_principal", []), '').strip()
                 obs_engagement = _get_first_value(row_data, header_groups.get("obs_engagement", []), '').strip()
+                calificacion_redes_str = _get_first_value(row_data, header_groups.get("calificacion_redes", []), '0')
+                tipo_contenido_mas_viral = _get_first_value(row_data, header_groups.get("tipo_contenido_mas_viral", []), '').strip()
+                publicacion_mas_viral_numeros_str = _get_first_value(row_data, header_groups.get("publicacion_mas_viral_numeros", []), '0')
+                calificacion_contenido_str = _get_first_value(row_data, header_groups.get("calificacion_contenido", []), '0')
+                plataforma_desglose_profundo = _get_first_value(row_data, header_groups.get("plataforma_desglose_profundo", []), '').strip()
+                comentarios_video_viral = _get_first_value(row_data, header_groups.get("comentarios_video_viral", []), '').strip()
+                media_interaccion_str = _get_first_value(row_data, header_groups.get("media_interaccion", []), '0')
+                se_considera_viral_280 = _normalize_booleanish(
+                    _get_first_value(row_data, header_groups.get("se_considera_viral_280", []), '')
+                )
+                publicacion_mas_interacciones = _get_first_value(row_data, header_groups.get("publicacion_mas_interacciones", []), '').strip()
+                se_considera_viral_250 = _normalize_booleanish(
+                    _get_first_value(row_data, header_groups.get("se_considera_viral_250", []), '')
+                )
+                novedoso_video_viral = _get_first_value(row_data, header_groups.get("novedoso_video_viral", []), '').strip()
+                calificacion_diseno_str = _get_first_value(row_data, header_groups.get("calificacion_diseno", []), '0')
                 notas_operacionales = _get_first_value(row_data, header_groups.get("notas_operacionales", []), '').strip()
                 alertas_riesgos = _get_first_value(row_data, header_groups.get("alertas_riesgos", []), '').strip()
                 tuvo_cambios_operacionales = _normalize_booleanish(
@@ -316,6 +360,8 @@ def import_form_responses(spreadsheet) -> Tuple[pd.DataFrame, pd.DataFrame]:
                 # Normalizar valores
                 seguidores = int(_parse_numeric_value(seguidores_str, 0))
                 engagement_rate = _parse_numeric_value(engagement_str, 0.0)
+                # La validación de formulario define engagement entre 0 y 100.
+                engagement_rate = max(0.0, min(100.0, engagement_rate))
                 alcance = int(_parse_numeric_value(alcance_str, 0))
                 media_visualizaciones = _parse_numeric_value(media_visualizaciones_str, 0.0)
                 engagement_contenido_imagenes = _parse_numeric_value(eng_img_str, 0.0)
@@ -323,6 +369,11 @@ def import_form_responses(spreadsheet) -> Tuple[pd.DataFrame, pd.DataFrame]:
                 engagement_contenido_videos = _parse_numeric_value(eng_videos_str, 0.0)
                 engagement_tema_mas_visto = _parse_numeric_value(eng_tema_mas_visto_str, 0.0)
                 publicaciones_por_semana = _parse_numeric_value(publicaciones_semana_str, 0.0)
+                calificacion_redes = _parse_numeric_value(calificacion_redes_str, 0.0)
+                publicacion_mas_viral_numeros = _parse_numeric_value(publicacion_mas_viral_numeros_str, 0.0)
+                calificacion_contenido = _parse_numeric_value(calificacion_contenido_str, 0.0)
+                media_interaccion = _parse_numeric_value(media_interaccion_str, 0.0)
+                calificacion_diseno = _parse_numeric_value(calificacion_diseno_str, 0.0)
                 
                 # Interacciones: usar valor ingresado o calcular desde engagement
                 if interacciones_str and str(interacciones_str).strip():
@@ -375,6 +426,18 @@ def import_form_responses(spreadsheet) -> Tuple[pd.DataFrame, pd.DataFrame]:
                     'comentarios_consolidados': comentarios_consolidados,
                     'tema_principal': tema_principal,
                     'obs_engagement': obs_engagement,
+                    'calificacion_redes': calificacion_redes,
+                    'tipo_contenido_mas_viral': tipo_contenido_mas_viral,
+                    'publicacion_mas_viral_numeros': publicacion_mas_viral_numeros,
+                    'calificacion_contenido': calificacion_contenido,
+                    'plataforma_desglose_profundo': plataforma_desglose_profundo,
+                    'comentarios_video_viral': comentarios_video_viral,
+                    'media_interaccion': media_interaccion,
+                    'se_considera_viral_280': se_considera_viral_280,
+                    'publicacion_mas_interacciones': publicacion_mas_interacciones,
+                    'se_considera_viral_250': se_considera_viral_250,
+                    'novedoso_video_viral': novedoso_video_viral,
+                    'calificacion_diseno': calificacion_diseno,
                     'notas_operacionales': notas_operacionales,
                     'alertas_riesgos': alertas_riesgos,
                     'tuvo_cambios_operacionales': tuvo_cambios_operacionales,

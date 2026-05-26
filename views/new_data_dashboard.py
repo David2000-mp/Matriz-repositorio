@@ -8,6 +8,7 @@ import streamlit as st
 import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+import re
 
 from components import PLOTLY_CONFIG, PLOTLY_LAYOUT_DEFAULTS
 from utils.data_provider import data_provider
@@ -102,6 +103,8 @@ MAPS_STOPWORDS = {
     "al",
 }
 
+URL_ONLY_PATTERN = re.compile(r"^(https?://|www\.)", re.IGNORECASE)
+
 
 def _normalize_platform_name(value: object) -> str:
     if value is None or (isinstance(value, float) and pd.isna(value)):
@@ -166,8 +169,19 @@ def _render_google_maps_section(maps_df: pd.DataFrame) -> None:
     comments_df = comments_df[comments_df["comentario"] != ""]
     comments_df = comments_df.drop_duplicates(subset=["comentario"]).reset_index(drop=True)
 
+    # Excluir filas que son solo enlaces (común en cargas de evidencia/Drive).
+    link_only_mask = comments_df["comentario"].str.match(URL_ONLY_PATTERN)
+    link_only_count = int(link_only_mask.sum())
+    comments_df = comments_df[~link_only_mask].copy()
+
     if comments_df.empty:
-        st.info("Los comentarios de Google Maps no tienen texto util para analizar.")
+        if link_only_count > 0:
+            st.info(
+                "Los registros de comentarios en Google Maps son enlaces/URLs y no texto de reseñas. "
+                "No se puede ejecutar análisis textual con ese formato."
+            )
+        else:
+            st.info("Los comentarios de Google Maps no tienen texto util para analizar.")
         return
 
     words = (
