@@ -69,6 +69,137 @@ COMPARISON_METRICS = [
     "engagement_tema_mas_visto",
 ]
 
+MAPS_PLATFORM_ALIASES = {
+    "googlemaps",
+    "googlemap",
+    "google maps",
+    "maps",
+}
+
+MAPS_STOPWORDS = {
+    "de",
+    "la",
+    "el",
+    "los",
+    "las",
+    "y",
+    "en",
+    "que",
+    "con",
+    "para",
+    "por",
+    "del",
+    "una",
+    "un",
+    "muy",
+    "pero",
+    "como",
+    "mas",
+    "esta",
+    "este",
+    "es",
+    "se",
+    "al",
+}
+
+
+def _normalize_platform_name(value: object) -> str:
+    if value is None or (isinstance(value, float) and pd.isna(value)):
+        return ""
+    text = str(value).strip().lower().replace("_", " ")
+    return " ".join(text.split())
+
+
+def _is_maps_platform(value: object) -> bool:
+    normalized = _normalize_platform_name(value)
+    if not normalized:
+        return False
+    compact = normalized.replace(" ", "")
+    return normalized in MAPS_PLATFORM_ALIASES or compact in MAPS_PLATFORM_ALIASES
+
+
+def _split_social_vs_maps(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+    if "plataforma" not in df.columns or df.empty:
+        return df.copy(), pd.DataFrame(columns=df.columns)
+
+    is_maps = df["plataforma"].map(_is_maps_platform)
+    return df[~is_maps].copy(), df[is_maps].copy()
+
+
+def _render_google_maps_section(maps_df: pd.DataFrame) -> None:
+    st.markdown("---")
+    st.subheader("Analisis de Google Maps")
+    st.caption("Google Maps se analiza por separado del rendimiento de redes sociales.")
+
+    if maps_df.empty:
+        st.info("No hay registros de Google Maps para los filtros seleccionados.")
+        return
+
+    c1, c2 = st.columns(2)
+    with c1:
+        if "calificacion_redes" in maps_df.columns:
+            ratings = pd.to_numeric(maps_df["calificacion_redes"], errors="coerce").dropna()
+            if not ratings.empty:
+                st.metric("Calificacion promedio en Maps", f"{ratings.mean():.2f}/10")
+            else:
+                st.metric("Calificacion promedio en Maps", "N/A")
+        else:
+            st.metric("Calificacion promedio en Maps", "N/A")
+    with c2:
+        st.metric("Registros de Maps", f"{len(maps_df):,}")
+
+    st.markdown("**Analisis de comentarios (Google Maps)**")
+    if "comentarios_consolidados" not in maps_df.columns:
+        st.info("No existe la columna comentarios_consolidados en los datos de Maps.")
+        return
+
+    comments_source = maps_df[[col for col in ["fecha", "entidad", "comentarios_consolidados"] if col in maps_df.columns]].copy()
+    comments_source["comentarios_consolidados"] = comments_source["comentarios_consolidados"].fillna("").astype(str).str.strip()
+    comments_source = comments_source[comments_source["comentarios_consolidados"] != ""]
+
+    if comments_source.empty:
+        st.info("No hay comentarios de Google Maps disponibles para analizar.")
+        return
+
+    comments_df = comments_source.rename(columns={"comentarios_consolidados": "comentario"})
+    comments_df["comentario"] = comments_df["comentario"].astype(str).str.replace("\n", " ", regex=False).str.strip()
+    comments_df = comments_df[comments_df["comentario"] != ""]
+    comments_df = comments_df.drop_duplicates(subset=["comentario"]).reset_index(drop=True)
+
+    if comments_df.empty:
+        st.info("Los comentarios de Google Maps no tienen texto util para analizar.")
+        return
+
+    words = (
+        comments_df["comentario"]
+        .str.lower()
+        .str.replace(r"[^a-z0-9\s]", " ", regex=True)
+        .str.split()
+        .explode()
+    )
+    words = words.dropna().astype(str)
+    words = words[(words.str.len() >= 4) & (~words.isin(MAPS_STOPWORDS))]
+    top_terms = words.value_counts().head(10).reset_index()
+    top_terms.columns = ["Termino", "Frecuencia"]
+
+    m1, m2 = st.columns(2)
+    with m1:
+        st.metric("Comentarios validos", f"{len(comments_df):,}")
+    with m2:
+        st.metric("Longitud promedio", f"{comments_df['comentario'].str.len().mean():.0f} caracteres")
+
+    if not top_terms.empty:
+        st.markdown("**Top terminos frecuentes**")
+        st.dataframe(top_terms, width="stretch", hide_index=True)
+
+    if "fecha" in comments_df.columns:
+        comments_df["fecha"] = pd.to_datetime(comments_df["fecha"], errors="coerce")
+        comments_df = comments_df.sort_values("fecha", ascending=False)
+
+    preview_cols = [col for col in ["fecha", "entidad", "comentario"] if col in comments_df.columns]
+    st.markdown("**Comentarios recientes**")
+    st.dataframe(comments_df[preview_cols].head(20), width="stretch", hide_index=True)
+
 
 def _render_institution_rankings(df: pd.DataFrame, plataforma_sel: str) -> None:
     if "entidad" not in df.columns:
@@ -680,73 +811,95 @@ def render_new_data_dashboard() -> None:
             index=default_entidad_idx,
             key="new_data_entidad",
         )
-    with c2:
-        plataformas = ["Todas"] + sorted([str(v) for v in df["plataforma"].dropna().unique()])
-        plataforma_sel = st.selectbox("Plataforma", plataformas, key="new_data_plataforma")
 
-    filtered = df.copy()
+    entity_filtered = df.copy()
     if entidad_sel != "Todas":
-        filtered = filtered[filtered["entidad"] == entidad_sel]
-    if plataforma_sel != "Todas":
-        filtered = filtered[filtered["plataforma"] == plataforma_sel]
+        entity_filtered = entity_filtered[entity_filtered["entidad"] == entidad_sel]
 
-    if filtered.empty:
+    social_for_selector, maps_filtered = _split_social_vs_maps(entity_filtered)
+
+    with c2:
+        social_platforms = [
+            str(v)
+            for v in social_for_selector["plataforma"].dropna().unique()
+            if str(v).strip()
+        ]
+        plataformas = ["Todas"] + sorted(social_platforms)
+        plataforma_sel = st.selectbox(
+            "Plataforma (red social)",
+            plataformas,
+            key="new_data_plataforma",
+            help="Google Maps se analiza en una seccion separada al final.",
+        )
+
+    social_filtered = social_for_selector.copy()
+    if plataforma_sel != "Todas":
+        social_filtered = social_filtered[social_filtered["plataforma"] == plataforma_sel]
+
+    if social_filtered.empty and maps_filtered.empty:
         st.warning("No hay filas para los filtros seleccionados.")
         return
 
-    _render_data_quality_badge(filtered)
+    has_social_data = not social_filtered.empty
 
-    monthly = _monthly_aggregation(filtered)
-    _render_kpis_with_context(filtered, monthly, compare_mode)
-    if monthly.empty:
-        st.info("No se pudo construir serie mensual con los datos actuales.")
-        return
+    if has_social_data:
+        _render_data_quality_badge(social_filtered)
 
-    if analytical_family == "Rendimiento":
-        insights = _build_executive_insights(monthly)
-        if insights:
-            st.subheader("Insights ejecutivos")
-            for insight in insights:
-                st.markdown(f"- {insight}")
-
-        if "engagement_rate" in monthly.columns and "publicaciones_por_semana" in monthly.columns:
-            fig_dual = make_subplots(specs=[[{"secondary_y": True}]])
-            fig_dual.add_trace(
-                go.Scatter(
-                    x=monthly["mes"],
-                    y=monthly["engagement_rate"],
-                    mode="lines+markers",
-                    name="Engagement rate",
-                    line={"color": "#003696", "width": 2},
-                ),
-                secondary_y=False,
-            )
-            fig_dual.add_trace(
-                go.Bar(
-                    x=monthly["mes"],
-                    y=monthly["publicaciones_por_semana"],
-                    name="Publicaciones/semana",
-                    marker_color="#CC7000",
-                    opacity=0.45,
-                ),
-                secondary_y=True,
-            )
-            fig_dual.update_layout(
-                title="Tendencia ejecutiva: engagement vs volumen de publicacion",
-                **PLOTLY_LAYOUT_DEFAULTS,
-            )
-            fig_dual.update_yaxes(title_text="Engagement (%)", secondary_y=False)
-            fig_dual.update_yaxes(title_text="Publicaciones/semana", secondary_y=True)
-            _apply_dark_chart_text(fig_dual)
-            st.plotly_chart(fig_dual, width="stretch", config=PLOTLY_CONFIG)
-
-        _render_side_by_side_comparison(monthly, compare_mode)
-
-    elif analytical_family == "Calidad de datos":
-        _render_data_quality_details(filtered)
-
+    monthly = _monthly_aggregation(social_filtered) if has_social_data else pd.DataFrame()
+    if has_social_data:
+        _render_kpis_with_context(social_filtered, monthly, compare_mode)
     else:
-        _render_format_diagnostic(monthly)
+        st.info("No hay plataformas de redes sociales para los filtros actuales. Google Maps se muestra en la seccion final.")
+
+    if has_social_data and monthly.empty:
+        st.info("No se pudo construir serie mensual con los datos sociales actuales.")
+
+    if has_social_data and not monthly.empty:
+        if analytical_family == "Rendimiento":
+            insights = _build_executive_insights(monthly)
+            if insights:
+                st.subheader("Insights ejecutivos")
+                for insight in insights:
+                    st.markdown(f"- {insight}")
+
+            if "engagement_rate" in monthly.columns and "publicaciones_por_semana" in monthly.columns:
+                fig_dual = make_subplots(specs=[[{"secondary_y": True}]])
+                fig_dual.add_trace(
+                    go.Scatter(
+                        x=monthly["mes"],
+                        y=monthly["engagement_rate"],
+                        mode="lines+markers",
+                        name="Engagement rate",
+                        line={"color": "#003696", "width": 2},
+                    ),
+                    secondary_y=False,
+                )
+                fig_dual.add_trace(
+                    go.Bar(
+                        x=monthly["mes"],
+                        y=monthly["publicaciones_por_semana"],
+                        name="Publicaciones/semana",
+                        marker_color="#CC7000",
+                        opacity=0.45,
+                    ),
+                    secondary_y=True,
+                )
+                fig_dual.update_layout(
+                    title="Tendencia ejecutiva: engagement vs volumen de publicacion",
+                    **PLOTLY_LAYOUT_DEFAULTS,
+                )
+                fig_dual.update_yaxes(title_text="Engagement (%)", secondary_y=False)
+                fig_dual.update_yaxes(title_text="Publicaciones/semana", secondary_y=True)
+                _apply_dark_chart_text(fig_dual)
+                st.plotly_chart(fig_dual, width="stretch", config=PLOTLY_CONFIG)
+
+            _render_side_by_side_comparison(monthly, compare_mode)
+
+        elif analytical_family == "Calidad de datos":
+            _render_data_quality_details(social_filtered)
+
+        else:
+            _render_format_diagnostic(monthly)
 
     # Comparación mensual: engagement histórico vs nuevos puntos de contenido
     engagement_compare_cols = [
@@ -761,7 +914,7 @@ def render_new_data_dashboard() -> None:
         if col in monthly.columns
     ]
 
-    if engagement_compare_cols:
+    if has_social_data and engagement_compare_cols:
         line_df = monthly[["mes", *engagement_compare_cols]].melt(
             id_vars=["mes"],
             value_vars=engagement_compare_cols,
@@ -782,7 +935,7 @@ def render_new_data_dashboard() -> None:
         st.plotly_chart(fig_line, width="stretch", config=PLOTLY_CONFIG)
 
     # Volumen mensual de publicaciones
-    if "publicaciones_por_semana" in monthly.columns:
+    if has_social_data and "publicaciones_por_semana" in monthly.columns:
         fig_bar = px.bar(
             monthly,
             x="mes",
@@ -795,11 +948,12 @@ def render_new_data_dashboard() -> None:
         st.plotly_chart(fig_bar, width="stretch", config=PLOTLY_CONFIG)
 
     # Rankings comparativos de rendimiento por institución
-    _render_institution_rankings(df, plataforma_sel)
+    if has_social_data:
+        _render_institution_rankings(social_filtered, plataforma_sel)
 
     # Cortes explicitos por tema principal y cambios operacionales
-    if "tema_principal" in filtered.columns and "engagement_rate" in filtered.columns:
-        tema_df = filtered.copy()
+    if has_social_data and "tema_principal" in social_filtered.columns and "engagement_rate" in social_filtered.columns:
+        tema_df = social_filtered.copy()
         tema_df["tema_principal"] = tema_df["tema_principal"].fillna("").astype(str).str.strip()
         tema_df = tema_df[tema_df["tema_principal"] != ""]
         if not tema_df.empty:
@@ -824,8 +978,8 @@ def render_new_data_dashboard() -> None:
             _apply_dark_chart_text(fig_tema)
             st.plotly_chart(fig_tema, width="stretch", config=PLOTLY_CONFIG)
 
-    if "tuvo_cambios_operacionales" in filtered.columns and "engagement_rate" in filtered.columns:
-        cambios_df = filtered.copy()
+    if has_social_data and "tuvo_cambios_operacionales" in social_filtered.columns and "engagement_rate" in social_filtered.columns:
+        cambios_df = social_filtered.copy()
         cambios_df["tuvo_cambios_operacionales"] = (
             cambios_df["tuvo_cambios_operacionales"].fillna("").astype(str).str.strip().str.lower()
         )
@@ -878,16 +1032,16 @@ def render_new_data_dashboard() -> None:
             "engagement_tema_mas_visto",
             "publicaciones_por_semana",
         ]
-        if col in filtered.columns
+        if col in social_filtered.columns
     ]
 
-    if show_cols:
+    if has_social_data and show_cols:
         st.subheader("Detalle de nuevos datos")
-        relevant_cols = [col for col in show_cols if _non_empty_ratio(filtered[col]) >= 0.3]
+        relevant_cols = [col for col in show_cols if _non_empty_ratio(social_filtered[col]) >= 0.3]
         if not relevant_cols:
             relevant_cols = show_cols
 
-        detail_df = filtered[relevant_cols].sort_values("fecha", ascending=False)
+        detail_df = social_filtered[relevant_cols].sort_values("fecha", ascending=False)
         detail_df = detail_df.rename(columns=COLUMN_LABELS)
         paged_df = _render_paginated_table(detail_df)
         st.dataframe(paged_df, width="stretch")
@@ -900,3 +1054,5 @@ def render_new_data_dashboard() -> None:
             file_name=f"tipo_contenidos_{file_suffix}.csv",
             mime="text/csv",
         )
+
+    _render_google_maps_section(maps_filtered)
