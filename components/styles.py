@@ -5,7 +5,6 @@ Define constantes de colores institucionales y función de inyección de CSS glo
 """
 
 import streamlit as st
-import streamlit.components.v1 as components
 
 # ===========================
 # CONSTANTES DE COLOR INSTITUCIONALES
@@ -152,7 +151,7 @@ def scroll_to_top_on_nav_change(nav_state_key: str = "page_selection", tracker_k
     st.session_state[tracker_key] = current
 
     if changed:
-        components.html(
+        st.html(
             """
             <script>
             const moveTop = () => {
@@ -165,45 +164,43 @@ def scroll_to_top_on_nav_change(nav_state_key: str = "page_selection", tracker_k
             setTimeout(moveTop, 120);
             </script>
             """,
-            height=0,
-            width=0,
+            unsafe_allow_javascript=True,
         )
 
 
 def inject_clipboard_shortcut_guard():
-        """Evita que Ctrl/Cmd+C/V/X propaguen a atajos globales de la app."""
-        components.html(
-                """
-                <script>
-                (() => {
-                    const installGuard = (doc) => {
-                        if (!doc || doc.__champiClipboardGuardInstalled) return;
-                        doc.__champiClipboardGuardInstalled = true;
+    """Evita que Ctrl/Cmd+C/V/X propaguen a atajos globales de la app."""
+    st.html(
+        """
+        <script>
+        (() => {
+            const installGuard = (doc) => {
+                if (!doc || doc.__champiClipboardGuardInstalled) return;
+                doc.__champiClipboardGuardInstalled = true;
 
-                        doc.addEventListener(
-                            "keydown",
-                            (event) => {
-                                const key = (event.key || "").toLowerCase();
-                                const isClipboardShortcut = (event.ctrlKey || event.metaKey) && ["c", "v", "x"].includes(key);
-                                if (!isClipboardShortcut) return;
+                doc.addEventListener(
+                    "keydown",
+                    (event) => {
+                        const key = (event.key || "").toLowerCase();
+                        const isClipboardShortcut = (event.ctrlKey || event.metaKey) && ["c", "v", "x"].includes(key);
+                        if (!isClipboardShortcut) return;
 
-                                // Bloqueamos la propagación para no activar shortcuts globales de Streamlit.
-                                event.stopPropagation();
-                            },
-                            true
-                        );
-                    };
+                        // Bloqueamos la propagación para no activar shortcuts globales de Streamlit.
+                        event.stopPropagation();
+                    },
+                    true
+                );
+            };
 
-                    installGuard(document);
-                    try {
-                        installGuard(parent.document);
-                    } catch (_) {}
-                })();
-                </script>
-                """,
-                height=0,
-                width=0,
-        )
+            installGuard(document);
+            try {
+                installGuard(parent.document);
+            } catch (_) {}
+        })();
+        </script>
+        """,
+        unsafe_allow_javascript=True,
+    )
 
 
 def inject_custom_css():

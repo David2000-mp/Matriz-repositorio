@@ -117,23 +117,38 @@ def _get_google_sheets_id() -> Optional[str]:
     2. st.secrets["general"]["google_sheets_id"]
     3. Env var GOOGLE_SHEETS_ID
     """
+    def _clean_sheet_id(value: Any) -> Optional[str]:
+        if value is None:
+            return None
+        text = str(value).strip().strip('"').strip("'")
+        return text or None
+
     try:
-        if "google_sheets_id" in st.secrets:
-            sheet_id = st.secrets["google_sheets_id"]
-            logger.debug(f"GOOGLE_SHEETS_ID encontrado en st.secrets")
-            return sheet_id
+        for key in ("google_sheets_id", "GOOGLE_SHEETS_ID", "spreadsheet_id", "SPREADSHEET_ID"):
+            if key in st.secrets:
+                sheet_id = _clean_sheet_id(st.secrets[key])
+                if sheet_id:
+                    logger.debug(f"GOOGLE_SHEETS_ID encontrado en st.secrets[{key}]")
+                    return sheet_id
     except Exception:
         pass
 
     try:
-        if "general" in st.secrets and "google_sheets_id" in st.secrets["general"]:
-            sheet_id = st.secrets["general"]["google_sheets_id"]
-            logger.debug(f"GOOGLE_SHEETS_ID encontrado en st.secrets[general]")
-            return sheet_id
+        if "general" in st.secrets:
+            for key in ("google_sheets_id", "GOOGLE_SHEETS_ID", "spreadsheet_id", "SPREADSHEET_ID"):
+                if key in st.secrets["general"]:
+                    sheet_id = _clean_sheet_id(st.secrets["general"][key])
+                    if sheet_id:
+                        logger.debug(f"GOOGLE_SHEETS_ID encontrado en st.secrets[general][{key}]")
+                        return sheet_id
     except Exception:
         pass
 
-    sheet_id = os.getenv("GOOGLE_SHEETS_ID")
+    sheet_id = _clean_sheet_id(
+        os.getenv("GOOGLE_SHEETS_ID")
+        or os.getenv("google_sheets_id")
+        or os.getenv("SPREADSHEET_ID")
+    )
     if sheet_id:
         logger.debug("GOOGLE_SHEETS_ID encontrado en variable de entorno")
         return sheet_id
