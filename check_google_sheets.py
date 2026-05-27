@@ -10,6 +10,7 @@ from google.oauth2.service_account import Credentials
 import os
 import json
 from utils.logger import get_logger
+from utils.schema_columns import COLS_CUENTAS, COLS_METRICAS
 
 logger = get_logger(__name__)
 
@@ -85,8 +86,8 @@ def configure_existing_sheets(spreadsheet_id):
 
         # Verificar/crear hojas necesarias
         sheets_to_check = [
-            ("cuentas", ["id_cuenta", "entidad", "plataforma", "usuario_red"]),
-            ("metricas", ["id_cuenta", "fecha", "seguidores", "alcance", "interacciones", "likes_promedio", "engagement_rate"]),
+            ("cuentas", COLS_CUENTAS),
+            ("metricas", COLS_METRICAS),
             ("config", ["entidad", "meta_seguidores", "meta_engagement"]),
             ("comentarios", ["entidad", "mes", "comentario"]),
             ("usernames_editados", ["entidad", "plataforma", "usuario_editado", "fecha_modificacion"]),

@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Tuple, Optional, Dict, List
 from datetime import datetime
 from dotenv import load_dotenv
+from utils.schema_columns import COLS_CUENTAS, COLS_METRICAS
 
 # Cargar variables de entorno
 load_dotenv()
@@ -246,8 +247,8 @@ def check_sheets_structure(spreadsheet) -> Dict[str, any]:
     }
 
     required_sheets = {
-        "cuentas": ["id_cuenta", "entidad", "plataforma", "usuario_red"],
-        "metricas": ["id_cuenta", "fecha", "seguidores", "alcance", "interacciones", "likes_promedio", "engagement_rate"],
+        "cuentas": COLS_CUENTAS,
+        "metricas": COLS_METRICAS,
         "config": ["entidad", "meta_seguidores", "meta_engagement"],
         "comentarios": ["entidad", "mes", "comentario"],
         "usernames_editados": ["entidad", "plataforma", "usuario_editado", "fecha_modificacion"]

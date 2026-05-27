@@ -7,6 +7,7 @@ Ejecuta este script para validar que la sincronización fue exitosa.
 import sys
 from pathlib import Path
 import pandas as pd
+from utils.schema_columns import COLS_METRICAS
 
 def check(condition, message):
     """Imprime resultado de una verificación."""
@@ -51,8 +52,7 @@ def validate_all():
     print("-" * 70)
     
     cols_cuentas = {'id_cuenta', 'entidad', 'plataforma', 'usuario_red'}
-    cols_metricas = {'id_cuenta', 'fecha', 'seguidores', 'alcance', 
-                     'interacciones', 'likes_promedio', 'engagement_rate'}
+    cols_metricas = set(COLS_METRICAS)
     
     all_pass &= check(
         cols_cuentas.issubset(df_cuentas.columns),

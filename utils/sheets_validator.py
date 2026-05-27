@@ -7,13 +7,14 @@ Módulo para verificar que un Spreadsheet tenga la estructura correcta.
 from typing import Tuple, List, Optional
 import logging
 from pathlib import Path
+from utils.schema_columns import COLS_CUENTAS, COLS_METRICAS
 
 logger = logging.getLogger(__name__)
 
 # Estructura requerida
 REQUIRED_SHEETS = {
-    "cuentas": ["id_cuenta", "entidad", "plataforma", "usuario_red"],
-    "metricas": ["id_cuenta", "fecha", "seguidores", "alcance", "interacciones", "likes_promedio", "engagement_rate"],
+    "cuentas": COLS_CUENTAS,
+    "metricas": COLS_METRICAS,
     "config": ["entidad", "meta_seguidores", "meta_engagement"],
     "comentarios": ["entidad", "mes", "comentario"],
     "usernames_editados": ["entidad", "plataforma", "usuario_editado", "fecha_modificacion"]

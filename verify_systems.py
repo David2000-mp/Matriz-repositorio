@@ -8,12 +8,13 @@ import sys
 import subprocess
 import pandas as pd
 from pathlib import Path
+from utils.schema_columns import COLS_CUENTAS, COLS_METRICAS
 
 # Agregar el directorio raíz al path para importar módulos
 sys.path.insert(0, str(Path(__file__).parent))
 
 try:
-    from utils.data_manager import conectar_sheets, COLS_CUENTAS, COLS_METRICAS, COLS_CONFIG, COLS_COMENTARIOS, COLS_USERNAMES_EDITADOS
+    from utils.data_manager import conectar_sheets, COLS_CONFIG, COLS_COMENTARIOS, COLS_USERNAMES_EDITADOS
     from utils import load_data
     from utils.data_manager import load_comments, load_usernames_editados
     print('✅ Importaciones exitosas')

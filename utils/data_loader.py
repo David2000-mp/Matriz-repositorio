@@ -15,6 +15,7 @@ import hashlib
 from pathlib import Path
 from typing import Tuple, Optional
 from utils.logger import get_logger
+from utils.schema_columns import COLS_CUENTAS, COLS_METRICAS
 
 logger = get_logger(__name__)
 
@@ -24,31 +25,6 @@ CUENTAS_CSV = DATA_DIR / "cuentas.csv"
 METRICAS_CSV = DATA_DIR / "metricas.csv"
 SAMPLE_UPLOAD_FULL_CSV = DATA_DIR / "sample_upload_full.csv"
 
-COLS_CUENTAS = ["id_cuenta", "entidad", "plataforma", "usuario_red"]
-COLS_METRICAS = [
-    "id_cuenta",
-    "fecha",
-    "seguidores",
-    "alcance",
-    "interacciones",
-    "likes_promedio",
-    "engagement_rate",
-    "media_visualizaciones",
-    "tema_mas_visto",
-    "engagement_contenido_imagenes",
-    "engagement_contenido_links",
-    "engagement_contenido_videos",
-    "top_5_publicaciones",
-    "engagement_tema_mas_visto",
-    "publicaciones_por_semana",
-    "comentarios_consolidados",
-    "tema_principal",
-    "obs_engagement",
-    "notas_operacionales",
-    "alertas_riesgos",
-    "tuvo_cambios_operacionales",
-    "publicacion_destacada",
-]
 COLS_CONFIG = ["entidad", "meta_seguidores", "meta_engagement"]
 COLS_COMENTARIOS = ["entidad", "mes", "comentario"]
 COLS_USERNAMES_EDITADOS = ["entidad", "plataforma", "usuario_editado", "fecha_modificacion"]

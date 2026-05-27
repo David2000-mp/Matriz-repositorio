@@ -36,6 +36,7 @@ from utils.data_manager import (
     COLS_METRICAS,
     reload_colegios_maristas,
 )
+from utils.schema_columns import COLS_METRICAS as COLS_METRICAS_SCHEMA
 
 
 # ========================================
@@ -512,15 +513,7 @@ def test_cols_metricas_tiene_columnas_correctas():
     TEST: COLS_METRICAS tiene las columnas esperadas
     """
 
-    columnas_esperadas = [
-        "id_cuenta",
-        "fecha",
-        "seguidores",
-        "alcance",
-        "interacciones",
-        "likes_promedio",
-        "engagement_rate",
-    ]
+    columnas_esperadas = COLS_METRICAS_SCHEMA
     assert COLS_METRICAS == columnas_esperadas
 
 

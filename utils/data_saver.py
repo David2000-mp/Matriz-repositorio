@@ -21,6 +21,7 @@ from pathlib import Path
 
 from utils.account_normalization import build_account_key, normalize_platform_name, normalize_social_user
 from utils.logger import get_logger
+from utils.schema_columns import COLS_CUENTAS, COLS_METRICAS
 
 logger = get_logger(__name__)
 
@@ -28,10 +29,6 @@ BASE_DIR = Path(__file__).parent.parent
 DATA_DIR = BASE_DIR / "data"
 METRICAS_CSV = DATA_DIR / "metricas.csv"
 CUENTAS_CSV = DATA_DIR / "cuentas.csv"
-
-COLS_METRICAS = ["id_cuenta", "fecha", "seguidores", "alcance", "interacciones", "likes_promedio", "engagement_rate"]
-COLS_CUENTAS = ["id_cuenta", "entidad", "plataforma", "usuario_red"]
-
 
 def get_id(entidad, plataforma, usuario, df_cuentas_cache=None, **kwargs) -> str:
     """
@@ -225,13 +222,30 @@ def guardar_datos(nuevo_df: pd.DataFrame, modo: str="append", csv_path=None, **k
     try:
         # Si faltan columnas, reindex las que existan y rellena el resto
         df_limpio = nuevo_df.reindex(columns=COLS_METRICAS)
+        integer_cols = {"seguidores", "alcance", "interacciones"}
+        float_cols = {
+            "likes_promedio",
+            "engagement_rate",
+            "media_visualizaciones",
+            "engagement_contenido_imagenes",
+            "engagement_contenido_links",
+            "engagement_contenido_videos",
+            "engagement_tema_mas_visto",
+            "publicaciones_por_semana",
+            "calificacion_redes",
+            "publicacion_mas_viral_numeros",
+            "calificacion_contenido",
+            "media_interaccion",
+            "calificacion_diseno",
+        }
+
         for col in COLS_METRICAS:
             if col in df_limpio.columns:
                 if col == 'fecha':
                     df_limpio[col] = pd.to_datetime(df_limpio[col], errors='coerce').dt.strftime('%Y-%m-%d')
-                elif col in ['seguidores', 'alcance', 'interacciones', 'likes_promedio']:
+                elif col in integer_cols:
                     df_limpio[col] = pd.to_numeric(df_limpio[col], errors='coerce').fillna(0).astype(int)
-                elif col == 'engagement_rate':
+                elif col in float_cols:
                     df_limpio[col] = pd.to_numeric(df_limpio[col], errors='coerce').fillna(0.0).round(4)
                 else:
                     df_limpio[col] = df_limpio[col].astype(str)

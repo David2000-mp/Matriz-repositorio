@@ -127,21 +127,21 @@ def test_column_constants():
     
     try:
         from utils.data_manager import COLS_METRICAS, COLS_CUENTAS
+        from utils.schema_columns import COLS_METRICAS as COLS_METRICAS_SCHEMA
         
         print(f"✅ COLS_CUENTAS: {COLS_CUENTAS}")
         print(f"✅ COLS_METRICAS: {COLS_METRICAS}")
         
-        # Verify exact column count
-        assert len(COLS_METRICAS) == 7, f"Should have 7 metric columns, got {len(COLS_METRICAS)}"
-        print(f"✅ Exactly 7 metrics columns (no extra _x/_y suffixes)")
+        # Verify shared schema consistency
+        assert len(COLS_METRICAS) == len(COLS_METRICAS_SCHEMA), f"Metric column count mismatch: {len(COLS_METRICAS)}"
+        print(f"✅ Metrics columns count aligned to shared schema: {len(COLS_METRICAS)}")
         
         assert len(COLS_CUENTAS) == 4, f"Should have 4 account columns, got {len(COLS_CUENTAS)}"
         print(f"✅ Exactly 4 account columns")
         
-        # Verify required columns exist
-        required_metrics = ['id_cuenta', 'fecha', 'seguidores', 'alcance', 'interacciones', 'likes_promedio', 'engagement_rate']
-        assert COLS_METRICAS == required_metrics, f"Metrics columns mismatch"
-        print(f"✅ Metrics columns match exact requirement")
+        # Verify shared schema order matches runtime constants
+        assert COLS_METRICAS == COLS_METRICAS_SCHEMA, f"Metrics columns mismatch"
+        print(f"✅ Metrics columns match shared schema")
         
         return True
     except Exception as e:

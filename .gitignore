@@ -41,6 +41,33 @@ venv_*
 .env.*.local
 secrets.toml
 
+# ==============================================================
+# GUIA PASO A PASO: COMO MANEJAR CLAVES/API KEYS SIN SUBIRLAS
+# ==============================================================
+# 1) Guarda tus claves en archivos locales (NO en el codigo):
+#    - .env
+#    - .env.local
+#    - .streamlit/secrets.toml
+#
+# 2) Formato recomendado para .env:
+#    API_KEY=tu_clave_aqui
+#    API_SECRET=tu_secreto_aqui
+#    DB_PASSWORD=tu_password_aqui
+#
+# 3) No hardcodees claves en .py/.js/.md. Cargalas desde variables de entorno.
+#
+# 4) Sube solo una plantilla sin secretos (ejemplo):
+#    - .env.example  (con valores de ejemplo, nunca reales)
+#
+# 5) Verifica antes de hacer push:
+#    git check-ignore -v .env
+#    git check-ignore -v .streamlit/secrets.toml
+#
+# 6) Si una clave ya se subio por error:
+#    - Rota/regenera la clave en el proveedor
+#    - Elimina la clave del repositorio e historial si aplica
+#    - Vuelve a validar con git status
+
 # IDEs
 .vscode/
 .idea/

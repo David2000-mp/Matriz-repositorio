@@ -116,15 +116,3 @@ timestamp,comment,predicted_label,predicted_score,correct_label,correct_score,wa
 2026-05-13T22:39:06.592628+00:00,Nefasta administración de la escuela,Neutral,3,Muy Negativo,1,False
 2026-05-13T22:39:06.593405+00:00,Nefasta administración de la escuela,Neutral,3,Muy Negativo,1,False
 2026-05-13T22:39:06.594104+00:00,Nefasta administración de la escuela,Neutral,3,Muy Negativo,1,False
-2026-05-13T22:39:48.874982+00:00,Test comment,Neutral,3,Positivo,4,False
-2026-05-13T22:39:48.896559+00:00,Decepcion de escuela,Neutral,3,Muy Negativo,1,False
-2026-05-13T22:39:48.906926+00:00,Que terrible escuela muy mala,Neutral,3,Muy Negativo,1,False
-2026-05-13T22:39:48.907656+00:00,Que terrible escuela muy mala,Neutral,3,Muy Negativo,1,False
-2026-05-13T22:39:48.908390+00:00,Que terrible escuela muy mala,Neutral,3,Muy Negativo,1,False
-2026-05-13T22:39:48.909136+00:00,Que terrible escuela muy mala,Neutral,3,Muy Negativo,1,False
-2026-05-13T22:39:48.909851+00:00,Que terrible escuela muy mala,Neutral,3,Muy Negativo,1,False
-2026-05-13T22:39:48.929191+00:00,Test feedback,Neutral,3,Negativo,2,False
-2026-05-13T22:39:48.952886+00:00,Que decepcion,Positivo,4,Muy Negativo,1,False
-2026-05-13T22:39:48.973338+00:00,Nefasta administración de la escuela,Neutral,3,Muy Negativo,1,False
-2026-05-13T22:39:48.974067+00:00,Nefasta administración de la escuela,Neutral,3,Muy Negativo,1,False
-2026-05-13T22:39:48.974761+00:00,Nefasta administración de la escuela,Neutral,3,Muy Negativo,1,False

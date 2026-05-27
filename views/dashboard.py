@@ -331,7 +331,10 @@ def render(df=None):
         st.warning("⚠️ **Problemas de calidad de datos detectados:**\n" + "\n".join(f"- {issue}" for issue in data_quality_issues))
 
     # Crear df_unique para cálculos consistentes
-    df_unique = df_m_month.drop_duplicates(subset=['entidad', 'plataforma'], keep='last')
+    df_unique = (
+        df_m_month.sort_values(['entidad', 'plataforma', 'fecha'])
+        .drop_duplicates(subset=['entidad', 'plataforma'], keep='last')
+    )
 
     # Botón de descarga del reporte HTML usando utils.generar_reporte_html
     try:
