@@ -72,6 +72,11 @@ def normalize_latest_by_account(df: pd.DataFrame, freq: str = "D") -> pd.DataFra
         .rename(columns={"seguidores": "seguidores_prev"})
     )
 
+    # Si el DataFrame de entrada ya trae esta columna, evitamos sufijos _x/_y
+    # en el merge para mantener un contrato estable (`seguidores_prev`).
+    if "seguidores_prev" in latest_rows.columns:
+        latest_rows = latest_rows.drop(columns=["seguidores_prev"])
+
     latest_rows = latest_rows.merge(prev_by_group, on=group_keys, how="left")
     latest_rows["seguidores_prev"] = pd.to_numeric(
         latest_rows["seguidores_prev"], errors="coerce"

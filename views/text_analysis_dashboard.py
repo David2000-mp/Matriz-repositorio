@@ -16,6 +16,8 @@ import streamlit as st
 
 from components import PLOTLY_CONFIG, PLOTLY_LAYOUT_DEFAULTS
 from utils.comment_processor import (
+    add_sentiment_analysis,
+    add_sentiment_analysis_legacy_3,
     clean_raw_text,
     create_dataframe_from_comments,
     export_full_csv,
@@ -66,6 +68,27 @@ SENTIMENT_SCORE_COLORS = {
     3: "#9CA3AF",
     4: "#12B76A",
     5: "#039855",
+}
+
+SENTIMENT_CONTRACT_OPTIONS = {
+    "Modo 5 clases (Canonico - Alta Precision)": "canonical_5",
+    "Modo 3 clases (Compatibilidad Historica)": "legacy_3",
+}
+
+SENTIMENT_CONTRACT_BADGE = {
+    "canonical_5": (
+        "Modo 5 clases (Canonico - Alta Precision)",
+        "Contrato activo: 5 clases (Muy Positivo, Positivo, Neutral, Negativo, Muy Negativo).",
+    ),
+    "legacy_3": (
+        "Modo 3 clases (Compatibilidad Historica)",
+        "Contrato activo: 3 clases (positivo, neutral, negativo) para retrocompatibilidad historica.",
+    ),
+}
+
+SENTIMENT_ORDER = {
+    "canonical_5": ["Muy Positivo", "Positivo", "Neutral", "Negativo", "Muy Negativo"],
+    "legacy_3": ["positivo", "neutral", "negativo"],
 }
 
 
@@ -128,6 +151,97 @@ def _global_sentiment(df: pd.DataFrame, selected_cols: list[str]) -> pd.DataFram
 
     merged = pd.concat(chunks, ignore_index=True)
     return merged.groupby("sentimiento", as_index=False)["total"].sum()
+
+
+def _contract_sentiment_distribution(
+    df: pd.DataFrame,
+    text_col: str,
+    mode: str,
+) -> pd.DataFrame:
+    if text_col not in df.columns:
+        return pd.DataFrame(columns=["sentimiento", "total"])
+
+    base = pd.DataFrame({"comentario_original": df[text_col].fillna("").astype(str)})
+    base = base[base["comentario_original"].str.strip() != ""]
+    if base.empty:
+        return pd.DataFrame(columns=["sentimiento", "total"])
+
+    if mode == "legacy_3":
+        enriched = add_sentiment_analysis_legacy_3(base, comment_column="comentario_original")
+    else:
+        enriched = add_sentiment_analysis(base, comment_column="comentario_original")
+
+    dist = (
+        enriched["sentimiento_etiqueta"]
+        .fillna("Neutral")
+        .astype(str)
+        .value_counts()
+        .rename_axis("sentimiento")
+        .reset_index(name="total")
+    )
+
+    order = SENTIMENT_ORDER.get(mode, [])
+    if order:
+        dist["sentimiento"] = pd.Categorical(dist["sentimiento"], categories=order, ordered=True)
+        dist = dist.sort_values("sentimiento")
+        dist["sentimiento"] = dist["sentimiento"].astype(str)
+    return dist
+
+
+def _contract_sentiment_monthly_trend(
+    df: pd.DataFrame,
+    text_col: str,
+    mode: str,
+    date_column: str = "fecha",
+) -> pd.DataFrame:
+    if text_col not in df.columns or date_column not in df.columns:
+        return pd.DataFrame(columns=["mes", "score_promedio"])
+
+    trend_input = pd.DataFrame(
+        {
+            "comentario_original": df[text_col].fillna("").astype(str),
+            date_column: pd.to_datetime(df[date_column], errors="coerce"),
+        }
+    )
+    trend_input = trend_input.dropna(subset=[date_column])
+    trend_input = trend_input[trend_input["comentario_original"].str.strip() != ""]
+    if trend_input.empty:
+        return pd.DataFrame(columns=["mes", "score_promedio"])
+
+    if mode == "legacy_3":
+        enriched = add_sentiment_analysis_legacy_3(trend_input, comment_column="comentario_original")
+    else:
+        enriched = add_sentiment_analysis(trend_input, comment_column="comentario_original")
+
+    enriched["mes"] = enriched[date_column].dt.to_period("M").dt.to_timestamp()
+    result = (
+        enriched.groupby("mes", as_index=False)["sentimiento_score"]
+        .mean(numeric_only=True)
+        .rename(columns={"sentimiento_score": "score_promedio"})
+        .sort_values("mes")
+    )
+    return result
+
+
+def _contract_global_sentiment(df: pd.DataFrame, selected_cols: list[str], mode: str) -> pd.DataFrame:
+    chunks = []
+    for col in selected_cols:
+        dist = _contract_sentiment_distribution(df, col, mode)
+        if not dist.empty:
+            dist["origen"] = col
+            chunks.append(dist)
+
+    if not chunks:
+        return pd.DataFrame(columns=["sentimiento", "total"])
+
+    merged = pd.concat(chunks, ignore_index=True)
+    grouped = merged.groupby("sentimiento", as_index=False)["total"].sum()
+    order = SENTIMENT_ORDER.get(mode, [])
+    if order:
+        grouped["sentimiento"] = pd.Categorical(grouped["sentimiento"], categories=order, ordered=True)
+        grouped = grouped.sort_values("sentimiento")
+        grouped["sentimiento"] = grouped["sentimiento"].astype(str)
+    return grouped
 
 
 def _score_to_stars(value: int) -> str:
@@ -364,7 +478,18 @@ def render_text_analysis_dashboard() -> None:
         st.info("Selecciona al menos una columna de texto.")
         return
 
-    sentiment_global = _global_sentiment(filtered, selected_cols)
+    contract_label = st.radio(
+        "Contrato semantico de sentimiento",
+        options=list(SENTIMENT_CONTRACT_OPTIONS.keys()),
+        horizontal=True,
+        key="text_sentiment_contract_mode",
+    )
+    sentiment_mode = SENTIMENT_CONTRACT_OPTIONS[contract_label]
+
+    badge_title, badge_message = SENTIMENT_CONTRACT_BADGE[sentiment_mode]
+    st.info(f"{badge_title} | {badge_message}")
+
+    sentiment_global = _contract_global_sentiment(filtered, selected_cols, sentiment_mode)
     total_texts = _safe_total_texts(filtered, selected_cols)
     unique_keywords = 0
     for col in selected_cols:
@@ -395,8 +520,8 @@ def render_text_analysis_dashboard() -> None:
     tabs = st.tabs([COLUMN_LABELS.get(col, col) for col in selected_cols])
     for tab, source_col in zip(tabs, selected_cols):
         with tab:
-            dist = sentiment_distribution(filtered, source_col)
-            trend = sentiment_monthly_trend(filtered, source_col)
+            dist = _contract_sentiment_distribution(filtered, source_col, sentiment_mode)
+            trend = _contract_sentiment_monthly_trend(filtered, source_col, sentiment_mode)
             keywords = keyword_frequency(filtered, source_col, top_n=15)
 
             c1, c2 = st.columns(2)
@@ -410,7 +535,7 @@ def render_text_analysis_dashboard() -> None:
                         y="total",
                         color="sentimiento",
                         title=f"Sentimiento en {COLUMN_LABELS.get(source_col, source_col)}",
-                        color_discrete_map=SENTIMENT_COLORS,
+                        color_discrete_sequence=px.colors.qualitative.Set2,
                     )
                     fig_bar.update_layout(**{**PLOTLY_LAYOUT_DEFAULTS, "showlegend": False})
                     _apply_dark_chart_text(fig_bar)

@@ -879,6 +879,43 @@ def add_sentiment_analysis(df: pd.DataFrame, comment_column: str = "comentario_o
     return enriched
 
 
+def collapse_sentiment_to_3_classes(label: str, score: int) -> tuple[str, int]:
+    """Convierte el contrato canónico de 5 clases al contrato histórico de 3 clases.
+
+    Mapeo:
+    - Muy Positivo / Positivo -> positivo (3)
+    - Neutral -> neutral (2)
+    - Negativo / Muy Negativo -> negativo (1)
+    """
+    normalized_label = str(label).strip().lower()
+    normalized_score = int(score) if score is not None else 3
+
+    if normalized_label in {"muy positivo", "positivo"} or normalized_score >= 4:
+        return "positivo", 3
+    if normalized_label in {"muy negativo", "negativo"} or normalized_score <= 2:
+        return "negativo", 1
+    return "neutral", 2
+
+
+def add_sentiment_analysis_legacy_3(df: pd.DataFrame, comment_column: str = "comentario_original") -> pd.DataFrame:
+    """Wrapper de retrocompatibilidad: agrega sentimiento colapsado en 3 clases.
+
+    Reutiliza la clasificación canónica de 5 clases y luego colapsa etiquetas/score
+    para mantener compatibilidad con tableros y exportables históricos.
+    """
+    enriched = add_sentiment_analysis(df, comment_column=comment_column)
+    payload = list(
+        zip(
+            enriched["sentimiento_etiqueta"].fillna("Neutral").astype(str),
+            pd.to_numeric(enriched["sentimiento_score"], errors="coerce").fillna(3).astype(int),
+        )
+    )
+    collapsed = [collapse_sentiment_to_3_classes(label, score) for label, score in payload]
+    enriched["sentimiento_etiqueta"] = [item[0] for item in collapsed]
+    enriched["sentimiento_score"] = [int(item[1]) for item in collapsed]
+    return enriched
+
+
 def create_dataframe_from_comments(
     comments: Iterable[str],
     source: str,
