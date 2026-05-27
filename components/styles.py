@@ -396,6 +396,31 @@ def inject_custom_css():
             background: inherit !important;
         }
 
+        /* Ajuste de layout: eliminar gap horizontal dinámico de Streamlit */
+        [data-testid="stHorizontalBlock"] {
+            gap: 0 !important;
+            column-gap: 0 !important;
+            row-gap: 0 !important;
+        }
+
+        div[class*="st-emotion-cache-"][data-testid="stHorizontalBlock"] {
+            gap: 0 !important;
+            column-gap: 0 !important;
+            row-gap: 0 !important;
+        }
+
+        [data-testid="stVerticalBlock"] {
+            gap: 0 !important;
+            row-gap: 0 !important;
+            column-gap: 0 !important;
+        }
+
+        div[class*="st-emotion-cache-"][data-testid="stVerticalBlock"] {
+            gap: 0 !important;
+            row-gap: 0 !important;
+            column-gap: 0 !important;
+        }
+
         /* ========================================
            TARJETAS KPI CON CONTRASTE WCAG AA
         ======================================== */
