@@ -82,6 +82,96 @@ def main():
         )
         st.session_state["_sidebar_default_expanded_applied"] = True
 
+    st.markdown(
+        """
+        <style>
+        [data-testid="stSidebar"] [data-testid="stExpander"] summary p,
+        [data-testid="stSidebar"] [data-testid="stExpander"] summary span,
+        [data-testid="stSidebar"] [data-testid="stExpander"] summary svg,
+        [data-testid="stSidebar"] [data-testid="stRadio"] label p,
+        [data-testid="stSidebar"] [data-testid="stRadio"] label span,
+        [data-testid="stSidebar"] p,
+        [data-testid="stSidebar"] span {
+            color: #f5f7fa !important;
+            fill: #f5f7fa !important;
+        }
+
+        [data-testid="stSidebar"] [data-testid="stSidebarUserContent"] {
+            padding-top: 0.35rem;
+            padding-bottom: 0.35rem;
+            gap: 0.25rem;
+        }
+
+        [data-testid="stSidebar"] [data-testid="stSidebarUserContent"] > div {
+            margin-bottom: 0.15rem;
+        }
+
+        [data-testid="stSidebar"] [data-testid="stExpander"] {
+            margin-top: 0.1rem;
+            margin-bottom: 0.15rem;
+        }
+
+        [data-testid="stSidebar"] [data-testid="stExpander"] details {
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+
+        [data-testid="stSidebar"] [data-testid="stExpander"] summary {
+            padding-top: 0.2rem;
+            padding-bottom: 0.2rem;
+        }
+
+        [data-testid="stSidebar"] [data-testid="stSelectbox"],
+        [data-testid="stSidebar"] [data-testid="stButton"],
+        [data-testid="stSidebar"] [data-testid="stRadio"] {
+            margin-bottom: 0.15rem;
+        }
+
+        [data-testid="stSidebar"] {
+            padding-top: 0.35rem;
+            padding-bottom: 0.35rem;
+        }
+
+        [data-testid="stSidebarUserContent"] {
+            padding-top: 0rem !important;
+        }
+
+        [data-testid="stSidebarHeader"] {
+            padding: 0rem !important;
+            min-height: 0px !important;
+        }
+
+        [data-testid="stSidebar"] .element-container:has(.logo-marista) {
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+
+        div[data-testid="stMarkdownContainer"]:has(.logo-marista) {
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+
+        div[data-testid="stMarkdownContainer"]:has(.logo-marista) > * {
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+
+        .logo-marista {
+            margin: 0 auto 0 auto !important;
+            padding: 0 !important;
+            display: block !important;
+            line-height: 0 !important;
+        }
+
+        div[data-testid="stMarkdownContainer"]:has(.logo-marista) p {
+            margin-top: 0 !important;
+            margin-bottom: 0 !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
     # Sidebar: El ÚNICO lugar para filtrar
     with st.sidebar:
         # Logo Marista
@@ -92,31 +182,30 @@ def main():
         st.title("CHAMPILEAKS")
 
         st.subheader("Navegación")
-        
-        # Navegación simplificada sin index calculado
-        menu_options = [
-            "🏠 Inicio",
-            "📊 Dashboard Global",
-            "📈 Comparativas",
-            "🆕 Tipo de contenidos",
-            "🧠 Analisis de textos",
-            "📐 Registro Estadistico",
-            "💡 Calc. Engagement",
-            "📝 Captura",
-            "🔍 Auditoría de Respuestas",
-            "⚙️ Configuración",
-        ]
-        selected_display = st.radio(
-            "Seleccionar página", 
-            menu_options, 
-            index=menu_options.index(st.session_state.get("page_selection", "🏠 Inicio")) if st.session_state.get("page_selection") in menu_options else 0,
-            label_visibility="hidden"
-        )
-        
-        # Mapear display a canonical
-        display_to_canonical = {
+        # Navegación agrupada con sincronización global de estado.
+        navigation_groups = {
+            "metrics_analysis": [
+                "Inicio",
+                "Dashboard Global",
+                "Comparativas",
+                "Tipo de contenidos",
+                "Analisis de textos",
+                "Calc. Engagement",
+            ],
+            "data_management": [
+                "Registro Estadistico",
+                "Captura",
+                "Auditoría de Respuestas",
+            ],
+            "settings": [
+                "Configuración",
+            ],
+        }
+
+        # Compatibilidad con valores legacy (con emoji) para evitar navegación inválida.
+        legacy_display_to_canonical = {
             "🏠 Inicio": "Inicio",
-            "📊 Dashboard Global": "Dashboard Global", 
+            "📊 Dashboard Global": "Dashboard Global",
             "📈 Comparativas": "Comparativas",
             "🆕 Tipo de contenidos": "Tipo de contenidos",
             "🧠 Analisis de textos": "Analisis de textos",
@@ -126,14 +215,102 @@ def main():
             "🔍 Auditoría de Respuestas": "Auditoría de Respuestas",
             "⚙️ Configuración": "Configuración",
         }
-        
-        selected = display_to_canonical.get(selected_display, "Inicio")
+
+        valid_canonical_options = {
+            option for options in navigation_groups.values() for option in options
+        }
+        label_to_canonical = {
+            option: option for option in valid_canonical_options
+        }
+        canonical_to_label = {
+            option: option for option in valid_canonical_options
+        }
+        canonical_to_group = {}
+        for group_name, group_options in navigation_groups.items():
+            for option in group_options:
+                canonical_to_group[option] = group_name
+
+        radio_keys = {
+            "metrics_analysis": "nav_radio_metrics_analysis",
+            "data_management": "nav_radio_data_management",
+            "settings": "nav_radio_settings",
+        }
+
+        current_selection = st.session_state.get("page_selection")
+        if current_selection in legacy_display_to_canonical:
+            current_selection = legacy_display_to_canonical[current_selection]
+        if current_selection not in valid_canonical_options:
+            current_selection = "Inicio"
+        st.session_state["page_selection"] = current_selection
+
+        def _sync_navigation(changed_radio_key: str):
+            if st.session_state.get("_nav_sync_in_progress", False):
+                return
+
+            st.session_state["_nav_sync_in_progress"] = True
+            try:
+                selected_label = st.session_state.get(changed_radio_key)
+                selected_canonical = label_to_canonical.get(selected_label)
+                if selected_canonical in valid_canonical_options:
+                    st.session_state["page_selection"] = selected_canonical
+
+                active_canonical = st.session_state.get("page_selection", "Inicio")
+                active_group = canonical_to_group.get(active_canonical, "metrics_analysis")
+
+                for group_name, state_key in radio_keys.items():
+                    if group_name == active_group:
+                        st.session_state[state_key] = canonical_to_label.get(active_canonical)
+                    else:
+                        st.session_state[state_key] = None
+            finally:
+                st.session_state["_nav_sync_in_progress"] = False
+
+        active_group = canonical_to_group.get(st.session_state["page_selection"], "metrics_analysis")
+        for group_name, state_key in radio_keys.items():
+            if group_name == active_group:
+                st.session_state[state_key] = canonical_to_label[st.session_state["page_selection"]]
+            elif state_key not in st.session_state:
+                st.session_state[state_key] = None
+
+        with st.expander("Métricas y Análisis", expanded=True):
+            st.radio(
+                "Métricas y Análisis",
+                navigation_groups["metrics_analysis"],
+                key=radio_keys["metrics_analysis"],
+                index=None,
+                label_visibility="collapsed",
+                on_change=_sync_navigation,
+                args=(radio_keys["metrics_analysis"],),
+            )
+
+        with st.expander("Gestión de Datos", expanded=False):
+            st.radio(
+                "Gestión de Datos",
+                navigation_groups["data_management"],
+                key=radio_keys["data_management"],
+                index=None,
+                label_visibility="collapsed",
+                on_change=_sync_navigation,
+                args=(radio_keys["data_management"],),
+            )
+
+        with st.expander("Ajustes", expanded=False):
+            st.radio(
+                "Ajustes",
+                navigation_groups["settings"],
+                key=radio_keys["settings"],
+                index=None,
+                label_visibility="collapsed",
+                on_change=_sync_navigation,
+                args=(radio_keys["settings"],),
+            )
+
+        selected = st.session_state["page_selection"]
         st.session_state["page_selection"] = selected
         scroll_to_top_on_nav_change("page_selection")
 
         st.markdown("---")
         st.subheader("Filtros Globales")
-        st.caption("Estos filtros impactan dashboards y comparativas para mantener el contexto.")
 
         # Filtros globales (sin cargar datos aquí - lazy loading)
         entidades = ["Todas"]  # Placeholder, se actualizará cuando se carguen datos
