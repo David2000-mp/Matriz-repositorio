@@ -500,3 +500,152 @@ def pytest_configure(config):
     config.addinivalue_line(
         "markers", "api: marca tests que llaman APIs externas (skip en CI)"
     )
+
+
+# ========================================
+# P0.1: BLOQUEO GLOBAL GOOGLE SHEETS + DUMMY DATAFRAMES TIPADOS
+# ========================================
+
+
+@pytest.fixture
+def typed_dummy_dataframes() -> Tuple[pd.DataFrame, pd.DataFrame]:
+    """
+    DataFrames dummy con contrato de tipos para DataProvider.
+
+    Contratos clave:
+    - id_cuenta: string
+    - fecha: datetime
+    - etiquetas: string
+    - métricas: numéricas
+    """
+    cuentas_df = pd.DataFrame(
+        [
+            {
+                "id_cuenta": "acct_001",
+                "entidad": "Colegio Test Uno",
+                "plataforma": "Instagram",
+                "usuario_red": "@colegio_test_uno",
+            },
+            {
+                "id_cuenta": "acct_002",
+                "entidad": "Colegio Test Dos",
+                "plataforma": "Facebook",
+                "usuario_red": "@colegio_test_dos",
+            },
+        ],
+        columns=COLS_CUENTAS,
+    )
+
+    metricas_seed = {col: "" for col in COLS_METRICAS}
+    metricas_rows = []
+
+    row1 = metricas_seed.copy()
+    row1.update(
+        {
+            "id_cuenta": "acct_001",
+            "fecha": pd.Timestamp("2024-01-31"),
+            "seguidores": 1200,
+            "alcance": 4300,
+            "interacciones": 320,
+            "likes_promedio": 45.0,
+            "engagement_rate": 7.44,
+        }
+    )
+    metricas_rows.append(row1)
+
+    row2 = metricas_seed.copy()
+    row2.update(
+        {
+            "id_cuenta": "acct_002",
+            "fecha": pd.Timestamp("2024-01-31"),
+            "seguidores": 1800,
+            "alcance": 6100,
+            "interacciones": 410,
+            "likes_promedio": 52.0,
+            "engagement_rate": 6.72,
+        }
+    )
+    metricas_rows.append(row2)
+
+    metricas_df = pd.DataFrame(metricas_rows, columns=COLS_METRICAS)
+    metricas_df["id_cuenta"] = metricas_df["id_cuenta"].astype(str)
+    metricas_df["fecha"] = pd.to_datetime(metricas_df["fecha"], errors="coerce")
+
+    for label_col in ("entidad", "plataforma", "usuario_red"):
+        if label_col in cuentas_df.columns:
+            cuentas_df[label_col] = cuentas_df[label_col].astype(str)
+
+    return cuentas_df, metricas_df
+
+
+@pytest.fixture(autouse=True)
+def block_real_google_sheets_calls(monkeypatch, typed_dummy_dataframes):
+    """
+    Bloquea llamadas reales a Sheets en TODOS los tests y reemplaza con mocks.
+    """
+    cuentas_df, metricas_df = typed_dummy_dataframes
+
+    class _FakeWorksheet:
+        def __init__(self, name: str):
+            self.title = name
+
+        def get_all_records(self):
+            if self.title == "cuentas":
+                return cuentas_df.to_dict("records")
+            if self.title == "metricas":
+                return metricas_df.to_dict("records")
+            return []
+
+        def get(self):
+            if self.title == "metricas":
+                header = list(metricas_df.columns)
+                rows = metricas_df.copy()
+                rows["fecha"] = rows["fecha"].dt.strftime("%Y-%m-%d")
+                return [header] + rows.astype(str).values.tolist()
+            if self.title == "Respuestas de formulario 3":
+                return []
+            return []
+
+    class _FakeSpreadsheet:
+        def worksheet(self, name):
+            return _FakeWorksheet(name)
+
+    class _FakeClient:
+        def open(self, _name):
+            return _FakeSpreadsheet()
+
+    fake_client = _FakeClient()
+
+    monkeypatch.setattr("gspread.authorize", lambda *_args, **_kwargs: fake_client)
+    monkeypatch.setattr(
+        "google.oauth2.service_account.Credentials.from_service_account_info",
+        lambda *_args, **_kwargs: object(),
+    )
+
+    # Forzar conectores a devolver spreadsheet simulado y nunca red real.
+    monkeypatch.setattr("utils.sheets_connector.get_sheets_connection", lambda: _FakeSpreadsheet())
+    monkeypatch.setattr("utils.sheets_connector.conectar_sheets", lambda: _FakeSpreadsheet())
+    monkeypatch.setattr("utils.data_manager.conectar_sheets", lambda: _FakeSpreadsheet())
+
+
+@pytest.fixture(autouse=True)
+def inject_typed_dummy_data_into_provider(monkeypatch, typed_dummy_dataframes):
+    """
+    Inyecta DataFrames dummy tipados en DataProvider para evitar None/objetos nulos
+    en analytics/comparison durante tests.
+    """
+    cuentas_df, metricas_df = typed_dummy_dataframes
+
+    def _fake_get_data(_self, force_reload: bool = False):
+        return cuentas_df.copy(), metricas_df.copy()
+
+    monkeypatch.setattr("utils.data_provider.DataProvider.get_data", _fake_get_data)
+
+    # Evitar contaminación entre tests en el singleton global.
+    from utils.data_provider import data_provider
+
+    data_provider._data_cache = None
+    data_provider._merged_cache = None
+    yield
+    data_provider._data_cache = None
+    data_provider._merged_cache = None
