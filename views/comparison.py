@@ -1225,31 +1225,87 @@ def _render_delta_table(
 ):
     """Tabla: Métrica | Valor Cuenta | Promedio Red | Δ% (verde si por encima, rojo si por debajo)."""
 
+    def _period_slice(df: pd.DataFrame, date_col: str = "fecha") -> Tuple[pd.DataFrame, Optional[pd.Timestamp]]:
+        if df is None or df.empty or date_col not in df.columns:
+            return pd.DataFrame(), None
+        work = df.copy()
+        work[date_col] = pd.to_datetime(work[date_col], errors="coerce")
+        work = work.dropna(subset=[date_col])
+        if work.empty:
+            return pd.DataFrame(), None
+        latest = work[date_col].max()
+        return work[work[date_col] == latest].copy(), latest
+
+    def _safe_delta(entity_val: float, network_val: float) -> Optional[float]:
+        if pd.isna(entity_val) or pd.isna(network_val):
+            return None
+        if network_val == 0:
+            return None
+        return ((entity_val - network_val) / network_val) * 100.0
+
+    def _format_period(ts: Optional[pd.Timestamp]) -> str:
+        if ts is None or pd.isna(ts):
+            return "N/A"
+        return pd.to_datetime(ts).strftime("%Y-%m-%d")
+
     rows = []
 
+    entity_period_df, entity_period = _period_slice(data_entity)
+    benchmark_period_df, benchmark_period = _period_slice(benchmark)
+
+    periods_aligned = (
+        entity_period is not None
+        and benchmark_period is not None
+        and pd.to_datetime(entity_period) == pd.to_datetime(benchmark_period)
+    )
+
+    if not periods_aligned:
+        st.info(
+            "Δ% no disponible por desalineación temporal. "
+            f"Entidad: {_format_period(entity_period)} | Red: {_format_period(benchmark_period)}. "
+            "Se muestra N/A para evitar comparaciones inválidas."
+        )
+
+    calc_entity = entity_period_df if periods_aligned else entity_period_df
+    calc_benchmark = benchmark_period_df if periods_aligned else benchmark_period_df
+
     # Seguidores
-    if "seguidores" in data_entity.columns and "seguidores_avg" in benchmark.columns:
-        val_cuenta = float(data_entity["seguidores"].max())
-        val_red = float(benchmark["seguidores_avg"].mean())
-        diff_pct = ((val_cuenta - val_red) / val_red * 100) if val_red > 0 else 0.0
+    if "seguidores" in calc_entity.columns and "seguidores_avg" in calc_benchmark.columns:
+        if "plataforma" in calc_entity.columns:
+            val_cuenta = float(calc_entity.groupby("plataforma")["seguidores"].max().sum())
+        else:
+            val_cuenta = float(calc_entity["seguidores"].max())
+
+        if "plataforma" in calc_benchmark.columns:
+            val_red = float(calc_benchmark.groupby("plataforma")["seguidores_avg"].mean().sum())
+        else:
+            val_red = float(calc_benchmark["seguidores_avg"].mean())
+
+        diff_pct = _safe_delta(val_cuenta, val_red) if periods_aligned else None
         rows.append({"Métrica": "Seguidores", "Valor Cuenta": f"{val_cuenta:,.0f}", "Promedio Red": f"{val_red:,.0f}", "_delta": diff_pct})
 
     # Engagement
-    if "engagement_rate" in data_entity.columns and "engagement_rate_avg" in benchmark.columns:
-        if "plataforma" in data_entity.columns:
-            per_plat = data_entity.groupby("plataforma")["engagement_rate"].mean()
+    if "engagement_rate" in calc_entity.columns and "engagement_rate_avg" in calc_benchmark.columns:
+        if "plataforma" in calc_entity.columns:
+            per_plat = calc_entity.groupby("plataforma")["engagement_rate"].mean()
             val_cuenta = float(per_plat.mean()) if not per_plat.empty else 0.0
         else:
-            val_cuenta = float(data_entity["engagement_rate"].mean())
-        val_red = float(benchmark["engagement_rate_avg"].mean())
-        diff_pct = ((val_cuenta - val_red) / val_red * 100) if val_red > 0 else 0.0
+            val_cuenta = float(calc_entity["engagement_rate"].mean())
+
+        if "plataforma" in calc_benchmark.columns:
+            net_per_plat = calc_benchmark.groupby("plataforma")["engagement_rate_avg"].mean()
+            val_red = float(net_per_plat.mean()) if not net_per_plat.empty else 0.0
+        else:
+            val_red = float(calc_benchmark["engagement_rate_avg"].mean())
+
+        diff_pct = _safe_delta(val_cuenta, val_red) if periods_aligned else None
         rows.append({"Métrica": "Engagement (%)", "Valor Cuenta": f"{val_cuenta:.2f}%", "Promedio Red": f"{val_red:.2f}%", "_delta": diff_pct})
 
     # Interacciones
-    if "interacciones" in data_entity.columns and "interacciones_avg" in benchmark.columns:
-        val_cuenta = float(data_entity["interacciones"].mean())
-        val_red = float(benchmark["interacciones_avg"].mean())
-        diff_pct = ((val_cuenta - val_red) / val_red * 100) if val_red > 0 else 0.0
+    if "interacciones" in calc_entity.columns and "interacciones_avg" in calc_benchmark.columns:
+        val_cuenta = float(calc_entity["interacciones"].mean())
+        val_red = float(calc_benchmark["interacciones_avg"].mean())
+        diff_pct = _safe_delta(val_cuenta, val_red) if periods_aligned else None
         rows.append({"Métrica": "Interacciones (prom.)", "Valor Cuenta": f"{val_cuenta:,.1f}", "Promedio Red": f"{val_red:,.1f}", "_delta": diff_pct})
 
     if not rows:
@@ -1261,9 +1317,12 @@ def _render_delta_table(
     body_rows = []
     for r in rows:
         d = r["_delta"]
-        sign = "+" if d >= 0 else ""
-        color = "#27ae60" if d >= 0 else "#e74c3c"
-        delta_html = f'<span style="color:{color};font-weight:bold">{sign}{d:.1f}%</span>'
+        if d is None or pd.isna(d):
+            delta_html = '<span style="color:#6b7280;font-weight:bold">N/A</span>'
+        else:
+            sign = "+" if d >= 0 else ""
+            color = "#27ae60" if d >= 0 else "#e74c3c"
+            delta_html = f'<span style="color:{color};font-weight:bold">{sign}{d:.1f}%</span>'
         body_rows.append(f"<tr><td>{r['Métrica']}</td><td>{r['Valor Cuenta']}</td><td>{r['Promedio Red']}</td><td>{delta_html}</td></tr>")
 
     table_html = f"""
