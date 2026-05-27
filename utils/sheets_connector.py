@@ -123,23 +123,40 @@ def _get_google_sheets_id() -> Optional[str]:
         text = str(value).strip().strip('"').strip("'")
         return text or None
 
-    try:
-        for key in ("google_sheets_id", "GOOGLE_SHEETS_ID", "spreadsheet_id", "SPREADSHEET_ID"):
-            if key in st.secrets:
-                sheet_id = _clean_sheet_id(st.secrets[key])
-                if sheet_id:
-                    logger.debug(f"GOOGLE_SHEETS_ID encontrado en st.secrets[{key}]")
-                    return sheet_id
-    except Exception:
-        pass
+    candidate_keys = (
+        "google_sheets_id",
+        "GOOGLE_SHEETS_ID",
+        "spreadsheet_id",
+        "SPREADSHEET_ID",
+        "sheet_id",
+        "SHEET_ID",
+    )
+
+    def _iter_secret_maps(obj: Any):
+        """Recorre estructuras anidadas de secrets para encontrar IDs en cualquier nivel."""
+        if isinstance(obj, dict):
+            yield obj
+            for value in obj.values():
+                yield from _iter_secret_maps(value)
+            return
+
+        # st.secrets y AttrDict-like
+        if hasattr(obj, "items"):
+            try:
+                data = dict(obj.items())
+                yield data
+                for value in data.values():
+                    yield from _iter_secret_maps(value)
+            except Exception:
+                return
 
     try:
-        if "general" in st.secrets:
-            for key in ("google_sheets_id", "GOOGLE_SHEETS_ID", "spreadsheet_id", "SPREADSHEET_ID"):
-                if key in st.secrets["general"]:
-                    sheet_id = _clean_sheet_id(st.secrets["general"][key])
+        for secret_map in _iter_secret_maps(st.secrets):
+            for key in candidate_keys:
+                if key in secret_map:
+                    sheet_id = _clean_sheet_id(secret_map[key])
                     if sheet_id:
-                        logger.debug(f"GOOGLE_SHEETS_ID encontrado en st.secrets[general][{key}]")
+                        logger.debug(f"GOOGLE_SHEETS_ID encontrado en st.secrets[{key}]")
                         return sheet_id
     except Exception:
         pass
@@ -148,6 +165,9 @@ def _get_google_sheets_id() -> Optional[str]:
         os.getenv("GOOGLE_SHEETS_ID")
         or os.getenv("google_sheets_id")
         or os.getenv("SPREADSHEET_ID")
+        or os.getenv("spreadsheet_id")
+        or os.getenv("SHEET_ID")
+        or os.getenv("sheet_id")
     )
     if sheet_id:
         logger.debug("GOOGLE_SHEETS_ID encontrado en variable de entorno")
