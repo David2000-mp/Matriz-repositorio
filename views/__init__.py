@@ -12,6 +12,7 @@ from . import changelog
 from . import new_data_dashboard
 from . import text_analysis_dashboard
 from . import statistical_registry_dashboard
+from . import audience_risk_view
 
 __all__ = [
 	"landing",
@@ -23,4 +24,5 @@ __all__ = [
 	"new_data_dashboard",
 	"text_analysis_dashboard",
 	"statistical_registry_dashboard",
+	"audience_risk_view",
 ]

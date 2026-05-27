@@ -133,6 +133,38 @@ def get_engagement_status(engagement_rate=None):
     return None  # Datos suficientes
 
 
+def calcular_kpi_engagement_global(df: pd.DataFrame) -> float:
+    """
+    Engagement KPI para vistas agregadas.
+    - 1 fila: respeta el engagement_rate capturado manualmente.
+    - Multiples filas: usa formula ponderada (sum interacciones / sum seguidores) * 100.
+    """
+    if df is None or df.empty:
+        return 0.0
+
+    # Para un unico registro, conservar el valor manual capturado.
+    if len(df) == 1 and "engagement_rate" in df.columns:
+        er_value = pd.to_numeric(
+            df["engagement_rate"].astype(str).str.replace(",", ".", regex=False),
+            errors="coerce",
+        ).fillna(0)
+        er_single = float(er_value.iloc[0]) if not er_value.empty else 0.0
+        if er_single == float("inf") or er_single == -float("inf"):
+            return 0.0
+        return max(0.0, er_single)
+
+    if not {"seguidores", "interacciones"}.issubset(df.columns):
+        return 0.0
+
+    total_seg = pd.to_numeric(df["seguidores"], errors="coerce").fillna(0).sum()
+    total_int = pd.to_numeric(df["interacciones"], errors="coerce").fillna(0).sum()
+
+    if total_seg <= 0:
+        return 0.0
+
+    return float((total_int / total_seg) * 100.0)
+
+
 def paginate_dataframe(df, page_size=1000, page_key="page"):
     """
     Implementa paginación para DataFrames grandes.
@@ -358,30 +390,8 @@ def render(df=None):
     tot_seg = df_unique['seguidores'].sum() if 'seguidores' in df_unique.columns else 0
     seg_prev_total = 0
 
-    try:
-        # CÁLCULO DE ENGAGEMENT GLOBAL (Promedio de los valores de engagement_rate por plataforma)
-        # Normalizar engagement_rate a numérico
-        df_unique_calc = df_unique.copy()
-        df_unique_calc['engagement_rate'] = pd.to_numeric(
-            df_unique_calc['engagement_rate'].astype(str).str.replace(',', '.', regex=False),
-            errors='coerce'
-        ).fillna(0)
-        
-        # Agrupar por plataforma y promediar los engagement_rate del formulario
-        platform_er = df_unique_calc.groupby('plataforma').agg({
-            'engagement_rate': 'mean'
-        }).reset_index()
-        
-        # Filtrar valores infinitos y extremos
-        platform_er['engagement_rate'] = platform_er['engagement_rate'].replace([float('inf'), -float('inf')], 0)
-        platform_er.loc[platform_er['engagement_rate'] > 100, 'engagement_rate'] = 100
-        
-        # Promedio simple de los ER por plataforma (del formulario)
-        er_global = platform_er['engagement_rate'].mean() if len(platform_er) > 0 else 0.0
-    except Exception as e:
-        logging.warning(f"Error en cálculo de engagement: {e}")
-        tot_seg_for_calc = df_unique['seguidores'].sum() if 'seguidores' in df_unique.columns else 0
-        er_global = df_unique['engagement_rate'].mean() if not df_unique.empty else 0.0
+    # KPI global: si hay agregacion usa ponderado; si hay 1 fila conserva valor manual.
+    er_global = calcular_kpi_engagement_global(df_unique)
     meses_disponibles = sorted(df_full["fecha"].dropna().dt.strftime("%Y-%m").unique(), reverse=True)  # type: ignore
     mes_actual = meses_disponibles[0] if len(meses_disponibles) > 0 else None
     mes_anterior = meses_disponibles[1] if len(meses_disponibles) > 1 else None
@@ -391,30 +401,8 @@ def render(df=None):
         df_prev = df_full[df_full["fecha"].dt.strftime("%Y-%m") == mes_anterior]  # type: ignore
         df_prev_unique = df_prev.drop_duplicates(subset=['entidad', 'plataforma'], keep='last')
         
-        # Calcular engagement del mes anterior usando el mismo método que el mes actual
-        try:
-            # Normalizar engagement_rate a numérico
-            df_prev_calc = df_prev_unique.copy()
-            df_prev_calc['engagement_rate'] = pd.to_numeric(
-                df_prev_calc['engagement_rate'].astype(str).str.replace(',', '.', regex=False),
-                errors='coerce'
-            ).fillna(0)
-            
-            # Agrupar por plataforma y promediar los engagement_rate del formulario
-            platform_er_prev = df_prev_calc.groupby('plataforma').agg({
-                'engagement_rate': 'mean'
-            }).reset_index()
-            
-            # Filtrar valores infinitos y extremos
-            platform_er_prev['engagement_rate'] = platform_er_prev['engagement_rate'].replace([float('inf'), -float('inf')], 0)
-            platform_er_prev.loc[platform_er_prev['engagement_rate'] > 100, 'engagement_rate'] = 100
-            
-            # Promedio simple de los ER por plataforma (del formulario)
-            er_prev = platform_er_prev['engagement_rate'].mean() if len(platform_er_prev) > 0 else 0.0
-        except Exception as e:
-            logging.warning(f"Error en cálculo de engagement anterior: {e}")
-            seg_prev_calc = df_prev_unique['seguidores'].sum()
-            er_prev = df_prev_unique['engagement_rate'].mean() if not df_prev_unique.empty else 0.0
+        # Comparacion mensual consistente con la misma metodologia de KPI global.
+        er_prev = calcular_kpi_engagement_global(df_prev_unique)
         
         # usar suma total para comparar seguidores
         seg_prev = df_prev_unique['seguidores'].sum()
@@ -625,14 +613,14 @@ def render(df=None):
         errors='coerce'
     ).fillna(0)
     
-    # Agrupar por plataforma usando valores del formulario
-    platform_summary = df_unique_display.groupby('plataforma').agg({
-        'seguidores': 'sum',
-        'engagement_rate': 'mean'  # Promedio de valores del formulario
-    }).reset_index()
-    
-    # Usar engagement_rate del formulario
-    platform_summary['engagement_promedio'] = platform_summary['engagement_rate']
+    # Agrupar por plataforma y calcular engagement agregado sin promediar promedios.
+    platform_summary = df_unique_display.groupby('plataforma').apply(
+        lambda g: pd.Series({
+            'seguidores': pd.to_numeric(g['seguidores'], errors='coerce').fillna(0).sum(),
+            'interacciones': pd.to_numeric(g['interacciones'], errors='coerce').fillna(0).sum() if 'interacciones' in g.columns else 0.0,
+            'engagement_promedio': calcular_kpi_engagement_global(g),
+        })
+    ).reset_index()
     
     for _, row in platform_summary.iterrows():
         status = get_engagement_status(engagement_rate=row['engagement_promedio'])

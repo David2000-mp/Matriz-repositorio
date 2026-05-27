@@ -95,6 +95,47 @@ def main():
             fill: #f5f7fa !important;
         }
 
+        /* Evitar cambio a negro cuando el expander está retraído */
+        [data-testid="stSidebar"] [data-testid="stExpander"] summary,
+        [data-testid="stSidebar"] [data-testid="stExpander"] summary *,
+        [data-testid="stSidebar"] [data-testid="stExpander"] details:not([open]) summary,
+        [data-testid="stSidebar"] [data-testid="stExpander"] details:not([open]) summary * {
+            color: #f5f7fa !important;
+            fill: #f5f7fa !important;
+        }
+
+        /* Mantener color estable en selectbox del sidebar (cerrado y desplegado) */
+        [data-testid="stSidebar"] [data-testid="stSelectbox"] [data-baseweb="select"],
+        [data-testid="stSidebar"] [data-testid="stSelectbox"] [data-baseweb="select"] *,
+        [data-testid="stSidebar"] [data-testid="stSelectbox"] div[role="combobox"],
+        [data-testid="stSidebar"] [data-testid="stSelectbox"] div[role="combobox"] *,
+        [data-testid="stSidebar"] [data-testid="stSelectbox"] input {
+            color: #212529 !important;
+            fill: #212529 !important;
+        }
+
+        /* Opciones cuando se abre el dropdown: contraste estable (evita texto oscuro sobre fondo oscuro) */
+        [data-baseweb="popover"] [role="listbox"],
+        [data-baseweb="popover"] [role="option"] {
+            background-color: #ffffff !important;
+            color: #212529 !important;
+        }
+
+        [data-baseweb="popover"] [role="listbox"] *,
+        [data-baseweb="popover"] [role="option"] * {
+            color: #212529 !important;
+        }
+
+        [data-baseweb="popover"] [role="option"][aria-selected="true"] {
+            background-color: #e8f0ff !important;
+            color: #0f2f68 !important;
+        }
+
+        [data-baseweb="popover"] [role="option"]:hover {
+            background-color: #f2f6ff !important;
+            color: #0f2f68 !important;
+        }
+
         [data-testid="stSidebar"] [data-testid="stSidebarUserContent"] {
             padding-top: 0.35rem;
             padding-bottom: 0.35rem;
@@ -187,6 +228,7 @@ def main():
                 "Inicio",
                 "Dashboard Global",
                 "Comparativas",
+                "Segmentación de Audiencias y Riesgo",
                 "Tipo de contenidos",
                 "Analisis de textos",
                 "Calc. Engagement",
@@ -206,6 +248,7 @@ def main():
             "🏠 Inicio": "Inicio",
             "📊 Dashboard Global": "Dashboard Global",
             "📈 Comparativas": "Comparativas",
+            "🎯 Segmentación de Audiencias y Riesgo": "Segmentación de Audiencias y Riesgo",
             "🆕 Tipo de contenidos": "Tipo de contenidos",
             "🧠 Analisis de textos": "Analisis de textos",
             "📐 Registro Estadistico": "Registro Estadistico",
@@ -446,6 +489,12 @@ def main():
 
         df_filtered = df_global.copy()
 
+        # Filtro por mes (defensivo): usa el valor del sidebar almacenado en session_state.
+        mes_sel = st.session_state.get("filtro_mes", "Todos")
+        if mes_sel != "Todos" and "fecha" in df_filtered.columns:
+            fechas = pd.to_datetime(df_filtered["fecha"], errors="coerce")
+            df_filtered = df_filtered[fechas.dt.strftime("%Y-%m") == str(mes_sel)]
+
         # Filtro por entidad
         entidad_sel = st.session_state.get("filtro_entidad", "Todas")
         if entidad_sel != "Todas" and entidad_sel in df_filtered["entidad"].values:
@@ -467,6 +516,10 @@ def main():
         # Sprint 2 Week 3: Nueva vista de comparación lado a lado
         from views import comparison
         comparison.render_comparison_view()
+    elif selected == "Segmentación de Audiencias y Riesgo":
+        from views import audience_risk_view
+
+        audience_risk_view.render()
     elif selected == "Tipo de contenidos":
         from views import new_data_dashboard
 

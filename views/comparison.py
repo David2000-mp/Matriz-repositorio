@@ -23,6 +23,7 @@ from plotly.subplots import make_subplots
 from utils.app_state import get_app_state
 from components.toast_notifications import toast_info, toast_warning, toast_filter_applied
 from utils.logger import get_logger
+from views.dashboard import calcular_kpi_engagement_global
 
 logger = get_logger(__name__)
 
@@ -395,13 +396,8 @@ def _render_entity_kpis(data: pd.DataFrame, color: str = "#1f77b4"):
         total_interactions = 0
         avg_interactions = 0
     
-    # Calcular engagement promedio agrupando por plataforma primero
-    # (consistente con Dashboard Global para evitar sesgo por conteo desigual de registros)
-    if "engagement_rate" in data.columns and "plataforma" in data.columns and not data.empty:
-        platform_er = data.groupby('plataforma')['engagement_rate'].mean()
-        weighted_engagement = platform_er.mean() if not platform_er.empty else 0
-    else:
-        weighted_engagement = 0
+    # Engagement con la misma regla híbrida del Dashboard Global.
+    weighted_engagement = calcular_kpi_engagement_global(data)
     
     # Verificar estado del engagement con get_engagement_status
     status = get_engagement_status(total_interactions, total_followers)
@@ -453,8 +449,6 @@ def _render_entity_kpis(data: pd.DataFrame, color: str = "#1f77b4"):
         agg_dict = {"seguidores": "max"}
         if "interacciones" in data.columns:
             agg_dict["interacciones"] = "mean"
-        if "engagement_rate" in data.columns:
-            agg_dict["engagement_rate"] = "mean"
 
         platform_summary = data.groupby("plataforma").agg(agg_dict).reset_index()
         
@@ -468,11 +462,13 @@ def _render_entity_kpis(data: pd.DataFrame, color: str = "#1f77b4"):
                 platform_interactions = row["interacciones"]
             else:
                 # Estimar usando engagement_rate promedio de la plataforma
-                platform_engagement = row.get("engagement_rate", 0)
+                platform_data = data[data["plataforma"] == platform_name]
+                platform_engagement = calcular_kpi_engagement_global(platform_data)
                 platform_interactions = (platform_engagement / 100) * platform_followers
             
-            # Engagement por plataforma: siempre promedio (no suma)
-            platform_engagement_weighted = row.get("engagement_rate", 0)
+            # Engagement por plataforma con regla híbrida (1 fila manual, multi ponderado).
+            platform_data = data[data["plataforma"] == platform_name]
+            platform_engagement_weighted = calcular_kpi_engagement_global(platform_data)
             if pd.isna(platform_engagement_weighted):
                 platform_engagement_weighted = 0
             
@@ -627,13 +623,13 @@ def _render_engagement_evolution_comparison(
         work_a["engagement_rate"] = pd.to_numeric(work_a["engagement_rate"], errors="coerce")
         work_a = work_a.dropna(subset=["fecha", "engagement_rate"])
 
-        # Primero agrupar por fecha y plataforma, luego promediar entre plataformas
-        # (consistente con Dashboard Global)
-        if "plataforma" in work_a.columns:
-            data_a_temp = work_a.groupby(["fecha", "plataforma"])["engagement_rate"].mean().reset_index()
-            data_a_grouped = data_a_temp.groupby("fecha")["engagement_rate"].mean().reset_index()
-        else:
-            data_a_grouped = work_a.groupby("fecha")["engagement_rate"].mean().reset_index()
+        # Misma regla híbrida del Dashboard Global por cada fecha.
+        data_a_grouped = (
+            work_a.groupby("fecha")
+            .apply(calcular_kpi_engagement_global)
+            .rename("engagement_rate")
+            .reset_index()
+        )
         data_a_grouped = data_a_grouped.sort_values("fecha")
         
         fig.add_trace(go.Scatter(
@@ -652,13 +648,13 @@ def _render_engagement_evolution_comparison(
         work_b["engagement_rate"] = pd.to_numeric(work_b["engagement_rate"], errors="coerce")
         work_b = work_b.dropna(subset=["fecha", "engagement_rate"])
 
-        # Primero agrupar por fecha y plataforma, luego promediar entre plataformas
-        # (consistente con Dashboard Global)
-        if "plataforma" in work_b.columns:
-            data_b_temp = work_b.groupby(["fecha", "plataforma"])["engagement_rate"].mean().reset_index()
-            data_b_grouped = data_b_temp.groupby("fecha")["engagement_rate"].mean().reset_index()
-        else:
-            data_b_grouped = work_b.groupby("fecha")["engagement_rate"].mean().reset_index()
+        # Misma regla híbrida del Dashboard Global por cada fecha.
+        data_b_grouped = (
+            work_b.groupby("fecha")
+            .apply(calcular_kpi_engagement_global)
+            .rename("engagement_rate")
+            .reset_index()
+        )
         data_b_grouped = data_b_grouped.sort_values("fecha")
         
         fig.add_trace(go.Scatter(
@@ -1043,15 +1039,7 @@ def _render_benchmark_comparison(state, df: pd.DataFrame, selected_platform: str
     if "interacciones" in entity_snapshot.columns and not entity_snapshot.empty:
         entity_interactions = float(pd.to_numeric(entity_snapshot["interacciones"], errors="coerce").fillna(0).sum())
 
-    if {
-        "seguidores",
-        "interacciones",
-    }.issubset(entity_snapshot.columns) and entity_followers > 0:
-        entity_engagement = (entity_interactions / entity_followers) * 100
-    elif "engagement_rate" in entity_snapshot.columns and not entity_snapshot.empty:
-        entity_engagement = float(pd.to_numeric(entity_snapshot["engagement_rate"], errors="coerce").fillna(0).mean())
-    else:
-        entity_engagement = 0.0
+    entity_engagement = calcular_kpi_engagement_global(entity_snapshot)
 
     # Promedios de la red (último periodo disponible)
     net_followers = 0.0
@@ -1068,7 +1056,14 @@ def _render_benchmark_comparison(state, df: pd.DataFrame, selected_platform: str
         if "interacciones_avg" in latest_benchmark.columns:
             net_interactions = float(latest_benchmark["interacciones_avg"].sum())
         if "engagement_rate_avg" in latest_benchmark.columns:
-            net_engagement = float(latest_benchmark["engagement_rate_avg"].mean())
+            benchmark_engagement_input = latest_benchmark.rename(
+                columns={
+                    "seguidores_avg": "seguidores",
+                    "interacciones_avg": "interacciones",
+                    "engagement_rate_avg": "engagement_rate",
+                }
+            )
+            net_engagement = calcular_kpi_engagement_global(benchmark_engagement_input)
 
     kpi_col1, kpi_col2, kpi_col3 = st.columns(3)
 
@@ -1162,8 +1157,15 @@ def _render_benchmark_chart(
         if "plataforma" in entity_work.columns and plataforma_sel != "Todas":
             entity_work = entity_work[entity_work["plataforma"] == plataforma_sel]
 
-        agg_fn = "sum" if metric_entity == "seguidores" else "mean"
-        entity_series = entity_work.groupby("fecha")[metric_entity].agg(agg_fn).reset_index()
+        if metric_entity == "engagement_rate":
+            entity_series = (
+                entity_work.groupby("fecha")
+                .apply(calcular_kpi_engagement_global)
+                .rename(metric_entity)
+                .reset_index()
+            )
+        else:
+            entity_series = entity_work.groupby("fecha")[metric_entity].sum().reset_index()
         entity_series = entity_series.sort_values("fecha")
 
         fig.add_trace(go.Scatter(
@@ -1185,9 +1187,22 @@ def _render_benchmark_chart(
         if "plataforma" in benchmark_work.columns and plataforma_sel != "Todas":
             benchmark_work = benchmark_work[benchmark_work["plataforma"] == plataforma_sel]
 
-        if "plataforma" in benchmark_work.columns and plataforma_sel == "Todas":
-            agg_fn = "sum" if metric_bench in {"seguidores_avg", "interacciones_avg"} else "mean"
-            bench_series = benchmark_work.groupby("fecha")[metric_bench].agg(agg_fn).reset_index()
+        if metric_bench == "engagement_rate_avg":
+            benchmark_engagement_input = benchmark_work.rename(
+                columns={
+                    "seguidores_avg": "seguidores",
+                    "interacciones_avg": "interacciones",
+                    "engagement_rate_avg": "engagement_rate",
+                }
+            )
+            bench_series = (
+                benchmark_engagement_input.groupby("fecha")
+                .apply(calcular_kpi_engagement_global)
+                .rename(metric_bench)
+                .reset_index()
+            )
+        elif "plataforma" in benchmark_work.columns and plataforma_sel == "Todas":
+            bench_series = benchmark_work.groupby("fecha")[metric_bench].sum().reset_index()
         else:
             bench_series = benchmark_work[["fecha", metric_bench]].copy()
         bench_series = bench_series.sort_values("fecha")
@@ -1297,19 +1312,16 @@ def _render_delta_table(
 
     # Engagement
     if "engagement_rate" in calc_entity.columns and "engagement_rate_avg" in calc_benchmark.columns:
-        if {"interacciones", "seguidores"}.issubset(calc_entity.columns):
-            cuenta_interacciones = float(pd.to_numeric(calc_entity["interacciones"], errors="coerce").fillna(0).sum())
-            cuenta_seguidores = float(pd.to_numeric(calc_entity["seguidores"], errors="coerce").fillna(0).sum())
-            val_cuenta = (cuenta_interacciones / cuenta_seguidores * 100) if cuenta_seguidores > 0 else 0.0
-        else:
-            val_cuenta = float(pd.to_numeric(calc_entity["engagement_rate"], errors="coerce").fillna(0).mean())
+        val_cuenta = calcular_kpi_engagement_global(calc_entity)
 
-        if {"interacciones_avg", "seguidores_avg"}.issubset(calc_benchmark.columns):
-            red_interacciones = float(pd.to_numeric(calc_benchmark["interacciones_avg"], errors="coerce").fillna(0).sum())
-            red_seguidores = float(pd.to_numeric(calc_benchmark["seguidores_avg"], errors="coerce").fillna(0).sum())
-            val_red = (red_interacciones / red_seguidores * 100) if red_seguidores > 0 else 0.0
-        else:
-            val_red = float(pd.to_numeric(calc_benchmark["engagement_rate_avg"], errors="coerce").fillna(0).mean())
+        benchmark_engagement_input = calc_benchmark.rename(
+            columns={
+                "seguidores_avg": "seguidores",
+                "interacciones_avg": "interacciones",
+                "engagement_rate_avg": "engagement_rate",
+            }
+        )
+        val_red = calcular_kpi_engagement_global(benchmark_engagement_input)
 
         diff_pct = _safe_delta(val_cuenta, val_red) if periods_aligned else None
         rows.append({"Métrica": "Engagement (%)", "Valor Cuenta": f"{val_cuenta:.2f}%", "Promedio Red": f"{val_red:.2f}%", "_delta": diff_pct})
