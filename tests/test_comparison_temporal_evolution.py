@@ -94,7 +94,9 @@ def test_benchmark_engagement_chart_uses_mean_when_all_platforms(monkeypatch):
         {
             "fecha": ["2026-03-01", "2026-03-01"],
             "plataforma": ["Facebook", "Instagram"],
-            "engagement_rate": [2.0, 4.0],
+            "seguidores": [100, 300],
+            "interacciones": [10, 30],
+            "engagement_rate": [99.0, 1.0],
         }
     )
 
@@ -102,7 +104,9 @@ def test_benchmark_engagement_chart_uses_mean_when_all_platforms(monkeypatch):
         {
             "fecha": ["2026-03-01", "2026-03-01"],
             "plataforma": ["Facebook", "Instagram"],
-            "engagement_rate_avg": [1.0, 3.0],
+            "seguidores_avg": [500, 500],
+            "interacciones_avg": [10, 30],
+            "engagement_rate_avg": [99.0, 1.0],
         }
     )
 
@@ -120,5 +124,47 @@ def test_benchmark_engagement_chart_uses_mean_when_all_platforms(monkeypatch):
     fig = fake_st.figures[-1]
 
     assert len(fig.data) == 2
-    assert list(fig.data[0].y) == [3.0]
-    assert list(fig.data[1].y) == [2.0]
+    assert list(fig.data[0].y) == [50.0]
+    assert list(fig.data[1].y) == [50.0]
+
+
+def test_benchmark_engagement_chart_uses_rate_values_when_denominator_is_zero(monkeypatch):
+    fake_st = _FakeStreamlit()
+    monkeypatch.setattr(comparison, "st", fake_st)
+
+    data_entity = pd.DataFrame(
+        {
+            "fecha": ["2026-03-01"],
+            "plataforma": ["Facebook"],
+            "seguidores": [0],
+            "interacciones": [25],
+            "engagement_rate": [7.0],
+        }
+    )
+
+    benchmark = pd.DataFrame(
+        {
+            "fecha": ["2026-03-01"],
+            "plataforma": ["Facebook"],
+            "seguidores_avg": [0],
+            "interacciones_avg": [20],
+            "engagement_rate_avg": [5.0],
+        }
+    )
+
+    comparison._render_benchmark_chart(
+        entity="Entidad A",
+        data_entity=data_entity,
+        benchmark=benchmark,
+        metric_entity="engagement_rate",
+        metric_bench="engagement_rate_avg",
+        ylabel="Engagement (%)",
+        plataforma_sel="Todas",
+    )
+
+    assert fake_st.figures, "No se generó la figura de benchmark de engagement"
+    fig = fake_st.figures[-1]
+
+    assert len(fig.data) == 2
+    assert list(fig.data[0].y) == [7.0]
+    assert list(fig.data[1].y) == [5.0]

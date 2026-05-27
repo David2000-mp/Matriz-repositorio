@@ -37,6 +37,8 @@ addopts = [
     # Warnings
     "--strict-markers",       # Error si marker no está definido
     "-W", "ignore::DeprecationWarning",
+    "--ignore=quick_test.py",             # Script legacy ejecutable (no pytest)
+    "--ignore=test_colegios_update.py",   # Script legacy ejecutable (no pytest)
     
     # Paralelización (usa -n auto para detectar CPUs)
     # "-n", "auto",  # Descomentar para tests paralelos

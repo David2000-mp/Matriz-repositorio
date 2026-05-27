@@ -14,6 +14,7 @@ Integración:
 
 import streamlit as st
 import pandas as pd
+import numpy as np
 from datetime import datetime
 from typing import Dict, Optional, Tuple
 import plotly.graph_objects as go
@@ -897,7 +898,7 @@ def _get_entity_data(
 
 def _calculate_network_benchmark(df: pd.DataFrame, plataforma: str = None) -> pd.DataFrame:
     """
-    Calcula el promedio de la red Marista agrupado por (fecha, plataforma).
+    Calcula el benchmark de la red Marista agrupado por (fecha, plataforma).
 
     Args:
         df: DataFrame completo de la red
@@ -905,7 +906,11 @@ def _calculate_network_benchmark(df: pd.DataFrame, plataforma: str = None) -> pd
 
     Returns:
         DataFrame con columnas [fecha, plataforma, seguidores_avg,
-        engagement_rate_avg, interacciones_avg]
+        engagement_rate_avg, interacciones_avg].
+
+        Nota: por compatibilidad histórica se conserva el sufijo "_avg",
+        pero `seguidores_avg` e `interacciones_avg` representan totales
+        agregados de red por periodo/plataforma.
     """
     if df is None or df.empty or "fecha" not in df.columns:
         return pd.DataFrame()
@@ -922,22 +927,48 @@ def _calculate_network_benchmark(df: pd.DataFrame, plataforma: str = None) -> pd
 
     group_cols = ["fecha", "plataforma"] if "plataforma" in work.columns else ["fecha"]
 
-    agg_dict = {}
-    if "seguidores" in work.columns:
-        agg_dict["seguidores"] = "mean"
-    if "engagement_rate" in work.columns:
-        agg_dict["engagement_rate"] = "mean"
-    if "interacciones" in work.columns:
-        agg_dict["interacciones"] = "mean"
+    # 1) Totales para matemática exacta (engagement), medias para visualización justa.
+    if {"seguidores", "interacciones"}.issubset(work.columns):
+        benchmark = (
+            work.groupby(group_cols, as_index=False)
+            .agg(
+                seguidores_total=("seguidores", "sum"),
+                interacciones_total=("interacciones", "sum"),
+                seguidores_promedio=("seguidores", "mean"),
+                interacciones_promedio=("interacciones", "mean"),
+            )
+        )
+    else:
+        agg_fallback = {}
+        if "seguidores" in work.columns:
+            agg_fallback["seguidores_promedio"] = ("seguidores", "mean")
+        if "interacciones" in work.columns:
+            agg_fallback["interacciones_promedio"] = ("interacciones", "mean")
+        if not agg_fallback:
+            return pd.DataFrame()
+        benchmark = work.groupby(group_cols, as_index=False).agg(**agg_fallback)
+        benchmark["seguidores_total"] = pd.to_numeric(benchmark.get("seguidores_promedio", 0), errors="coerce").fillna(0)
+        benchmark["interacciones_total"] = pd.to_numeric(benchmark.get("interacciones_promedio", 0), errors="coerce").fillna(0)
 
-    if not agg_dict:
-        return pd.DataFrame()
+    # 2) Engagement ponderado real de la red.
+    benchmark["engagement_rate"] = np.where(
+        benchmark["seguidores_total"] > 0,
+        (benchmark["interacciones_total"] / benchmark["seguidores_total"]) * 100.0,
+        0.0,
+    )
 
-    benchmark = work.groupby(group_cols).agg(agg_dict).reset_index()
+    # 3) Sobrescribir columnas base para consumo visual con medias.
+    benchmark["seguidores"] = benchmark["seguidores_promedio"]
+    benchmark["interacciones"] = benchmark["interacciones_promedio"]
+
+    benchmark = benchmark.drop(
+        columns=["seguidores_total", "interacciones_total", "seguidores_promedio", "interacciones_promedio"]
+    )
+
     benchmark = benchmark.rename(columns={
         "seguidores": "seguidores_avg",
-        "engagement_rate": "engagement_rate_avg",
         "interacciones": "interacciones_avg",
+        "engagement_rate": "engagement_rate_avg",
     })
     benchmark = benchmark.sort_values("fecha")
     return benchmark
@@ -991,50 +1022,36 @@ def _render_benchmark_comparison(state, df: pd.DataFrame, selected_platform: str
     # ---- KPIs comparativos ----
     st.markdown("### 📈 Métricas Clave vs Promedio Red")
 
-    # Valores actuales de la entidad (consolidando todas las plataformas)
+    # Valores actuales de la entidad (snapshot más reciente por cuenta/plataforma)
+    entity_snapshot = data_entity.copy()
+    if "fecha" in entity_snapshot.columns:
+        entity_snapshot["fecha"] = pd.to_datetime(entity_snapshot["fecha"], errors="coerce")
+    if "id_cuenta" in entity_snapshot.columns and "fecha" in entity_snapshot.columns:
+        entity_snapshot = entity_snapshot.sort_values("fecha").groupby("id_cuenta", as_index=False).tail(1)
+    elif "plataforma" in entity_snapshot.columns and "fecha" in entity_snapshot.columns:
+        entity_snapshot = entity_snapshot.sort_values("fecha").groupby("plataforma", as_index=False).tail(1)
+    elif "fecha" in entity_snapshot.columns:
+        latest_date_entity = entity_snapshot["fecha"].max()
+        if pd.notna(latest_date_entity):
+            entity_snapshot = entity_snapshot[entity_snapshot["fecha"] == latest_date_entity]
+
     entity_followers = 0.0
-    if "seguidores" in data_entity.columns and not data_entity.empty:
-        entity_work = data_entity.copy()
-        if "fecha" in entity_work.columns:
-            entity_work["fecha"] = pd.to_datetime(entity_work["fecha"], errors="coerce")
-        if "id_cuenta" in entity_work.columns and "fecha" in entity_work.columns:
-            latest_entity_rows = (
-                entity_work.sort_values("fecha")
-                .dropna(subset=["seguidores"])
-                .groupby("id_cuenta", as_index=False)
-                .tail(1)
-            )
-            entity_followers = float(latest_entity_rows["seguidores"].sum()) if not latest_entity_rows.empty else 0.0
-        elif "plataforma" in entity_work.columns and "fecha" in entity_work.columns:
-            latest_entity_rows = (
-                entity_work.sort_values("fecha")
-                .dropna(subset=["seguidores"])
-                .groupby("plataforma", as_index=False)
-                .tail(1)
-            )
-            entity_followers = float(latest_entity_rows["seguidores"].sum()) if not latest_entity_rows.empty else 0.0
-        elif "plataforma" in entity_work.columns:
-            entity_followers = float(entity_work.groupby("plataforma")["seguidores"].max().sum())
-        else:
-            entity_followers = float(entity_work["seguidores"].max())
+    if "seguidores" in entity_snapshot.columns and not entity_snapshot.empty:
+        entity_followers = float(pd.to_numeric(entity_snapshot["seguidores"], errors="coerce").fillna(0).sum())
 
-    if "engagement_rate" in data_entity.columns and not data_entity.empty:
-        entity_er_work = data_entity.copy()
-        if "fecha" in entity_er_work.columns:
-            entity_er_work["fecha"] = pd.to_datetime(entity_er_work["fecha"], errors="coerce")
-            latest_date_entity = entity_er_work["fecha"].max()
-            if pd.notna(latest_date_entity):
-                entity_er_work = entity_er_work[entity_er_work["fecha"] == latest_date_entity]
+    entity_interactions = 0.0
+    if "interacciones" in entity_snapshot.columns and not entity_snapshot.empty:
+        entity_interactions = float(pd.to_numeric(entity_snapshot["interacciones"], errors="coerce").fillna(0).sum())
 
-        if "plataforma" in entity_er_work.columns:
-            per_plat_er = entity_er_work.groupby("plataforma")["engagement_rate"].mean()
-            entity_engagement = float(per_plat_er.mean()) if not per_plat_er.empty else 0.0
-        else:
-            entity_engagement = float(entity_er_work["engagement_rate"].mean())
+    if {
+        "seguidores",
+        "interacciones",
+    }.issubset(entity_snapshot.columns) and entity_followers > 0:
+        entity_engagement = (entity_interactions / entity_followers) * 100
+    elif "engagement_rate" in entity_snapshot.columns and not entity_snapshot.empty:
+        entity_engagement = float(pd.to_numeric(entity_snapshot["engagement_rate"], errors="coerce").fillna(0).mean())
     else:
         entity_engagement = 0.0
-
-    entity_interactions = float(data_entity["interacciones"].mean()) if "interacciones" in data_entity.columns else 0.0
 
     # Promedios de la red (último periodo disponible)
     net_followers = 0.0
@@ -1048,10 +1065,10 @@ def _render_benchmark_comparison(state, df: pd.DataFrame, selected_platform: str
 
         if "seguidores_avg" in latest_benchmark.columns:
             net_followers = float(latest_benchmark["seguidores_avg"].sum())
+        if "interacciones_avg" in latest_benchmark.columns:
+            net_interactions = float(latest_benchmark["interacciones_avg"].sum())
         if "engagement_rate_avg" in latest_benchmark.columns:
             net_engagement = float(latest_benchmark["engagement_rate_avg"].mean())
-        if "interacciones_avg" in latest_benchmark.columns:
-            net_interactions = float(latest_benchmark["interacciones_avg"].mean())
 
     kpi_col1, kpi_col2, kpi_col3 = st.columns(3)
 
@@ -1077,9 +1094,9 @@ def _render_benchmark_comparison(state, df: pd.DataFrame, selected_platform: str
         delta_int = entity_interactions - net_interactions
         sign = "+" if delta_int >= 0 else ""
         st.metric(
-            "Interacciones (prom.)",
-            f"{entity_interactions:,.1f}",
-            delta=f"{sign}{delta_int:,.1f} vs red ({net_interactions:,.1f})",
+            "Interacciones (total)",
+            f"{entity_interactions:,.0f}",
+            delta=f"{sign}{delta_int:,.0f} vs red ({net_interactions:,.0f})",
         )
 
     st.divider()
@@ -1142,13 +1159,11 @@ def _render_benchmark_chart(
         entity_work[metric_entity] = pd.to_numeric(entity_work[metric_entity], errors="coerce")
         entity_work = entity_work.dropna(subset=["fecha", metric_entity])
 
-        if "plataforma" in entity_work.columns and plataforma_sel == "Todas":
-            agg_fn = "sum" if metric_entity == "seguidores" else "mean"
-            grp = entity_work.groupby(["fecha", "plataforma"])[metric_entity].agg(agg_fn).reset_index()
-            entity_series = grp.groupby("fecha")[metric_entity].agg(agg_fn).reset_index()
-        else:
-            agg_fn = "sum" if metric_entity == "seguidores" else "mean"
-            entity_series = entity_work.groupby("fecha")[metric_entity].agg(agg_fn).reset_index()
+        if "plataforma" in entity_work.columns and plataforma_sel != "Todas":
+            entity_work = entity_work[entity_work["plataforma"] == plataforma_sel]
+
+        agg_fn = "sum" if metric_entity == "seguidores" else "mean"
+        entity_series = entity_work.groupby("fecha")[metric_entity].agg(agg_fn).reset_index()
         entity_series = entity_series.sort_values("fecha")
 
         fig.add_trace(go.Scatter(
@@ -1167,8 +1182,11 @@ def _render_benchmark_chart(
         benchmark_work[metric_bench] = pd.to_numeric(benchmark_work[metric_bench], errors="coerce")
         benchmark_work = benchmark_work.dropna(subset=["fecha", metric_bench])
 
+        if "plataforma" in benchmark_work.columns and plataforma_sel != "Todas":
+            benchmark_work = benchmark_work[benchmark_work["plataforma"] == plataforma_sel]
+
         if "plataforma" in benchmark_work.columns and plataforma_sel == "Todas":
-            agg_fn = "sum" if metric_bench == "seguidores_avg" else "mean"
+            agg_fn = "sum" if metric_bench in {"seguidores_avg", "interacciones_avg"} else "mean"
             bench_series = benchmark_work.groupby("fecha")[metric_bench].agg(agg_fn).reset_index()
         else:
             bench_series = benchmark_work[["fecha", metric_bench]].copy()
@@ -1271,42 +1289,37 @@ def _render_delta_table(
 
     # Seguidores
     if "seguidores" in calc_entity.columns and "seguidores_avg" in calc_benchmark.columns:
-        if "plataforma" in calc_entity.columns:
-            val_cuenta = float(calc_entity.groupby("plataforma")["seguidores"].max().sum())
-        else:
-            val_cuenta = float(calc_entity["seguidores"].max())
-
-        if "plataforma" in calc_benchmark.columns:
-            val_red = float(calc_benchmark.groupby("plataforma")["seguidores_avg"].mean().sum())
-        else:
-            val_red = float(calc_benchmark["seguidores_avg"].mean())
+        val_cuenta = float(pd.to_numeric(calc_entity["seguidores"], errors="coerce").fillna(0).sum())
+        val_red = float(pd.to_numeric(calc_benchmark["seguidores_avg"], errors="coerce").fillna(0).sum())
 
         diff_pct = _safe_delta(val_cuenta, val_red) if periods_aligned else None
         rows.append({"Métrica": "Seguidores", "Valor Cuenta": f"{val_cuenta:,.0f}", "Promedio Red": f"{val_red:,.0f}", "_delta": diff_pct})
 
     # Engagement
     if "engagement_rate" in calc_entity.columns and "engagement_rate_avg" in calc_benchmark.columns:
-        if "plataforma" in calc_entity.columns:
-            per_plat = calc_entity.groupby("plataforma")["engagement_rate"].mean()
-            val_cuenta = float(per_plat.mean()) if not per_plat.empty else 0.0
+        if {"interacciones", "seguidores"}.issubset(calc_entity.columns):
+            cuenta_interacciones = float(pd.to_numeric(calc_entity["interacciones"], errors="coerce").fillna(0).sum())
+            cuenta_seguidores = float(pd.to_numeric(calc_entity["seguidores"], errors="coerce").fillna(0).sum())
+            val_cuenta = (cuenta_interacciones / cuenta_seguidores * 100) if cuenta_seguidores > 0 else 0.0
         else:
-            val_cuenta = float(calc_entity["engagement_rate"].mean())
+            val_cuenta = float(pd.to_numeric(calc_entity["engagement_rate"], errors="coerce").fillna(0).mean())
 
-        if "plataforma" in calc_benchmark.columns:
-            net_per_plat = calc_benchmark.groupby("plataforma")["engagement_rate_avg"].mean()
-            val_red = float(net_per_plat.mean()) if not net_per_plat.empty else 0.0
+        if {"interacciones_avg", "seguidores_avg"}.issubset(calc_benchmark.columns):
+            red_interacciones = float(pd.to_numeric(calc_benchmark["interacciones_avg"], errors="coerce").fillna(0).sum())
+            red_seguidores = float(pd.to_numeric(calc_benchmark["seguidores_avg"], errors="coerce").fillna(0).sum())
+            val_red = (red_interacciones / red_seguidores * 100) if red_seguidores > 0 else 0.0
         else:
-            val_red = float(calc_benchmark["engagement_rate_avg"].mean())
+            val_red = float(pd.to_numeric(calc_benchmark["engagement_rate_avg"], errors="coerce").fillna(0).mean())
 
         diff_pct = _safe_delta(val_cuenta, val_red) if periods_aligned else None
         rows.append({"Métrica": "Engagement (%)", "Valor Cuenta": f"{val_cuenta:.2f}%", "Promedio Red": f"{val_red:.2f}%", "_delta": diff_pct})
 
     # Interacciones
     if "interacciones" in calc_entity.columns and "interacciones_avg" in calc_benchmark.columns:
-        val_cuenta = float(calc_entity["interacciones"].mean())
-        val_red = float(calc_benchmark["interacciones_avg"].mean())
+        val_cuenta = float(pd.to_numeric(calc_entity["interacciones"], errors="coerce").fillna(0).sum())
+        val_red = float(pd.to_numeric(calc_benchmark["interacciones_avg"], errors="coerce").fillna(0).sum())
         diff_pct = _safe_delta(val_cuenta, val_red) if periods_aligned else None
-        rows.append({"Métrica": "Interacciones (prom.)", "Valor Cuenta": f"{val_cuenta:,.1f}", "Promedio Red": f"{val_red:,.1f}", "_delta": diff_pct})
+        rows.append({"Métrica": "Interacciones (total)", "Valor Cuenta": f"{val_cuenta:,.0f}", "Promedio Red": f"{val_red:,.0f}", "_delta": diff_pct})
 
     if not rows:
         st.info("No hay suficientes datos para calcular la tabla de variación.")
