@@ -10,6 +10,7 @@ import os
 from dotenv import load_dotenv
 from utils.logger import get_logger
 from datetime import datetime
+from utils.engagement_validation import normalize_engagement_series
 
 # Cargar variables de entorno
 load_dotenv()
@@ -89,17 +90,9 @@ def importar_csv_formato_usuario(csv_path):
         if columns_to_drop:
             df.drop(columns=columns_to_drop, inplace=True)
 
-        # Convertir engagement de decimal a porcentaje
+        # Normalización canónica: engagement en porcentaje [0, 100]
         if 'engagement_rate' in df.columns:
-            # Convertir strings con coma a float
-            df['engagement_rate'] = df['engagement_rate'].astype(str).str.replace(',', '.')
-            df['engagement_rate'] = pd.to_numeric(df['engagement_rate'], errors='coerce')
-
-            # Convertir de decimal a porcentaje (2.79 -> 279%)
-            df['engagement_rate'] = df['engagement_rate'] * 100
-
-            # Aplicar límite del 20%
-            df.loc[df['engagement_rate'] > 20, 'engagement_rate'] = 20.0
+            df['engagement_rate'] = normalize_engagement_series(df['engagement_rate'])
 
         # Convertir seguidores a numérico
         if 'seguidores' in df.columns:
@@ -115,8 +108,8 @@ def importar_csv_formato_usuario(csv_path):
         mask_calculable = (df['seguidores'] > 0) & (df['engagement_rate'] > 0)
         if mask_calculable.any():
             df.loc[mask_calculable, 'interacciones'] = (
-                df.loc[mask_calculable, 'seguidores'] * df.loc[mask_calculable, 'engagement_rate']
-            ) / 100
+                df.loc[mask_calculable, 'seguidores'] * (df.loc[mask_calculable, 'engagement_rate'] / 100)
+            )
             df['interacciones'] = df['interacciones'].round().astype(int)
 
         # Reordenar columnas según el formato esperado

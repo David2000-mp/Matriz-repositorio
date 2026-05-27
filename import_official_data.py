@@ -3,6 +3,7 @@ import os
 from pathlib import Path
 from utils.catalog import COLEGIOS_MARISTAS
 from utils.data_saver import get_id, sync_cuentas_to_sheets, guardar_datos
+from utils.engagement_validation import normalize_engagement_rate
 
 # Ruta al CSV (asumiendo Downloads en Windows)
 CSV_PATH = Path.home() / "Downloads" / "CAPTURA MANUAL DE LOS COLEGIOS (respuestas) - Respuestas de formulario 1.csv"
@@ -81,18 +82,8 @@ def main():
             # Calcular alcance estimado: seguidores * 2.5 (basado en lógica de data_entry.py)
             alcance = int(seguidores * 2.5) if not pd.isna(seguidores) else 0
 
-            # El valor "Engagment:" puede ser porcentaje directo o multiplicado por 100
-            # Corregir automáticamente valores que parecen mal formateados
-            if not pd.isna(engagement_raw):
-                # Si el valor es > 15 (máximo engagement realista), asumirlo como porcentaje mal formateado
-                if engagement_raw > 15:
-                    engagement_raw = engagement_raw / 100.0
-                # También corregir valores entre 10-15 que podrían ser ambiguos pero probablemente mal formateados
-                elif engagement_raw > 10:
-                    engagement_raw = engagement_raw / 100.0
-            
-            engagement_rate = engagement_raw if not pd.isna(engagement_raw) else 0.0
-            engagement_rate = min(engagement_rate, 15.0)  # Limitar al máximo referencial de 15%
+            # Normalización canónica: engagement en porcentaje [0, 100]
+            engagement_rate = normalize_engagement_rate(engagement_raw)
 
             # Calcular interacciones como: (engagement_rate / 100) * alcance
             interacciones = (engagement_rate / 100) * alcance if alcance > 0 and engagement_rate > 0 else 0

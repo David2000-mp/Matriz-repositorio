@@ -17,6 +17,7 @@ import pandas as pd
 from typing import Optional, Dict, Any, List
 from dotenv import load_dotenv
 from utils.logger import get_logger
+from utils.engagement_validation import normalize_engagement_series
 
 # Cargar variables de entorno desde .env (solo en desarrollo local)
 load_dotenv()
@@ -627,9 +628,9 @@ def cargar_respuestas_forms() -> pd.DataFrame:
                 )
                 df[col] = pd.to_numeric(cleaned, errors='coerce').fillna(0)
         
-        # Engagement rate especial (tiene %)
+        # Engagement rate canónico en porcentaje [0, 100]
         if 'engagement_rate' in df.columns:
-            df['engagement_rate'] = pd.to_numeric(df['engagement_rate'].astype(str).str.replace('%', '').str.replace(',', '.').str.strip(), errors='coerce').fillna(0)
+            df['engagement_rate'] = normalize_engagement_series(df['engagement_rate'])
         
         # CORRECCIÓN DE ENGAGEMENT RATE: Calcular valores realistas
         if 'engagement_rate' in df.columns and 'seguidores' in df.columns and 'interacciones' in df.columns:

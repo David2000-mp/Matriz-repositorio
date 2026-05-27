@@ -9,6 +9,7 @@ from google.oauth2.service_account import Credentials
 import os
 from dotenv import load_dotenv
 from utils.logger import get_logger
+from utils.engagement_validation import normalize_engagement_series
 
 # Cargar variables de entorno
 load_dotenv()
@@ -82,11 +83,8 @@ def importar_datos_csv(csv_path):
     df_mapped['entidad'] = df_mapped['entidad'].str.strip()
     df_mapped['plataforma'] = df_mapped['plataforma'].str.strip()
 
-    # Convertir engagement_rate (manejar comas y puntos)
-    df_mapped['engagement_rate'] = pd.to_numeric(
-        df_mapped['engagement_rate'].astype(str).str.replace(',', '.', regex=False),
-        errors='coerce'
-    )
+    # Normalización canónica: engagement en porcentaje [0, 100]
+    df_mapped['engagement_rate'] = normalize_engagement_series(df_mapped['engagement_rate'])
 
     # Convertir seguidores
     df_mapped['seguidores'] = pd.to_numeric(df_mapped['seguidores'], errors='coerce')
@@ -116,8 +114,8 @@ def importar_datos_csv(csv_path):
     mask_calculable = (df_final['interacciones'] == 0) & (df_final['seguidores'] > 0) & (df_final['engagement_rate'] > 0)
     if mask_calculable.any():
         df_final.loc[mask_calculable, 'interacciones'] = (
-            df_final.loc[mask_calculable, 'seguidores'] * df_final.loc[mask_calculable, 'engagement_rate']
-        ) / 100
+            df_final.loc[mask_calculable, 'seguidores'] * (df_final.loc[mask_calculable, 'engagement_rate'] / 100)
+        )
         df_final['interacciones'] = df_final['interacciones'].round().astype(int)
 
     # Estimar alcance si falta

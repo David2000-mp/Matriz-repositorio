@@ -324,9 +324,11 @@ def render(df=None):
         st.caption("📊 No se pudo generar el reporte HTML para descarga.")
 
     # Verificar anomalías en el mes actual
-    anomalias_mes = df_unique[
-        (df_unique.get("anomalia_seguidores", False))
-    ]
+    if "anomalia_seguidores" in df_unique.columns:
+        anomaly_mask = pd.to_numeric(df_unique["anomalia_seguidores"], errors="coerce").fillna(0).astype(bool)
+        anomalias_mes = df_unique[anomaly_mask]
+    else:
+        anomalias_mes = df_unique.iloc[0:0].copy()
     plataformas_anomalas = anomalias_mes["plataforma"].unique() if not anomalias_mes.empty else []
 
     # Alerta ejecutiva si hay anomalías (defensiva contra NaN)
@@ -381,6 +383,7 @@ def render(df=None):
         tot_seg_for_calc = df_unique['seguidores'].sum() if 'seguidores' in df_unique.columns else 0
         er_global = df_unique['engagement_rate'].mean() if not df_unique.empty else 0.0
     meses_disponibles = sorted(df_full["fecha"].dropna().dt.strftime("%Y-%m").unique(), reverse=True)  # type: ignore
+    mes_actual = meses_disponibles[0] if len(meses_disponibles) > 0 else None
     mes_anterior = meses_disponibles[1] if len(meses_disponibles) > 1 else None
 
     yoy_seg = None
@@ -427,13 +430,14 @@ def render(df=None):
             pass
         # YoY: comparar mismo mes año anterior
         try:
-            mes_dt = pd.to_datetime(mes + "-01")
+            if mes_actual is None:
+                raise ValueError("No hay mes actual disponible para cálculo YoY")
+            mes_dt = pd.to_datetime(f"{mes_actual}-01")
             prev_year_dt = mes_dt - pd.DateOffset(years=1)
             prev_year_str = prev_year_dt.strftime("%Y-%m")
             # Asegurar que fecha sea datetime antes de usar strftime
-            if pd.api.types.is_datetime64_any_dtype(df["fecha"]):
-                df_temp = df.copy()
-                df_prev_year = df_temp[df_temp["fecha"].dt.strftime("%Y-%m") == prev_year_str]  # type: ignore
+            if pd.api.types.is_datetime64_any_dtype(df_full["fecha"]):
+                df_prev_year = df_full[df_full["fecha"].dt.strftime("%Y-%m") == prev_year_str]  # type: ignore
             else:
                 df_prev_year = pd.DataFrame()  # DataFrame vacío si fecha no es datetime
             df_prev_year_unique = df_prev_year.drop_duplicates(subset=['entidad', 'plataforma'], keep='last')
@@ -453,7 +457,10 @@ def render(df=None):
     health_score = calculate_health_score(df_full)
 
     # Verificar si hay anomalías en el mes actual para badges
-    anomalia_seguidores = df_unique.get("anomalia_seguidores", pd.Series(False)).any()
+    if "anomalia_seguidores" in df_unique.columns:
+        anomalia_seguidores = pd.to_numeric(df_unique["anomalia_seguidores"], errors="coerce").fillna(0).astype(bool).any()
+    else:
+        anomalia_seguidores = False
 
     # Calcular estado del engagement global
     status_global = get_engagement_status(engagement_rate=er_global)
