@@ -64,34 +64,18 @@ def normalize_latest_by_account(df: pd.DataFrame, freq: str = "D") -> pd.DataFra
     else:
         latest_rows = dfc.groupby(group_keys, as_index=False).tail(1).copy()
 
-    # Calcula seguidores_prev para cada fila del latest_rows
-    # Busca el segundo último registro de cada grupo
-    seguidores_prev_list = []
-    for group_val, group_df in dfc.groupby(group_keys):
-        # Asegurar que group_val sea siempre una tupla
-        if not isinstance(group_val, tuple):
-            group_val = (group_val,)
-        
-        if len(group_df) > 1:
-            prev_value = group_df.iloc[-2]["seguidores"]
-        else:
-            prev_value = 0
-        seguidores_prev_list.append((group_val, prev_value))
-    
-    # Crea diccionario para lookup rápido
-    prev_dict = {k: v for k, v in seguidores_prev_list}
-    
-    # Aplica seguidores_prev basado en el grupo
-    def get_prev_value(row):
-        # Construir la clave del mismo modo que en el groupby
-        if len(group_keys) == 1:
-            key = (row[group_keys[0]],)
-        else:
-            key = tuple(row[k] for k in group_keys)
-        return prev_dict.get(key, 0)
-    
-    latest_rows["seguidores_prev"] = latest_rows.apply(get_prev_value, axis=1)
-    latest_rows["seguidores_prev"] = latest_rows["seguidores_prev"].fillna(0)
+    # Calcula seguidores_prev por grupo de manera vectorizada.
+    prev_by_group = (
+        dfc.groupby(group_keys, as_index=False)
+        .nth(-2)
+        .loc[:, group_keys + ["seguidores"]]
+        .rename(columns={"seguidores": "seguidores_prev"})
+    )
+
+    latest_rows = latest_rows.merge(prev_by_group, on=group_keys, how="left")
+    latest_rows["seguidores_prev"] = pd.to_numeric(
+        latest_rows["seguidores_prev"], errors="coerce"
+    ).fillna(0)
     return latest_rows
 
 
@@ -173,8 +157,6 @@ def build_followers_growth_ranking(
     if mode not in ("monthly", "latest_two"):
         mode = "monthly"
 
-    ranking_rows = []
-
     if mode == "monthly":
         # Modo mejorado: cada entidad/plataforma compara sus últimos 2 meses disponibles
         dfc["Mes"] = dfc["fecha"].dt.to_period("M").dt.to_timestamp()
@@ -186,54 +168,58 @@ def build_followers_growth_ranking(
             .copy()
         )
         
-        # Para cada entidad/plataforma, obtener sus últimos 2 meses
-        for (entidad, plataforma), group in monthly_latest.groupby(["entidad", "plataforma"]):
-            meses_unicos = sorted(group["Mes"].dropna().unique())
-            
-            # Necesita al menos 2 meses distintos
-            if len(meses_unicos) < 2:
-                continue
-            
-            # Últimos 2 meses para esta entidad/plataforma
-            latest_month = meses_unicos[-1]
-            previous_month = meses_unicos[-2]
-            
-            # Obtener datos de ambos meses
-            latest_data = group[group["Mes"] == latest_month]
-            previous_data = group[group["Mes"] == previous_month]
-            
-            if not latest_data.empty and not previous_data.empty:
-                latest_row = latest_data.iloc[0]
-                previous_row = previous_data.iloc[0]
-                
-                ranking_rows.append({
-                    "entidad": entidad,
-                    "plataforma": plataforma,
-                    "fecha_mas_reciente": latest_row["fecha"],
-                    "seguidores_mas_reciente": latest_row["seguidores"],
-                    "fecha_anterior": previous_row["fecha"],
-                    "seguidores_anterior": previous_row["seguidores"],
-                })
+        monthly_latest = monthly_latest.sort_values(
+            ["entidad", "plataforma", "Mes", "fecha"],
+            ascending=[True, True, False, False],
+        )
+        monthly_latest["_rn"] = monthly_latest.groupby(["entidad", "plataforma"]).cumcount() + 1
+
+        latest_rows = monthly_latest[monthly_latest["_rn"] == 1][
+            ["entidad", "plataforma", "fecha", "seguidores"]
+        ].rename(
+            columns={
+                "fecha": "fecha_mas_reciente",
+                "seguidores": "seguidores_mas_reciente",
+            }
+        )
+
+        previous_rows = monthly_latest[monthly_latest["_rn"] == 2][
+            ["entidad", "plataforma", "fecha", "seguidores"]
+        ].rename(
+            columns={
+                "fecha": "fecha_anterior",
+                "seguidores": "seguidores_anterior",
+            }
+        )
+
+        growth_df = latest_rows.merge(previous_rows, on=["entidad", "plataforma"], how="inner")
     else:
-        for (entidad, plataforma), group in dfc.groupby(["entidad", "plataforma"]):
-            group_sorted = group.sort_values("fecha", ascending=False)
-            if len(group_sorted) < 2:
-                continue
+        latest_two = dfc.sort_values(
+            ["entidad", "plataforma", "fecha"],
+            ascending=[True, True, False],
+        ).copy()
+        latest_two["_rn"] = latest_two.groupby(["entidad", "plataforma"]).cumcount() + 1
 
-            latest = group_sorted.iloc[0]
-            previous = group_sorted.iloc[1]
-            ranking_rows.append(
-                {
-                    "entidad": entidad,
-                    "plataforma": plataforma,
-                    "fecha_mas_reciente": latest["fecha"],
-                    "seguidores_mas_reciente": latest["seguidores"],
-                    "fecha_anterior": previous["fecha"],
-                    "seguidores_anterior": previous["seguidores"],
-                }
-            )
+        latest_rows = latest_two[latest_two["_rn"] == 1][
+            ["entidad", "plataforma", "fecha", "seguidores"]
+        ].rename(
+            columns={
+                "fecha": "fecha_mas_reciente",
+                "seguidores": "seguidores_mas_reciente",
+            }
+        )
 
-    growth_df = pd.DataFrame(ranking_rows)
+        previous_rows = latest_two[latest_two["_rn"] == 2][
+            ["entidad", "plataforma", "fecha", "seguidores"]
+        ].rename(
+            columns={
+                "fecha": "fecha_anterior",
+                "seguidores": "seguidores_anterior",
+            }
+        )
+
+        growth_df = latest_rows.merge(previous_rows, on=["entidad", "plataforma"], how="inner")
+
     if growth_df.empty:
         return pd.DataFrame(columns=base_cols)
 
@@ -548,9 +534,10 @@ def calculate_health_score(df: pd.DataFrame) -> float:
         months = dfc.groupby("Mes")[["interacciones", "seguidores"]].sum().reset_index()
         months = months[months["Mes"] != latest_month]
         if not months.empty:
-            months["eng_rate"] = months.apply(
-                lambda r: (r["interacciones"] / r["seguidores"] * 100.0) if r["seguidores"] > 0 else 0.0,
-                axis=1,
+            months["eng_rate"] = np.where(
+                months["seguidores"] > 0,
+                (months["interacciones"] / months["seguidores"]) * 100.0,
+                0.0,
             )
             historical_mean_engagement = months["eng_rate"].mean()
 
@@ -611,18 +598,11 @@ def apply_smoothing(df: pd.DataFrame, column: str = "seguidores", window: int = 
     # Asegurar tipos
     df_out["fecha"] = pd.to_datetime(df_out["fecha"], errors="coerce")
     if "id_cuenta" in df_out.columns:
-        # Aplicar por grupo
         trend_col = f"{column}_tendencia"
-
-        def _apply_group(g):
-            g = g.sort_values("fecha")
-            g[trend_col] = g[column].rolling(window=window, min_periods=1).mean()
-            return g
-
-        # Evitar FutureWarning de Pandas pasando include_groups=False
-        df_out = df_out.groupby("id_cuenta", group_keys=False).apply(
-            _apply_group,
-            include_groups=False,
+        df_out = df_out.sort_values(["id_cuenta", "fecha"])
+        df_out[trend_col] = (
+            df_out.groupby("id_cuenta")[column]
+            .transform(lambda s: s.rolling(window=window, min_periods=1).mean())
         )
     else:
         # Global rolling (por fecha ordenada)
@@ -690,24 +670,21 @@ def detect_anomalies(df: pd.DataFrame, threshold: float = 0.20) -> pd.DataFrame:
     if "interacciones_ma3" not in df_out.columns and "interacciones" in df_out.columns:
         df_out = apply_moving_average(df_out, "interacciones")
 
-    # Función para detectar anomalía en una columna
+    # Detección vectorizada de anomalías para una columna.
+    # Mantiene semántica previa: fallback usa prev_series.shift(1)
+    # (equivalente a mirar i-1 sobre una serie que ya venía desplazada).
     def _detect_anomaly(series, ma_series, prev_series):
-        anomalies = pd.Series(False, index=series.index)
-        for i in range(len(series)):
-            current = series.iloc[i]
-            # Preferir MA si disponible
-            if not pd.isna(ma_series.iloc[i]) and ma_series.iloc[i] != 0:
-                baseline = ma_series.iloc[i]
-            elif i > 0 and not pd.isna(prev_series.iloc[i-1]):
-                baseline = prev_series.iloc[i-1]
-            else:
-                continue  # No baseline available
+        ma_series = pd.to_numeric(ma_series, errors="coerce")
+        prev_series = pd.to_numeric(prev_series, errors="coerce")
+        series = pd.to_numeric(series, errors="coerce")
 
-            if baseline != 0:
-                variation = abs((current - baseline) / baseline)
-                if variation > threshold:
-                    anomalies.iloc[i] = True
-        return anomalies
+        ma_valid = ma_series.where((~ma_series.isna()) & (ma_series != 0))
+        prev_fallback = prev_series.shift(1)
+        baseline = ma_valid.combine_first(prev_fallback)
+
+        baseline = baseline.where(baseline != 0)
+        variation = ((series - baseline).abs() / baseline.abs())
+        return (variation > threshold).fillna(False)
 
     # Detectar para seguidores
     if "seguidores" in df_out.columns:
