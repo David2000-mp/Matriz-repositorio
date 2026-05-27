@@ -409,6 +409,49 @@ def inject_custom_css():
             opacity: 0.85 !important;
         }
 
+        /* ========================================
+           DATAFRAME / DATA EDITOR - TONOS AMIGABLES
+        ======================================== */
+        [data-testid="stDataFrame"] {
+            background: #F7FAFF !important;
+            border: 1px solid #DCE8F6 !important;
+            border-radius: 12px !important;
+            box-shadow: 0 2px 8px rgba(36, 87, 138, 0.08) !important;
+            overflow: hidden !important;
+        }
+
+        [data-testid="stDataFrame"] .stDataFrameGlideDataEditor,
+        [data-testid="stDataFrame"] [class*="gdg-"] {
+            --gdg-bg-cell: #FDFEFF;
+            --gdg-bg-cell-medium: #F4F8FF;
+            --gdg-bg-header: #E8F1FF;
+            --gdg-bg-header-has-focus: #DCEBFF;
+            --gdg-bg-icon-header: #2E5F8A;
+            --gdg-fg-icon-header: #FFFFFF;
+            --gdg-text-dark: #22364A;
+            --gdg-text-medium: #36506A;
+            --gdg-border-color: #D4E3F5;
+            --gdg-horizontal-border-color: #E5EEF9;
+            --gdg-accent-color: #2F79C2;
+            --gdg-accent-fg: #FFFFFF;
+            --gdg-link-color: #2F79C2;
+        }
+
+        [data-testid="stDataFrame"] .dvn-underlay,
+        [data-testid="stDataFrame"] canvas[data-testid="data-grid-canvas"] {
+            background: #FDFEFF !important;
+        }
+
+        [data-testid="stDataFrame"] [role="columnheader"] {
+            background: #E8F1FF !important;
+            color: #1E4C75 !important;
+            font-weight: 700 !important;
+        }
+
+        [data-testid="stDataFrame"] [role="gridcell"] {
+            color: #24394D !important;
+        }
+
         
         /* ========================================
            SIDEBAR - Preservar colores azules
