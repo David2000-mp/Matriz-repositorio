@@ -49,24 +49,13 @@ def _normalize_private_key(pk: str) -> str:
 def _get_service_account_config() -> Optional[Dict[str, Any]]:
     """
     Obtiene credenciales con jerarquía:
-    1. st.secrets["gcp_service_account"] (Streamlit Cloud)
-    2. GCP_SERVICE_ACCOUNT_JSON env (JSON completo)
-    3. Variables individuales GCP_* (desarrollo local)
+    1. GCP_SERVICE_ACCOUNT_JSON env (JSON completo)
+    2. Variables individuales GCP_* (desarrollo local)
+    3. st.secrets["gcp_service_account"] (Streamlit Cloud)
     """
-    
-    # ============================================
-    # NIVEL 1: Streamlit Cloud - st.secrets
-    # ============================================
-    try:
-        if "gcp_service_account" in st.secrets:
-            logger.debug("Credenciales encontradas en st.secrets[gcp_service_account]")
-            return dict(st.secrets["gcp_service_account"])
-    except Exception as e:
-        logger.debug(f"No hay st.secrets disponibles: {e}")
-        pass
 
     # ============================================
-    # NIVEL 2: Env JSON completo
+    # NIVEL 1: Env JSON completo
     # ============================================
     sa_json = os.getenv("GCP_SERVICE_ACCOUNT_JSON")
     if sa_json:
@@ -105,6 +94,17 @@ def _get_service_account_config() -> Optional[Dict[str, Any]]:
             "client_id": "",
             "universe_domain": "googleapis.com"
         }
+
+    # ============================================
+    # NIVEL 3: Streamlit Cloud - st.secrets
+    # ============================================
+    try:
+        if "gcp_service_account" in st.secrets:
+            logger.debug("Credenciales encontradas en st.secrets[gcp_service_account]")
+            return dict(st.secrets["gcp_service_account"])
+    except Exception as e:
+        logger.debug(f"No hay st.secrets disponibles: {e}")
+        pass
 
     logger.warning("No se encontraron credenciales en ningún nivel (st.secrets, JSON env, variables individuales)")
     return None

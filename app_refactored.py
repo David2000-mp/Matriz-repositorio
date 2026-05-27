@@ -46,7 +46,7 @@ def main():
     # Aplicar estilos CSS globales
     try:
         inject_custom_css()
-        inject_layout_compact_css(hide_streamlit_header=False)
+        inject_layout_compact_css(hide_streamlit_header=True)
         inject_clipboard_shortcut_guard()
     except Exception as e:
         try:
@@ -62,6 +62,26 @@ def main():
         st.session_state["page_selection"] = st.session_state.page
         del st.session_state["page"]
 
+    # Asegurar sidebar desplegado por defecto una vez por sesión.
+    # Evita forzarlo en cada rerun para no romper la preferencia manual del usuario.
+    if not st.session_state.get("_sidebar_default_expanded_applied", False):
+        st.html(
+            """
+            <script>
+            const ensureExpanded = () => {
+              const expandBtn = parent.document.querySelector('button[data-testid="stExpandSidebarButton"]');
+              if (expandBtn) {
+                expandBtn.click();
+              }
+            };
+            setTimeout(ensureExpanded, 30);
+            setTimeout(ensureExpanded, 180);
+            </script>
+            """,
+            unsafe_allow_javascript=True,
+        )
+        st.session_state["_sidebar_default_expanded_applied"] = True
+
     # Sidebar: El ÚNICO lugar para filtrar
     with st.sidebar:
         # Logo Marista
@@ -72,7 +92,6 @@ def main():
         st.title("CHAMPILEAKS")
 
         st.subheader("Navegación")
-        st.caption("Primero elige una vista; después usa los filtros globales para refinar la lectura.")
         
         # Navegación simplificada sin index calculado
         menu_options = [

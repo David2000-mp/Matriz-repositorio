@@ -84,9 +84,50 @@ def inject_layout_compact_css(hide_streamlit_header: bool = False):
         hide_streamlit_header: Si True, oculta header/toolbar nativo.
     """
     header_rules = """
-    header[data-testid="stHeader"] { display: none !important; }
+    /* Oculta visualmente el header, pero preserva controles de sidebar */
+    header[data-testid="stHeader"] {
+        background: transparent !important;
+        box-shadow: none !important;
+        border: none !important;
+        min-height: 0 !important;
+        height: 0 !important;
+    }
+
     div[data-testid="stToolbar"] { display: none !important; }
     div[data-testid="stDecoration"] { display: none !important; }
+
+    /* Mantener visible el toggle del sidebar en ambos estados */
+    button[data-testid="stExpandSidebarButton"],
+    div[data-testid="stSidebarCollapseButton"] button,
+    button[data-testid="stBaseButton-headerNoPadding"] {
+        display: inline-flex !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        pointer-events: auto !important;
+        z-index: 100002 !important;
+        color: #FFFFFF !important;
+        background: rgba(255, 255, 255, 0.18) !important;
+        border: 1px solid rgba(255, 255, 255, 0.55) !important;
+        border-radius: 8px !important;
+    }
+
+    /* Evita que el sidebar quede desplazado/oculto por estados colapsados previos */
+    section[data-testid="stSidebar"] {
+        margin-left: 0 !important;
+        transform: translateX(0) !important;
+        visibility: visible !important;
+        z-index: 100001 !important;
+    }
+
+    section[data-testid="stSidebar"] > div {
+        visibility: visible !important;
+    }
+
+    button[data-testid="stExpandSidebarButton"] {
+        position: fixed !important;
+        top: 12px !important;
+        left: 12px !important;
+    }
     """ if hide_streamlit_header else """
     /* Barra superior fija azul institucional - RECTANGULAR */
     header[data-testid="stHeader"] {
@@ -381,6 +422,65 @@ def inject_custom_css():
         [data-testid="stSidebar"] p,
         [data-testid="stSidebar"] span {
             color: var(--sidebar-text) !important;
+        }
+
+        /* Botón colapsar sidebar: mayor visibilidad y color blanco */
+        div[data-testid="stSidebarCollapseButton"] button,
+        button[data-testid="stBaseButton-headerNoPadding"] {
+            color: #FFFFFF !important;
+            background: rgba(255, 255, 255, 0.18) !important;
+            border: 1px solid rgba(255, 255, 255, 0.45) !important;
+            border-radius: 8px !important;
+            min-width: 36px !important;
+            min-height: 36px !important;
+        }
+
+        div[data-testid="stSidebarCollapsedControl"] {
+            display: block !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+            position: fixed !important;
+            top: 10px !important;
+            left: 10px !important;
+            z-index: 100003 !important;
+        }
+
+        button[data-testid="stExpandSidebarButton"] {
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+            color: #FFFFFF !important;
+            background: rgba(255, 255, 255, 0.18) !important;
+            border: 1px solid rgba(255, 255, 255, 0.55) !important;
+            border-radius: 8px !important;
+            min-width: 36px !important;
+            min-height: 36px !important;
+            z-index: 100004 !important;
+        }
+
+        div[data-testid="stSidebarCollapseButton"] button:hover,
+        button[data-testid="stBaseButton-headerNoPadding"]:hover {
+            background: rgba(255, 255, 255, 0.30) !important;
+            border-color: rgba(255, 255, 255, 0.72) !important;
+        }
+
+        div[data-testid="stSidebarCollapseButton"] button:focus-visible,
+        button[data-testid="stBaseButton-headerNoPadding"]:focus-visible {
+            outline: 2px solid #FFFFFF !important;
+            outline-offset: 2px !important;
+        }
+
+        div[data-testid="stSidebarCollapseButton"] button span,
+        div[data-testid="stSidebarCollapseButton"] button [data-testid="stIconMaterial"],
+        button[data-testid="stExpandSidebarButton"] span,
+        button[data-testid="stExpandSidebarButton"] [data-testid="stIconMaterial"],
+        button[data-testid="stBaseButton-headerNoPadding"] span,
+        button[data-testid="stBaseButton-headerNoPadding"] [data-testid="stIconMaterial"] {
+            color: #FFFFFF !important;
+            fill: #FFFFFF !important;
+            opacity: 1 !important;
         }
         
         /* ========================================
