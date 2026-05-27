@@ -109,6 +109,7 @@ tmp/
 preview_report.html
 Colegio*.pdf
 *_reporte.pdf
+diagnostic_results.json
 
 # Local app draft caches
 /data/cache/
