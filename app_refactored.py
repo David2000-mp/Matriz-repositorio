@@ -13,7 +13,6 @@ from components import (
 )
 from utils.helpers import load_image
 from utils.logger import set_production_mode, get_logger
-from utils.sheets_connector import cargar_respuestas_forms
 
 logger = get_logger(__name__)
 
@@ -490,61 +489,9 @@ def main():
 
         data_entry.render()
     elif selected == "Auditoría de Respuestas":
-        # Nueva sección: Auditoría de Respuestas
-        st.header("🔍 Auditoría de Respuestas")
+        from views import audit_view
 
-        try:
-            df_forms = cargar_respuestas_forms()
-            
-            if df_forms.empty:
-                st.warning("No hay datos nuevos del formulario")
-                st.stop()
-
-            df_forms = df_forms.reset_index(drop=True)
-            
-            # Métricas rápidas
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                total_registros = len(df_forms)
-                st.metric("Total de Registros", total_registros)
-            
-            with col2:
-                promedio_engagement = df_forms['engagement_rate'].mean() if 'engagement_rate' in df_forms.columns else 0.0
-                st.metric("Promedio de Engagement", f"{promedio_engagement:.2f}%")
-            
-            with col3:
-                ultima_fecha = df_forms['fecha'].max() if 'fecha' in df_forms.columns else pd.NaT
-                st.metric("Última Fecha de Reporte", ultima_fecha.strftime('%Y-%m-%d') if pd.notna(ultima_fecha) else "N/A")
-            
-            # Data Editor para correcciones manuales
-            st.subheader("Datos del Formulario")
-            edited_df = st.data_editor(
-                df_forms,
-                width="stretch",
-                num_rows="dynamic",
-                column_config={
-                    "fecha": st.column_config.DateColumn("Fecha del Reporte"),
-                    "seguidores": st.column_config.NumberColumn("Seguidores Totales", min_value=0),
-                    "engagement_rate": st.column_config.NumberColumn("Engagement Rate (%)", min_value=0.0, max_value=100.0, step=0.01),
-                    "alcance": st.column_config.NumberColumn("Alcance Total", min_value=0),
-                    "interacciones": st.column_config.NumberColumn("Interacciones Totales", min_value=0),
-                }
-            )
-            
-            # Mostrar filas con errores
-            if 'error_validacion' not in df_forms.columns:
-                df_forms['error_validacion'] = ''
-
-            errores = df_forms[df_forms['error_validacion'] != '']
-            if not errores.empty:
-                st.error("Filas con errores de validación:")
-                error_cols = [col for col in ['entidad', 'plataforma', 'error_validacion'] if col in errores.columns]
-                st.dataframe(errores[error_cols], width="stretch")
-
-        except Exception as e:
-            st.error(f"Error cargando datos del formulario: {e}")
-            import logging
-            logging.error(f"Error en auditoría de respuestas: {e}")
+        audit_view.render_audit_view()
     elif selected == "Configuración":
         from views import settings
         settings.render()

@@ -5,6 +5,7 @@ Panel principal con métricas agregadas de toda la red.
 
 import streamlit as st
 import pandas as pd
+import os
 try:
     import plotly.express as px
 except Exception:
@@ -196,15 +197,13 @@ def render(df=None):
         # Debug visual temporal para confirmar cantidad de registros cargados
         if df is not None:
             try:
-                st.sidebar.write(f"DEBUG: {len(df)} registros cargados")
+                if os.getenv("APP_DEBUG", "0") == "1":
+                    st.sidebar.write(f"DEBUG: {len(df)} registros cargados")
             except Exception:
                 pass
 
-    # Selector temporal rápido
-    col_time, col_space = st.columns([2, 3])
-    with col_time:
-        # Periodo fijo: Histórico completo
-        periodo_seleccionado = "Histórico"
+    # Periodo fijo por decisión de negocio: Histórico completo.
+    periodo_label = "Histórico completo"
 
     # Micro-interacción: status mientras procesamos/normalizamos el DataFrame
     # OCULTO: Solo visible como pop-up en depuración
@@ -214,89 +213,64 @@ def render(df=None):
     #     pass
 
     # Si recibimos un DataFrame filtrado desde el entrypoint, úsalo.
-        if df is None or (hasattr(df, "empty") and df.empty):
-            st.warning("⚠️ No hay datos para los filtros seleccionados.")
-            st.caption("💡 Ajusta los filtros o intenta otro periodo.")
-            return
+    if df is None or (hasattr(df, "empty") and df.empty):
+        st.warning("⚠️ No hay datos para los filtros seleccionados.")
+        st.caption("💡 Ajusta los filtros o intenta otro periodo.")
+        return
 
-        # Trabajaremos con dos vistas internas:
-        # - df_full: todo el histórico recibido (p. ej. filtrado por entidad si aplica)
-        # - df_m_month: datos limitados al mes seleccionado (usado para KPIs y ranking)
-        df_full = sanitize_chart_dataframe(
-            df.copy(),
-            date_cols=["fecha"],
-            numeric_cols=["seguidores", "alcance", "interacciones", "likes_promedio"],
-            percent_cols=["engagement_rate"],
-        )
+    # Trabajaremos con dos vistas internas:
+    # - df_full: todo el histórico recibido (p. ej. filtrado por entidad si aplica)
+    # - df_m_month: histórico completo (anclado por decisión de negocio)
+    df_full = sanitize_chart_dataframe(
+        df.copy(),
+        date_cols=["fecha"],
+        numeric_cols=["seguidores", "alcance", "interacciones", "likes_promedio"],
+        percent_cols=["engagement_rate"],
+    )
 
-        # Asegurar tipos antes de cualquier cálculo
-        if "fecha" in df_full.columns:
-            # Eliminar filas con fechas inválidas para evitar errores en .dt.strftime
-            df_full = df_full.dropna(subset=['fecha'])
-            # Consolidar: mantener solo último registro por cuenta y mes para evitar doble conteo
-            df_full = normalize_monthly_latest(df_full)
+    # Asegurar tipos antes de cualquier cálculo
+    if "fecha" in df_full.columns:
+        # Eliminar filas con fechas inválidas para evitar errores en .dt.strftime
+        df_full = df_full.dropna(subset=['fecha'])
+        # Consolidar: mantener solo último registro por cuenta y mes para evitar doble conteo
+        df_full = normalize_monthly_latest(df_full)
 
-        # Aplicar suavizado (promedio móvil 3M) sobre seguidores
-        try:
-            df_full = apply_moving_average(df_full, col="seguidores")
-        except Exception as e:
-            logging.warning(f"No se pudo aplicar moving average: {e}")
+    # Aplicar suavizado (promedio móvil 3M) sobre seguidores
+    try:
+        df_full = apply_moving_average(df_full, col="seguidores")
+    except Exception as e:
+        logging.warning(f"No se pudo aplicar moving average: {e}")
 
-        # Detectar anomalías
-        try:
-            df_full = detect_anomalies(df_full, threshold=0.20)
-        except Exception as e:
-            logging.warning(f"No se pudo detectar anomalías: {e}")
+    # Detectar anomalías
+    try:
+        df_full = detect_anomalies(df_full, threshold=0.20)
+    except Exception as e:
+        logging.warning(f"No se pudo detectar anomalías: {e}")
 
-        # Normalizar nombres de columnas resultantes de merges: muchas vistas esperan
-        # columnas como 'plataforma' o 'entidad' sin sufijos. Si el DataFrame tiene
-        # versiones con sufijos (_x/_y), preferirlas. Si ninguna existe, rellenar
-        # con un valor por defecto para evitar KeyError en agrupaciones.
-        for logical in ("plataforma", "entidad", "usuario_red"):
-            if logical in df_full.columns:
-                continue
-            for suff in (f"{logical}_y", f"{logical}_x", f"{logical}"):
-                if suff in df_full.columns:
-                    ser = df_full.loc[:, suff]
-                    if isinstance(ser, pd.DataFrame):
-                        ser = ser.iloc[:, 0]
-                    df_full[logical] = ser
-                    break
-            else:
-                df_full[logical] = "Unknown"
-
-        # Asegurar que las columnas numéricas estén en formato correcto para evitar errores
-        for _col in ("seguidores", "engagement_rate"):
-            if _col in df_full.columns:
-                df_full[_col] = pd.to_numeric(df_full[_col], errors="coerce").fillna(0)
-
-        # Determinar periodo (mes) a partir del histórico para etiquetas/títulos
-        meses = sorted(df_full["fecha"].dropna().dt.strftime("%Y-%m").unique(), reverse=True)  # type: ignore
-        mes = meses[0] if meses else None
-
-        if not mes:
-            st.warning("⚠️ No hay meses válidos en los datos.")
-            return
-
-        # Aplicar filtro temporal según selección del usuario
-        if periodo_seleccionado == "Últimos 3 meses" and len(meses) >= 3:
-            meses_seleccionados = meses[:3]
-            # Asegurar que fecha sea datetime antes de usar strftime
-            if pd.api.types.is_datetime64_any_dtype(df_full["fecha"]):
-                df_full_temp = df_full.copy()
-                df_m_month = df_full_temp[df_full_temp["fecha"].dt.strftime("%Y-%m").isin(meses_seleccionados)].copy()  # type: ignore
-            else:
-                st.error("Error: La columna 'fecha' no es de tipo datetime válido.")
-                return
-            periodo_label = f"{meses[2]} - {meses[0]}"
-        elif periodo_seleccionado == "Histórico":
-            df_m_month = df_full.copy()  # Usar todos los datos históricos
-            periodo_label = "Histórico completo"
+    # Normalizar nombres de columnas resultantes de merges: muchas vistas esperan
+    # columnas como 'plataforma' o 'entidad' sin sufijos. Si el DataFrame tiene
+    # versiones con sufijos (_x/_y), preferirlas. Si ninguna existe, rellenar
+    # con un valor por defecto para evitar KeyError en agrupaciones.
+    for logical in ("plataforma", "entidad", "usuario_red"):
+        if logical in df_full.columns:
+            continue
+        for suff in (f"{logical}_y", f"{logical}_x", f"{logical}"):
+            if suff in df_full.columns:
+                ser = df_full.loc[:, suff]
+                if isinstance(ser, pd.DataFrame):
+                    ser = ser.iloc[:, 0]
+                df_full[logical] = ser
+                break
         else:
-            # DataFrame reducido al mes seleccionado (para KPIs y ranking). NO se usa
-            # para calcular la salud ni las series históricas.
-            df_m_month = df_full[df_full["fecha"].dt.strftime("%Y-%m") == mes].copy()  # type: ignore
-            periodo_label = mes
+            df_full[logical] = "Unknown"
+
+    # Asegurar que las columnas numéricas estén en formato correcto para evitar errores
+    for _col in ("seguidores", "engagement_rate"):
+        if _col in df_full.columns:
+            df_full[_col] = pd.to_numeric(df_full[_col], errors="coerce").fillna(0)
+
+    # Dashboard anclado a histórico completo.
+    df_m_month = df_full.copy()
 
     # ========================================================================
     # VALIDACIÓN DEFENSIVA: Si df_m_month está vacío, mostrar warning y salir
