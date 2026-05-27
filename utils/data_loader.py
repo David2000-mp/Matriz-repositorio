@@ -14,6 +14,7 @@ import pandas as pd
 import hashlib
 from pathlib import Path
 from typing import Tuple, Optional
+import os
 from utils.logger import get_logger
 from utils.schema_columns import COLS_CUENTAS, COLS_METRICAS
 
@@ -102,6 +103,7 @@ def _load_data_impl(_schema_hash_token: str = "") -> Tuple[pd.DataFrame, pd.Data
     cuentas_df = pd.DataFrame(columns=COLS_CUENTAS)
     metricas_df = pd.DataFrame(columns=COLS_METRICAS)
     sheets_success = False
+    data_origin = "csv"
 
     try:
         # Lazy import para evitar circularidad
@@ -120,6 +122,7 @@ def _load_data_impl(_schema_hash_token: str = "") -> Tuple[pd.DataFrame, pd.Data
                     metricas_df = form_metricas
                     logger.info(f"Importadas {len(cuentas_df)} cuentas y {len(metricas_df)} metricas desde formulario")
                     sheets_success = True
+                    st.session_state["data_origin"] = "sheets_form"
                     return cuentas_df, metricas_df  # Usar datos del formulario como fuente principal
             except Exception as e:
                 logger.warning(f"No se pudo cargar del formulario: {e}")
@@ -168,19 +171,22 @@ def _load_data_impl(_schema_hash_token: str = "") -> Tuple[pd.DataFrame, pd.Data
                 logger.warning("Hoja 'metricas' no encontrada.")
             
             sheets_success = True
+            if not cuentas_df.empty or not metricas_df.empty:
+                data_origin = "sheets"
     
     except Exception as e:
         logger.warning(f"Error conectando a Sheets: {e}")
 
     # PRIORIDAD 3: Fallback a CSVs locales
     if not sheets_success or (cuentas_df.empty and metricas_df.empty):
+        data_origin = "csv"
         if CUENTAS_CSV.exists():
             try:
                 cuentas_df = pd.read_csv(CUENTAS_CSV, dtype={"id_cuenta": str}).fillna('')
                 cuentas_df = validate_and_fill_columns(cuentas_df, COLS_CUENTAS)
             except Exception as e:
                 logger.warning(f"Error cargando cuentas.csv: {e}")
-        
+
         if METRICAS_CSV.exists():
             try:
                 metricas_df = pd.read_csv(METRICAS_CSV, dtype={"id_cuenta": str}).fillna('')
@@ -189,38 +195,46 @@ def _load_data_impl(_schema_hash_token: str = "") -> Tuple[pd.DataFrame, pd.Data
                 logger.warning(f"Error cargando metricas.csv: {e}")
 
     # COMBINAR CON DATOS DE MUESTRA (sample_upload_full.csv)
-    # Esto asegura que las instituciones de muestra estén siempre disponibles
-    if SAMPLE_UPLOAD_FULL_CSV.exists():
+    # IMPORTANTE: desactivado por defecto para evitar contaminar producción.
+    # Solo se activa cuando ENABLE_SAMPLE_DATA=true.
+    enable_sample_data = os.getenv("ENABLE_SAMPLE_DATA", "false").strip().lower() in {
+        "1", "true", "yes", "on"
+    }
+
+    if enable_sample_data and SAMPLE_UPLOAD_FULL_CSV.exists():
         try:
             sample_df = pd.read_csv(SAMPLE_UPLOAD_FULL_CSV, dtype={"id_cuenta": str}).fillna('')
-            
+
             # Si tenemos datos de Sheets, combinarlos con sample
             if not cuentas_df.empty:
                 # Crear IDs únicos para sample data para evitar conflictos
-                # Usar un contador simple basado en el índice
                 base_id = len(cuentas_df)
-                
+
                 # Agregar prefijo 'sample_' a los IDs de muestra
                 sample_df['id_cuenta'] = 'sample_' + (sample_df.index + base_id + 1).astype(str)
-                
+
                 # Combinar cuentas
                 cuentas_df = pd.concat([cuentas_df, sample_df[COLS_CUENTAS]], ignore_index=True)
                 logger.info(f"Agregadas {len(sample_df)} cuentas de muestra")
-            
+
             # Para métricas de muestra, combinarlas con las existentes
             if all(col in sample_df.columns for col in COLS_METRICAS):
                 sample_metricas = sample_df[COLS_METRICAS].copy()
                 sample_metricas['id_cuenta'] = 'sample_' + (sample_metricas.index + base_id + 1).astype(str)
-                
+
                 if metricas_df.empty:
                     metricas_df = sample_metricas
                 else:
                     metricas_df = pd.concat([metricas_df, sample_metricas], ignore_index=True)
-                
+
                 logger.info(f"Agregadas {len(sample_metricas)} métricas de muestra")
-                
+
         except Exception as e:
             logger.warning(f"Error cargando sample_upload_full.csv: {e}")
+    elif SAMPLE_UPLOAD_FULL_CSV.exists():
+        logger.debug("Datos de muestra deshabilitados (ENABLE_SAMPLE_DATA=false)")
+
+    st.session_state["data_origin"] = data_origin
 
     return cuentas_df, metricas_df
 

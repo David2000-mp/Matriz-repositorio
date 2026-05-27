@@ -228,8 +228,8 @@ def main():
                         st.session_state.force_data_refresh = False
                     
                     # Toast de éxito
-                    origin = st.session_state.get("data_origin", "cloud")
-                    if origin == "cloud":
+                    origin = st.session_state.get("data_origin", "unknown")
+                    if origin in {"sheets", "sheets_form"}:
                         st.toast("🌐 Datos cargados desde Google Sheets", icon="✅")
                     else:
                         st.toast("💾 Datos cargados correctamente", icon="✅")
