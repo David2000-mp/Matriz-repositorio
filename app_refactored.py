@@ -102,6 +102,13 @@ def main():
         [data-testid="stSidebar"] [data-testid="stExpander"] details:not([open]) summary * {
             color: #f5f7fa !important;
             fill: #f5f7fa !important;
+            font-weight: 500 !important;
+        }
+
+        /* Mantener el mismo peso cuando el expander está abierto */
+        [data-testid="stSidebar"] [data-testid="stExpander"] details[open] summary,
+        [data-testid="stSidebar"] [data-testid="stExpander"] details[open] summary * {
+            font-weight: 500 !important;
         }
 
         /* Mantener color estable en selectbox del sidebar (cerrado y desplegado) */
@@ -112,6 +119,15 @@ def main():
         [data-testid="stSidebar"] [data-testid="stSelectbox"] input {
             color: #212529 !important;
             fill: #212529 !important;
+        }
+
+        /* Labels de filtros en sidebar: asegurar legibilidad sobre fondo azul */
+        [data-testid="stSidebar"] [data-testid="stSelectbox"] [data-testid="stWidgetLabel"] p,
+        [data-testid="stSidebar"] [data-testid="stSelectbox"] [data-testid="stWidgetLabel"] span,
+        [data-testid="stSidebar"] [data-testid="stSelectbox"] > label p,
+        [data-testid="stSidebar"] [data-testid="stSelectbox"] > label span {
+            color: #f5f7fa !important;
+            fill: #f5f7fa !important;
         }
 
         /* Opciones cuando se abre el dropdown: contraste estable (evita texto oscuro sobre fondo oscuro) */

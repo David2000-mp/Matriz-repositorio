@@ -6,6 +6,7 @@ Página de inicio con hero banner y navegación rápida.
 import streamlit as st
 import pandas as pd
 import logging
+from pathlib import Path
 from utils.data_provider import data_provider
 from utils import simular, save_batch
 from utils.helpers import get_banner_css
@@ -23,13 +24,15 @@ def render(df=None):
     banner_css = get_banner_css("banner_landing.jpg")
 
     # Video de fondo para el hero
-    import os
     import base64
-    video_path = os.path.join("images", "banner_video.mp4")
+    base_dir = Path(__file__).resolve().parent.parent
+    video_path = base_dir / "images" / "banner_video.mp4"
+
     def get_video_base64(video_path):
-        if os.path.exists(video_path):
+        if video_path.exists():
             with open(video_path, "rb") as f:
                 return base64.b64encode(f.read()).decode()
+        logging.warning(f"Video de banner no encontrado: {video_path}")
         return None
     video_b64 = get_video_base64(video_path)
 

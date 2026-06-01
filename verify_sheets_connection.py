@@ -81,10 +81,15 @@ def test_google_sheets_connection():
     print("\n📋 Paso 5: Conectando a Google Sheets...")
     
     sheet_name = "BaseDatosMatriz"
+    sheet_id = os.getenv("GOOGLE_SHEETS_ID", "").strip()
     
     try:
-        spreadsheet = client.open(sheet_name)
-        print(f"✅ Conectado a '{sheet_name}'")
+        if sheet_id:
+            spreadsheet = client.open_by_key(sheet_id)
+            print("✅ Conectado por GOOGLE_SHEETS_ID")
+        else:
+            spreadsheet = client.open(sheet_name)
+            print(f"✅ Conectado a '{sheet_name}'")
         print(f"   📊 URL: {spreadsheet.url}")
         
         # Listar hojas disponibles
@@ -94,7 +99,10 @@ def test_google_sheets_connection():
             print(f"      - {ws.title} ({ws.row_count} filas x {ws.col_count} columnas)")
         
     except gspread.exceptions.SpreadsheetNotFound:
-        print(f"❌ No se encontró la hoja '{sheet_name}'")
+        if sheet_id:
+            print(f"❌ No se encontró la hoja con ID '{sheet_id}'")
+        else:
+            print(f"❌ No se encontró la hoja '{sheet_name}'")
         print("   Verifica que:")
         print("   1. La hoja existe en Google Sheets")
         print("   2. Está compartida con el service account email mostrado arriba")

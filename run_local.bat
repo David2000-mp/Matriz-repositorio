@@ -1,11 +1,12 @@
 @echo off
 echo ========================================
-echo   CHAMPILYTICS - Maristas Analytics
+echo   CHAMPILEAKS - Local Runner
 echo ========================================
 echo.
-echo Activando entorno virtual...
-call venv_local\Scripts\activate.bat
-echo.
-echo Iniciando aplicacion Streamlit...
-streamlit run app.py
-pause
+set REPO_DIR=%~dp0
+powershell -NoProfile -ExecutionPolicy Bypass -File "%REPO_DIR%run_local.ps1"
+if errorlevel 1 (
+	echo.
+	echo Error al iniciar CHAMPILEAKS.
+	pause
+)

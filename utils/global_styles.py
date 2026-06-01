@@ -1027,6 +1027,14 @@ def get_global_institutional_css() -> str:
         font-weight: 600 !important;
         font-size: 16px !important;
     }}
+
+    /* Sidebar: mantener peso uniforme (sin negritas al expandir) */
+    section[data-testid="stSidebar"] [data-testid="stExpander"] summary,
+    section[data-testid="stSidebar"] [data-testid="stExpander"] summary *,
+    section[data-testid="stSidebar"] [data-testid="stExpander"] details[open] summary,
+    section[data-testid="stSidebar"] [data-testid="stExpander"] details[open] summary * {{
+        font-weight: 500 !important;
+    }}
     
     /* Iconos de expander visibles */
     summary span[data-testid="stIconMaterial"],
