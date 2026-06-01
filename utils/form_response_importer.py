@@ -90,7 +90,11 @@ def _canonical_alias_map() -> Dict[str, set]:
             "engagement del tema mas visto",
             "engagment del tema mas visto",
         },
-        "publicaciones_por_semana": {"publicaciones por semana"},
+        "publicaciones_por_semana": {
+            "publicaciones por semana",
+            "publicaciones x semana",
+            "publicaciones/semana",
+        },
         "tema_principal": {"tema principal del contenido del periodo"},
         "calificacion_contenido": {"del 1 al 10 que calificacion le pones al contenido de la pagina"},
         "obs_engagement": {"observaciones de engagement del periodo"},

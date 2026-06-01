@@ -396,6 +396,11 @@ def _monthly_aggregation(df: pd.DataFrame) -> pd.DataFrame:
     if tmp.empty:
         return tmp
 
+    # En formulario, vacíos pueden llegar como 0; para esta métrica se consideran faltantes.
+    if "publicaciones_por_semana" in tmp.columns:
+        tmp["publicaciones_por_semana"] = pd.to_numeric(tmp["publicaciones_por_semana"], errors="coerce")
+        tmp.loc[tmp["publicaciones_por_semana"] <= 0, "publicaciones_por_semana"] = pd.NA
+
     tmp["mes"] = tmp["fecha"].dt.to_period("M").dt.to_timestamp()
 
     agg_cols = [col for col in ["engagement_rate", *NEW_NUMERIC_COLS] if col in tmp.columns]
@@ -533,7 +538,113 @@ def _render_kpis_with_context(filtered: pd.DataFrame, monthly: pd.DataFrame, mod
                 st.caption(f"YoY {yoy_delta:+.1f}%")
 
 
-def _build_executive_insights(monthly: pd.DataFrame) -> list[str]:
+def _calculate_posts_per_week_benchmark(
+    current_df: pd.DataFrame,
+    benchmark_df: pd.DataFrame,
+    top_n: int = 10,
+) -> dict[str, float | int | None]:
+    """Calcula benchmark de publicaciones/semana usando Top/Bottom por engagement."""
+    result: dict[str, float | int | None] = {
+        "actual": None,
+        "recommended": None,
+        "worst": None,
+        "sample": 0,
+        "top_n": int(top_n),
+    }
+
+    # KPI actual: promedio en el contexto filtrado de la vista.
+    if "publicaciones_por_semana" in current_df.columns:
+        current_series = pd.to_numeric(current_df["publicaciones_por_semana"], errors="coerce")
+        current_series = current_series[current_series > 0].dropna()
+        if not current_series.empty:
+            result["actual"] = float(current_series.mean())
+
+    required_cols = ["engagement_rate", "publicaciones_por_semana"]
+    if any(col not in benchmark_df.columns for col in required_cols):
+        return result
+
+    valid = benchmark_df.copy()
+    valid["engagement_rate"] = pd.to_numeric(valid["engagement_rate"], errors="coerce")
+    valid["publicaciones_por_semana"] = pd.to_numeric(valid["publicaciones_por_semana"], errors="coerce")
+    valid = valid.dropna(subset=["engagement_rate", "publicaciones_por_semana"])
+    valid = valid[valid["publicaciones_por_semana"] > 0]
+
+    if valid.empty:
+        return result
+
+    if "id_cuenta" in valid.columns:
+        account_level = (
+            valid.groupby("id_cuenta", as_index=False)
+            .agg(
+                engagement_rate=("engagement_rate", "mean"),
+                publicaciones_por_semana=("publicaciones_por_semana", "mean"),
+            )
+            .dropna(subset=["engagement_rate", "publicaciones_por_semana"])
+        )
+    else:
+        account_level = valid[["engagement_rate", "publicaciones_por_semana"]].copy()
+
+    if account_level.empty:
+        return result
+
+    sample = len(account_level)
+    n = min(int(top_n), sample)
+    ranked = account_level.sort_values("engagement_rate", ascending=False).reset_index(drop=True)
+
+    top_slice = ranked.head(n)
+    bottom_slice = ranked.tail(n)
+
+    result["sample"] = int(sample)
+    result["recommended"] = float(top_slice["publicaciones_por_semana"].mean()) if not top_slice.empty else None
+    result["worst"] = float(bottom_slice["publicaciones_por_semana"].mean()) if not bottom_slice.empty else None
+    return result
+
+
+def _render_posts_per_week_kpis(
+    current_df: pd.DataFrame,
+    benchmark_df: pd.DataFrame,
+    top_n: int = 10,
+) -> dict[str, float | int | None]:
+    stats = _calculate_posts_per_week_benchmark(current_df, benchmark_df, top_n=top_n)
+
+    st.markdown("#### Publicaciones por Semana")
+    k1, k2, k3 = st.columns(3)
+    with k1:
+        st.metric(
+            "Promedio actual",
+            _format_metric(stats.get("actual"), "number"),
+            delta="Contexto filtrado",
+        )
+    with k2:
+        st.metric(
+            "Recomendado",
+            _format_metric(stats.get("recommended"), "number"),
+            delta=f"Top {int(stats.get('top_n') or top_n)} engagement",
+        )
+    with k3:
+        st.metric(
+            "Peor observado",
+            _format_metric(stats.get("worst"), "number"),
+            delta=f"Bottom {int(stats.get('top_n') or top_n)} engagement",
+        )
+
+    sample = int(stats.get("sample") or 0)
+    if sample < int(top_n):
+        st.caption(
+            f"Benchmark global con muestra reducida ({sample} cuentas válidas). "
+            "Se usaron todas las cuentas disponibles con engagement y publicaciones por semana."
+        )
+    else:
+        st.caption(
+            f"Benchmark global calculado con {sample} cuentas válidas. "
+            f"Recomendado = Top {int(stats.get('top_n') or top_n)} por engagement; "
+            f"Peor = Bottom {int(stats.get('top_n') or top_n)}."
+        )
+
+    return stats
+
+
+def _build_executive_insights(monthly: pd.DataFrame, ppw_stats: dict[str, float | int | None] | None = None) -> list[str]:
     insights: list[str] = []
     if monthly.empty:
         return insights
@@ -569,6 +680,31 @@ def _build_executive_insights(monthly: pd.DataFrame) -> list[str]:
         insights.append(
             f"Mejor formato actual: {COLUMN_LABELS.get(best, best)}. Oportunidad principal: {COLUMN_LABELS.get(worst, worst)}."
         )
+
+    if ppw_stats is not None:
+        current_ppw = ppw_stats.get("actual")
+        recommended_ppw = ppw_stats.get("recommended")
+        worst_ppw = ppw_stats.get("worst")
+
+        if current_ppw is not None and recommended_ppw is not None:
+            gap = float(current_ppw) - float(recommended_ppw)
+            if abs(gap) < 0.2:
+                insights.append("Tu ritmo de publicaciones está alineado con el benchmark de mejor engagement.")
+            elif gap < 0:
+                insights.append(
+                    f"Oportunidad de cadencia: el benchmark recomienda {float(recommended_ppw):.2f} publicaciones/semana "
+                    f"vs {float(current_ppw):.2f} actuales."
+                )
+            else:
+                insights.append(
+                    f"Publicas por encima del benchmark recomendado ({float(current_ppw):.2f} vs {float(recommended_ppw):.2f}). "
+                    "Revisa si se sostiene la calidad de engagement."
+                )
+
+        if worst_ppw is not None and recommended_ppw is not None:
+            insights.append(
+                f"Rango de referencia actual: peor observado {float(worst_ppw):.2f} y recomendado {float(recommended_ppw):.2f} publicaciones/semana."
+            )
 
     return insights[:3]
 
@@ -786,17 +922,19 @@ def render_new_data_dashboard() -> None:
     st.title("Tipo de contenidos")
     st.caption("Panel ejecutivo para evaluar desempeno, calidad y oportunidades por tipo de contenido.")
 
-    analytical_family = st.radio(
-        "Enfoque analitico",
-        options=["Rendimiento", "Calidad de datos", "Diagnostico por formato"],
-        horizontal=True,
-    )
-
-    compare_mode = st.radio(
-        "Modo de comparacion temporal",
-        options=["periodo completo", "vs mes anterior", "vs mismo mes anio anterior"],
-        horizontal=True,
-    )
+    control_left, control_right = st.columns(2)
+    with control_left:
+        analytical_family = st.radio(
+            "Enfoque analitico",
+            options=["Rendimiento", "Calidad de datos", "Diagnostico por formato"],
+            horizontal=True,
+        )
+    with control_right:
+        compare_mode = st.radio(
+            "Modo de comparacion temporal",
+            options=["periodo completo", "vs mes anterior", "vs mismo mes anio anterior"],
+            horizontal=True,
+        )
 
     df = data_provider.get_merged_data(force_reload=False)
     if df is None or df.empty:
@@ -813,6 +951,7 @@ def render_new_data_dashboard() -> None:
 
     # Filtros locales de la vista (sincronizados con filtros globales)
     df = _resolve_global_filters(df)
+    social_global, _ = _split_social_vs_maps(df)
 
     c1, c2 = st.columns(2)
     with c1:
@@ -860,8 +999,15 @@ def render_new_data_dashboard() -> None:
         _render_data_quality_badge(social_filtered)
 
     monthly = _monthly_aggregation(social_filtered) if has_social_data else pd.DataFrame()
+    ppw_stats: dict[str, float | int | None] | None = None
     if has_social_data:
+        st.markdown("### Resumen ejecutivo")
         _render_kpis_with_context(social_filtered, monthly, compare_mode)
+        ppw_stats = _render_posts_per_week_kpis(
+            current_df=social_filtered,
+            benchmark_df=social_global,
+            top_n=10,
+        )
     else:
         st.info("No hay plataformas de redes sociales para los filtros actuales. Google Maps se muestra en la seccion final.")
 
@@ -870,7 +1016,7 @@ def render_new_data_dashboard() -> None:
 
     if has_social_data and not monthly.empty:
         if analytical_family == "Rendimiento":
-            insights = _build_executive_insights(monthly)
+            insights = _build_executive_insights(monthly, ppw_stats=ppw_stats)
             if insights:
                 st.subheader("Insights ejecutivos")
                 for insight in insights:
@@ -915,113 +1061,115 @@ def render_new_data_dashboard() -> None:
         else:
             _render_format_diagnostic(monthly)
 
-    # Comparación mensual: engagement histórico vs nuevos puntos de contenido
-    engagement_compare_cols = [
-        col
-        for col in [
-            "engagement_rate",
-            "engagement_contenido_imagenes",
-            "engagement_contenido_links",
-            "engagement_contenido_videos",
-            "engagement_tema_mas_visto",
+    with st.expander("Analítica complementaria (opcional)", expanded=False):
+        # Comparación mensual: engagement histórico vs nuevos puntos de contenido
+        engagement_compare_cols = [
+            col
+            for col in [
+                "engagement_rate",
+                "engagement_contenido_imagenes",
+                "engagement_contenido_links",
+                "engagement_contenido_videos",
+                "engagement_tema_mas_visto",
+            ]
+            if col in monthly.columns
         ]
-        if col in monthly.columns
-    ]
 
-    if has_social_data and engagement_compare_cols:
-        line_df = monthly[["mes", *engagement_compare_cols]].melt(
-            id_vars=["mes"],
-            value_vars=engagement_compare_cols,
-            var_name="metrica",
-            value_name="valor",
-        )
-        fig_line = px.line(
-            line_df,
-            x="mes",
-            y="valor",
-            color="metrica",
-            markers=True,
-            title="Comparativa mensual de engagement (histórico vs nuevos campos)",
-            color_discrete_map=METRIC_COLOR_MAP,
-        )
-        fig_line.update_layout(**PLOTLY_LAYOUT_DEFAULTS)
-        _apply_dark_chart_text(fig_line)
-        st.plotly_chart(fig_line, width="stretch", config=PLOTLY_CONFIG)
+        if has_social_data and engagement_compare_cols:
+            line_df = monthly[["mes", *engagement_compare_cols]].melt(
+                id_vars=["mes"],
+                value_vars=engagement_compare_cols,
+                var_name="metrica",
+                value_name="valor",
+            )
+            fig_line = px.line(
+                line_df,
+                x="mes",
+                y="valor",
+                color="metrica",
+                markers=True,
+                title="Comparativa mensual de engagement (histórico vs nuevos campos)",
+                color_discrete_map=METRIC_COLOR_MAP,
+            )
+            fig_line.update_layout(**PLOTLY_LAYOUT_DEFAULTS)
+            _apply_dark_chart_text(fig_line)
+            st.plotly_chart(fig_line, width="stretch", config=PLOTLY_CONFIG)
 
-    # Volumen mensual de publicaciones
-    if has_social_data and "publicaciones_por_semana" in monthly.columns:
-        fig_bar = px.bar(
-            monthly,
-            x="mes",
-            y="publicaciones_por_semana",
-            title="Evolución mensual de publicaciones por semana",
-            color_discrete_sequence=["#003696"],
-        )
-        fig_bar.update_layout(**PLOTLY_LAYOUT_DEFAULTS)
-        _apply_dark_chart_text(fig_bar)
-        st.plotly_chart(fig_bar, width="stretch", config=PLOTLY_CONFIG)
+        # Volumen mensual de publicaciones
+        if has_social_data and "publicaciones_por_semana" in monthly.columns:
+            fig_bar = px.bar(
+                monthly,
+                x="mes",
+                y="publicaciones_por_semana",
+                title="Evolución mensual de publicaciones por semana",
+                color_discrete_sequence=["#003696"],
+            )
+            fig_bar.update_layout(**PLOTLY_LAYOUT_DEFAULTS)
+            _apply_dark_chart_text(fig_bar)
+            st.plotly_chart(fig_bar, width="stretch", config=PLOTLY_CONFIG)
 
-    # Rankings comparativos de rendimiento por institución
-    if has_social_data:
-        _render_institution_rankings(social_filtered, plataforma_sel)
+    with st.expander("Desglose avanzado por institución y temas", expanded=False):
+        # Rankings comparativos de rendimiento por institución
+        if has_social_data:
+            _render_institution_rankings(social_filtered, plataforma_sel)
 
-    # Cortes explicitos por tema principal y cambios operacionales
-    if has_social_data and "tema_principal" in social_filtered.columns and "engagement_rate" in social_filtered.columns:
-        tema_df = social_filtered.copy()
-        tema_df["tema_principal"] = tema_df["tema_principal"].fillna("").astype(str).str.strip()
-        tema_df = tema_df[tema_df["tema_principal"] != ""]
-        if not tema_df.empty:
-            st.subheader("Engagement por tema principal")
-            tema_agg = (
-                tema_df.groupby("tema_principal", as_index=False)
-                .agg(
-                    engagement_promedio=("engagement_rate", "mean"),
-                    registros=("engagement_rate", "count"),
+        # Cortes explícitos por tema principal y cambios operacionales
+        if has_social_data and "tema_principal" in social_filtered.columns and "engagement_rate" in social_filtered.columns:
+            tema_df = social_filtered.copy()
+            tema_df["tema_principal"] = tema_df["tema_principal"].fillna("").astype(str).str.strip()
+            tema_df = tema_df[tema_df["tema_principal"] != ""]
+            if not tema_df.empty:
+                st.subheader("Engagement por tema principal")
+                tema_agg = (
+                    tema_df.groupby("tema_principal", as_index=False)
+                    .agg(
+                        engagement_promedio=("engagement_rate", "mean"),
+                        registros=("engagement_rate", "count"),
+                    )
+                    .sort_values("engagement_promedio", ascending=False)
                 )
-                .sort_values("engagement_promedio", ascending=False)
-            )
-            fig_tema = px.bar(
-                tema_agg,
-                x="tema_principal",
-                y="engagement_promedio",
-                color="registros",
-                title="Promedio de engagement por tema principal",
-                color_continuous_scale=[[0.0, "#CC7000"], [1.0, "#003696"]],
-            )
-            fig_tema.update_layout(**PLOTLY_LAYOUT_DEFAULTS)
-            _apply_dark_chart_text(fig_tema)
-            st.plotly_chart(fig_tema, width="stretch", config=PLOTLY_CONFIG)
-
-    if has_social_data and "tuvo_cambios_operacionales" in social_filtered.columns and "engagement_rate" in social_filtered.columns:
-        cambios_df = social_filtered.copy()
-        cambios_df["tuvo_cambios_operacionales"] = (
-            cambios_df["tuvo_cambios_operacionales"].fillna("").astype(str).str.strip().str.lower()
-        )
-        cambios_df = cambios_df[cambios_df["tuvo_cambios_operacionales"].isin(["si", "no"])]
-        if not cambios_df.empty:
-            st.subheader("Impacto de cambios operacionales")
-            cambios_agg = (
-                cambios_df.groupby("tuvo_cambios_operacionales", as_index=False)
-                .agg(
-                    engagement_promedio=("engagement_rate", "mean"),
-                    registros=("engagement_rate", "count"),
+                fig_tema = px.bar(
+                    tema_agg,
+                    x="tema_principal",
+                    y="engagement_promedio",
+                    color="registros",
+                    title="Promedio de engagement por tema principal",
+                    color_continuous_scale=[[0.0, "#CC7000"], [1.0, "#003696"]],
                 )
-                .sort_values("tuvo_cambios_operacionales")
+                fig_tema.update_layout(**PLOTLY_LAYOUT_DEFAULTS)
+                _apply_dark_chart_text(fig_tema)
+                st.plotly_chart(fig_tema, width="stretch", config=PLOTLY_CONFIG)
+
+        if has_social_data and "tuvo_cambios_operacionales" in social_filtered.columns and "engagement_rate" in social_filtered.columns:
+            cambios_df = social_filtered.copy()
+            cambios_df["tuvo_cambios_operacionales"] = (
+                cambios_df["tuvo_cambios_operacionales"].fillna("").astype(str).str.strip().str.lower()
             )
-            cambios_agg["tuvo_cambios_operacionales"] = cambios_agg["tuvo_cambios_operacionales"].replace(
-                {"si": "Con cambios", "no": "Sin cambios"}
-            )
-            fig_cambios = px.bar(
-                cambios_agg,
-                x="tuvo_cambios_operacionales",
-                y="engagement_promedio",
-                color="tuvo_cambios_operacionales",
-                title="Engagement promedio con/sin cambios operacionales",
-                color_discrete_map={"Con cambios": "#003696", "Sin cambios": "#CC7000"},
-            )
-            fig_cambios.update_layout(**{**PLOTLY_LAYOUT_DEFAULTS, "showlegend": False})
-            _apply_dark_chart_text(fig_cambios)
-            st.plotly_chart(fig_cambios, width="stretch", config=PLOTLY_CONFIG)
+            cambios_df = cambios_df[cambios_df["tuvo_cambios_operacionales"].isin(["si", "no"])]
+            if not cambios_df.empty:
+                st.subheader("Impacto de cambios operacionales")
+                cambios_agg = (
+                    cambios_df.groupby("tuvo_cambios_operacionales", as_index=False)
+                    .agg(
+                        engagement_promedio=("engagement_rate", "mean"),
+                        registros=("engagement_rate", "count"),
+                    )
+                    .sort_values("tuvo_cambios_operacionales")
+                )
+                cambios_agg["tuvo_cambios_operacionales"] = cambios_agg["tuvo_cambios_operacionales"].replace(
+                    {"si": "Con cambios", "no": "Sin cambios"}
+                )
+                fig_cambios = px.bar(
+                    cambios_agg,
+                    x="tuvo_cambios_operacionales",
+                    y="engagement_promedio",
+                    color="tuvo_cambios_operacionales",
+                    title="Engagement promedio con/sin cambios operacionales",
+                    color_discrete_map={"Con cambios": "#003696", "Sin cambios": "#CC7000"},
+                )
+                fig_cambios.update_layout(**{**PLOTLY_LAYOUT_DEFAULTS, "showlegend": False})
+                _apply_dark_chart_text(fig_cambios)
+                st.plotly_chart(fig_cambios, width="stretch", config=PLOTLY_CONFIG)
 
     # Tabla de detalle para auditoría operativa
     show_cols = [
@@ -1050,23 +1198,24 @@ def render_new_data_dashboard() -> None:
     ]
 
     if has_social_data and show_cols:
-        st.subheader("Detalle de nuevos datos")
-        relevant_cols = [col for col in show_cols if _non_empty_ratio(social_filtered[col]) >= 0.3]
-        if not relevant_cols:
-            relevant_cols = show_cols
+        with st.expander("Detalle operativo y descarga", expanded=False):
+            st.subheader("Detalle de nuevos datos")
+            relevant_cols = [col for col in show_cols if _non_empty_ratio(social_filtered[col]) >= 0.3]
+            if not relevant_cols:
+                relevant_cols = show_cols
 
-        detail_df = social_filtered[relevant_cols].sort_values("fecha", ascending=False)
-        detail_df = detail_df.rename(columns=COLUMN_LABELS)
-        paged_df = _render_paginated_table(detail_df)
-        st.dataframe(paged_df, width="stretch")
+            detail_df = social_filtered[relevant_cols].sort_values("fecha", ascending=False)
+            detail_df = detail_df.rename(columns=COLUMN_LABELS)
+            paged_df = _render_paginated_table(detail_df)
+            st.dataframe(paged_df, width="stretch")
 
-        csv_data = detail_df.to_csv(index=False).encode("utf-8-sig")
-        file_suffix = f"{entidad_sel}_{plataforma_sel}".replace(" ", "_")
-        st.download_button(
-            label="Descargar detalle CSV",
-            data=csv_data,
-            file_name=f"tipo_contenidos_{file_suffix}.csv",
-            mime="text/csv",
-        )
+            csv_data = detail_df.to_csv(index=False).encode("utf-8-sig")
+            file_suffix = f"{entidad_sel}_{plataforma_sel}".replace(" ", "_")
+            st.download_button(
+                label="Descargar detalle CSV",
+                data=csv_data,
+                file_name=f"tipo_contenidos_{file_suffix}.csv",
+                mime="text/csv",
+            )
 
     _render_google_maps_section(maps_filtered)

@@ -428,6 +428,8 @@ def _canonical_form_column_groups(columns: List[str]) -> Dict[str, List[str]]:
         },
         "publicaciones_por_semana": {
             "publicaciones por semana",
+            "publicaciones x semana",
+            "publicaciones/semana",
         },
         "tema_principal": {
             "tema principal del contenido del periodo",
