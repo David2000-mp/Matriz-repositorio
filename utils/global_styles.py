@@ -1016,15 +1016,27 @@ def get_global_institutional_css() -> str:
         background-color: {HOVER_BG} !important;
     }}
     
-    /* Título del expander - texto negro legible */
-    details[open] summary,
-    summary[class*="streamlit-expanderHeader"],
-    .st-emotion-cache-nwb5ao,
-    .st-emotion-cache-11fa8fd,
-    span.st-emotion-cache-nwb5ao p,
-    div.st-emotion-cache-11fa8fd p {{
+    /* Título del expander en contenido principal */
+    section[data-testid="stMain"] details[open] summary,
+    section[data-testid="stMain"] summary[class*="streamlit-expanderHeader"],
+    section[data-testid="stMain"] .st-emotion-cache-nwb5ao,
+    section[data-testid="stMain"] .st-emotion-cache-11fa8fd,
+    section[data-testid="stMain"] span.st-emotion-cache-nwb5ao p,
+    section[data-testid="stMain"] div.st-emotion-cache-11fa8fd p {{
         color: {TEXT_PRIMARY} !important;
         font-weight: 600 !important;
+        font-size: 16px !important;
+    }}
+
+    /* Título del expander en sidebar: siempre claro y legible */
+    section[data-testid="stSidebar"] details[open] summary,
+    section[data-testid="stSidebar"] summary[class*="streamlit-expanderHeader"],
+    section[data-testid="stSidebar"] .st-emotion-cache-nwb5ao,
+    section[data-testid="stSidebar"] .st-emotion-cache-11fa8fd,
+    section[data-testid="stSidebar"] span.st-emotion-cache-nwb5ao p,
+    section[data-testid="stSidebar"] div.st-emotion-cache-11fa8fd p {{
+        color: #f5f7fa !important;
+        fill: #f5f7fa !important;
         font-size: 16px !important;
     }}
 
