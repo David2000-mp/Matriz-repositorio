@@ -25,6 +25,70 @@ from utils.logger import get_logger
 
 logger = get_logger(__name__)
 
+# Catalogo oficial de instituciones para evitar variantes que rompan rankings.
+INSTITUTION_CATALOG: Dict[str, str] = {
+    "CMB": "Colegio Mexico Bachillerato",
+    "ACOXPA": "Colegio Mexico Acoxpa",
+    "CUERNAVACA": "Colegio Cristobal Colon Cuernavaca",
+    "GUADALAJARA": "Colegio Cervantes Costa Rica",
+    "COMITAN": "Instituto Mexico de Comitan",
+    "TUXTLA": "Instituto Mexico Tuxtla",
+    "MERIDA": "Centro Universitario Montejo",
+    "CUM": "Centro Universitario Mexico",
+    "CEYCA": "Centro Yermo y Parres",
+    "PUEBLA": "Instituto Oriente de Puebla",
+    "MORELIA": "Instituto Valladolid",
+    "QUERETARO": "Colegio Alamos",
+    "LEON": "Colegio Miraflores",
+    "TIJUANA": "Instituto Mexico de Tijuana",
+    "SAN LUIS": "Colegio Motolinia",
+    "UMG": "Universidad Marista de Guadalajara",
+    "UMSLP": "Universidad Marista SLP",
+    "UMM": "Universidad Marista de Mexico",
+    "MMC": "Maristas Mexico Central",
+    "CLMC": "Colegio Lic. Manuel Concha",
+    "IPS": "Instituto Potosino Secundaria",
+    "CPMV": "Colegio Pedro Martinez Vazquez",
+    "JACONA": "Colegio Jacona",
+    "CONV": "Convocacion Marista",
+    "ISAH": "Instituto Sahuayense",
+    "PJMMC": "Pastoral Juvenil Marista Mexico Central",
+}
+
+
+def _normalize_institution_key(value: str) -> str:
+    text = "" if value is None else str(value)
+    text = unicodedata.normalize("NFKD", text)
+    text = "".join(ch for ch in text if not unicodedata.combining(ch))
+    text = text.strip().upper()
+    text = re.sub(r"[^A-Z0-9]", "", text)
+    return text
+
+
+def normalize_institution_name(value: str) -> str:
+    """Normaliza institución a nombre canónico según catálogo oficial."""
+    if value is None:
+        return ""
+
+    raw = str(value).strip()
+    if not raw:
+        return ""
+
+    canonical_by_key = {
+        _normalize_institution_key(code): name
+        for code, name in INSTITUTION_CATALOG.items()
+    }
+    # También mapear el nombre canónico hacia sí mismo para aceptar entradas largas.
+    canonical_by_key.update(
+        {
+            _normalize_institution_key(name): name
+            for name in INSTITUTION_CATALOG.values()
+        }
+    )
+
+    normalized_key = _normalize_institution_key(raw)
+    return canonical_by_key.get(normalized_key, raw)
+
 
 def _normalize_header_label(header: str) -> str:
     """Normaliza headers para matching flexible."""
@@ -316,7 +380,9 @@ def import_form_responses(spreadsheet) -> Tuple[pd.DataFrame, pd.DataFrame]:
 
                 # Extraer campos por header canónico
                 fecha = _parse_fecha(_get_first_value(row_data, header_groups.get("fecha", []), ''))
-                entidad = _get_first_value(row_data, header_groups.get("entidad", []), '').strip()
+                entidad = normalize_institution_name(
+                    _get_first_value(row_data, header_groups.get("entidad", []), '').strip()
+                )
                 plataforma = _get_first_value(row_data, header_groups.get("plataforma", []), '').strip()
                 usuario_red = _get_first_value(row_data, header_groups.get("usuario_red", []), '').strip()
 

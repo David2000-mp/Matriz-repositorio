@@ -91,6 +91,18 @@ SENTIMENT_ORDER = {
     "legacy_3": ["positivo", "neutral", "negativo"],
 }
 
+CRITICAL_KEYWORDS = {
+    "acoso",
+    "abuso",
+    "violencia",
+    "bullying",
+    "fraude",
+    "corrupcion",
+    "maltrato",
+    "riesgo",
+    "denuncia",
+}
+
 
 def _apply_dark_chart_text(fig):
     fig.update_layout(
@@ -248,6 +260,118 @@ def _score_to_stars(value: int) -> str:
     score = int(value) if pd.notna(value) else 0
     score = max(1, min(5, score))
     return "★" * score + "☆" * (5 - score)
+
+
+def _build_institution_display(df: pd.DataFrame) -> pd.Series:
+    code = df.get("institucion_codigo", "").fillna("").astype(str).str.strip()
+    name = df.get("institucion_nombre", df.get("institucion", "")).fillna("").astype(str).str.strip()
+    return code.where(code == "", code + " | ") + name
+
+
+def _render_consolidated_executive_panel(df: pd.DataFrame) -> None:
+    st.subheader("Panel ejecutivo historico")
+
+    work = df.copy()
+    work["sentimiento_score"] = pd.to_numeric(work.get("sentimiento_score"), errors="coerce")
+    work["sentimiento_etiqueta"] = work.get("sentimiento_etiqueta", "").fillna("").astype(str)
+    work["categoria"] = work.get("categoria", "").fillna("Sin categoria").astype(str).str.strip()
+    work["comentario"] = work.get("comentario", "").fillna("").astype(str)
+
+    risk_pattern = "|".join(sorted(CRITICAL_KEYWORDS))
+    has_risk_keyword = work["comentario"].str.lower().str.contains(risk_pattern, regex=True, na=False)
+    is_very_negative = work["sentimiento_etiqueta"].str.lower().str.strip().eq("muy negativo")
+    alerts_df = work[is_very_negative | has_risk_keyword].copy()
+
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Comentarios historicos", f"{len(work):,}")
+    c2.metric("Score promedio", f"{work['sentimiento_score'].mean(skipna=True):.2f}/5")
+    c3.metric("Alertas criticas", f"{len(alerts_df):,}")
+
+    tabs = st.tabs([
+        "Ranking instituciones",
+        "Categorias (elogio/queja)",
+        "Alertas criticas",
+    ])
+
+    with tabs[0]:
+        ranking = (
+            work.groupby("entidad", as_index=False)
+            .agg(
+                score_promedio=("sentimiento_score", "mean"),
+                total_comentarios=("comentario", "count"),
+            )
+            .sort_values(["score_promedio", "total_comentarios"], ascending=[False, False])
+        )
+
+        if ranking.empty:
+            st.info("No hay datos suficientes para ranking por institucion.")
+        else:
+            st.dataframe(
+                ranking.head(20),
+                width="stretch",
+                hide_index=True,
+                column_config={
+                    "entidad": st.column_config.TextColumn("Institucion"),
+                    "score_promedio": st.column_config.NumberColumn("Score promedio", format="%.2f"),
+                    "total_comentarios": st.column_config.NumberColumn("Comentarios"),
+                },
+            )
+
+            fig_rank = px.bar(
+                ranking.head(10).sort_values("score_promedio", ascending=True),
+                x="score_promedio",
+                y="entidad",
+                orientation="h",
+                title="Top instituciones por score promedio",
+                color_discrete_sequence=["#003696"],
+            )
+            fig_rank.update_layout(**{**PLOTLY_LAYOUT_DEFAULTS, "showlegend": False})
+            _apply_dark_chart_text(fig_rank)
+            st.plotly_chart(fig_rank, width="stretch", config=PLOTLY_CONFIG)
+
+    with tabs[1]:
+        praises = (
+            work[work["sentimiento_score"] >= 4]
+            .groupby("categoria", as_index=False)
+            .size()
+            .rename(columns={"size": "total"})
+            .sort_values("total", ascending=False)
+        )
+        complaints = (
+            work[work["sentimiento_score"] <= 2]
+            .groupby("categoria", as_index=False)
+            .size()
+            .rename(columns={"size": "total"})
+            .sort_values("total", ascending=False)
+        )
+
+        left, right = st.columns(2)
+        with left:
+            st.markdown("**Top categorias de elogio (score >= 4)**")
+            if praises.empty:
+                st.caption("Sin categorias de elogio en el filtro actual.")
+            else:
+                st.dataframe(praises.head(10), width="stretch", hide_index=True)
+
+        with right:
+            st.markdown("**Top categorias de queja (score <= 2)**")
+            if complaints.empty:
+                st.caption("Sin categorias de queja en el filtro actual.")
+            else:
+                st.dataframe(complaints.head(10), width="stretch", hide_index=True)
+
+    with tabs[2]:
+        if alerts_df.empty:
+            st.caption("No se detectaron alertas criticas en el periodo filtrado.")
+        else:
+            alerts_view = alerts_df[[
+                col
+                for col in ["fecha", "entidad", "plataforma", "sentimiento_etiqueta", "sentimiento_score", "comentario"]
+                if col in alerts_df.columns
+            ]].copy()
+            if "fecha" in alerts_view.columns:
+                alerts_view = alerts_view.sort_values("fecha", ascending=False)
+            st.dataframe(alerts_view.head(200), width="stretch", hide_index=True)
 
 
 def _render_comment_importer() -> None:
@@ -414,7 +538,29 @@ def render_text_analysis_dashboard() -> None:
     _render_comment_importer()
     st.divider()
 
-    df = data_provider.get_merged_data(force_reload=False)
+    source_mode = st.radio(
+        "Fuente de datos",
+        options=[
+            "Base historica (Comentarios Consolidados)",
+            "Formulario/Metricas (flujo actual)",
+        ],
+        horizontal=True,
+        key="text_analysis_source_mode",
+    )
+
+    if source_mode == "Base historica (Comentarios Consolidados)":
+        df = data_provider.get_consolidated_comments(force_reload=False)
+        if df is not None and not df.empty:
+            # Adaptador para reutilizar el pipeline visual existente.
+            df = df.copy()
+            df["fecha"] = pd.to_datetime(df.get("fecha_carga"), errors="coerce")
+            df["entidad"] = _build_institution_display(df).astype(str).str.strip()
+            df["plataforma"] = df.get("fuente", "").astype(str)
+            df["comentarios_consolidados"] = df.get("comentario", "").astype(str)
+            st.caption(f"Registros historicos consolidados: {len(df):,}")
+    else:
+        df = data_provider.get_merged_data(force_reload=False)
+
     if df is None or df.empty:
         st.warning("No hay datos disponibles para analizar textos.")
         return
@@ -466,6 +612,10 @@ def render_text_analysis_dashboard() -> None:
     if filtered.empty:
         st.info("No hay datos para los filtros seleccionados.")
         return
+
+    if source_mode == "Base historica (Comentarios Consolidados)":
+        _render_consolidated_executive_panel(filtered)
+        st.markdown("---")
 
     selected_cols = st.multiselect(
         "Columnas de texto a analizar",

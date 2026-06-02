@@ -62,6 +62,7 @@ class DataProvider:
         """Inicializa el provider con caché vacío."""
         self._data_cache = None
         self._merged_cache = None
+        self._comments_consolidated_cache = None
         self._last_schema_hash = ""
 
     def get_data(self, force_reload: bool = False) -> Tuple[pd.DataFrame, pd.DataFrame]:
@@ -243,11 +244,44 @@ class DataProvider:
         """
         self._data_cache = None
         self._merged_cache = None
+        self._comments_consolidated_cache = None
         try:
             st.cache_data.clear()
             logger.debug("Cache invalidado en DataProvider")
         except Exception as e:
             logger.warning(f"Error limpiando st.cache_data en DataProvider: {e}")
+
+    def get_consolidated_comments(self, force_reload: bool = False) -> pd.DataFrame:
+        """
+        Obtiene comentarios históricos consolidados desde Google Sheets.
+
+        Args:
+            force_reload: Si True, limpia caché y vuelve a consultar la hoja.
+
+        Returns:
+            pd.DataFrame: Comentarios consolidados normalizados y sin duplicados.
+        """
+        if force_reload:
+            self._comments_consolidated_cache = None
+            try:
+                st.cache_data.clear()
+            except Exception as e:
+                logger.warning(f"No se pudo limpiar st.cache_data al recargar comentarios: {e}")
+
+        if self._comments_consolidated_cache is None:
+            try:
+                from utils.sheets_connector import load_consolidated_comments
+
+                self._comments_consolidated_cache = load_consolidated_comments()
+                logger.info(
+                    "✓ Comentarios consolidados cargados: %s registros",
+                    len(self._comments_consolidated_cache),
+                )
+            except Exception as e:
+                logger.error(f"Error cargando comentarios consolidados: {e}")
+                self._comments_consolidated_cache = pd.DataFrame()
+
+        return self._comments_consolidated_cache.copy()
 
 
 # Instancia global singleton
@@ -270,3 +304,8 @@ def get_merged_data(force_reload: bool = False) -> pd.DataFrame:
     Equivalente a: data_provider.get_merged_data(force_reload)
     """
     return data_provider.get_merged_data(force_reload)
+
+
+def get_consolidated_comments(force_reload: bool = False) -> pd.DataFrame:
+    """Obtiene base histórica de Comentarios Consolidados."""
+    return data_provider.get_consolidated_comments(force_reload)

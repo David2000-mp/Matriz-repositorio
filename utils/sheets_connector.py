@@ -18,11 +18,53 @@ from typing import Optional, Dict, Any, List
 from dotenv import load_dotenv
 from utils.logger import get_logger
 from utils.engagement_validation import normalize_engagement_series
+from utils.form_response_importer import INSTITUTION_CATALOG, normalize_institution_name
 
 # Cargar variables de entorno desde .env (solo en desarrollo local)
 load_dotenv()
 
 logger = get_logger(__name__)
+
+CONSOLIDATED_COMMENTS_SHEET = "Comentarios Consolidados"
+CONSOLIDATED_COMMENTS_CANONICAL = {
+    "institucion": "institucion",
+    "fecha_carga": "fecha_carga",
+    "fuente": "fuente",
+    "comentario": "comentario",
+    "sentimiento_etiqueta": "sentimiento_etiqueta",
+    "sentimiento_score": "sentimiento_score",
+    "categoria": "categoria",
+}
+CONSOLIDATED_COMMENTS_ALIASES = {
+    "institucion": {
+        "institucion",
+        "institución",
+    },
+    "fecha_carga": {
+        "fecha carga",
+        "fecha_carga",
+    },
+    "fuente": {
+        "fuente",
+    },
+    "comentario": {
+        "comentarios de la seccion de opinion",
+        "comentario",
+        "comentarios",
+    },
+    "sentimiento_etiqueta": {
+        "sentimiento etiqueta",
+        "sentimiento_etiqueta",
+    },
+    "sentimiento_score": {
+        "sentimiento score",
+        "sentimiento_score",
+    },
+    "categoria": {
+        "categoria",
+        "categoría",
+    },
+}
 
 # ===========================
 # CONFIGURACIÓN DE GOOGLE SHEETS
@@ -682,6 +724,104 @@ def cargar_respuestas_forms() -> pd.DataFrame:
     except Exception as e:
         logger.error(f"Error cargando respuestas de forms: {e}")
         return pd.DataFrame()
+
+
+def _institution_name_to_code(name: str) -> str:
+    normalized_name = _normalize_header_label(name).replace(" ", "")
+    for code, canonical_name in INSTITUTION_CATALOG.items():
+        canonical_key = _normalize_header_label(canonical_name).replace(" ", "")
+        if normalized_name == canonical_key:
+            return code
+    return ""
+
+
+def _canonicalize_consolidated_comments_columns(df: pd.DataFrame) -> pd.DataFrame:
+    rename_map: Dict[str, str] = {}
+    for col in df.columns:
+        normalized = _normalize_header_label(col)
+        for canonical, aliases in CONSOLIDATED_COMMENTS_ALIASES.items():
+            if normalized in aliases:
+                rename_map[col] = CONSOLIDATED_COMMENTS_CANONICAL[canonical]
+                break
+    return df.rename(columns=rename_map)
+
+
+@st.cache_data(ttl=3600)
+def load_consolidated_comments() -> pd.DataFrame:
+    """Carga base histórica desde 'Comentarios Consolidados' con esquema canónico y deduplicación."""
+    try:
+        ss = get_sheets_connection()
+        if not ss:
+            logger.error("No se pudo conectar a Google Sheets para Comentarios Consolidados")
+            return pd.DataFrame(columns=list(CONSOLIDATED_COMMENTS_CANONICAL.values()))
+
+        ws = ss.worksheet(CONSOLIDATED_COMMENTS_SHEET)
+        raw_data = ws.get()
+        if not raw_data or len(raw_data) < 2:
+            logger.info("La hoja 'Comentarios Consolidados' no tiene registros")
+            return pd.DataFrame(columns=list(CONSOLIDATED_COMMENTS_CANONICAL.values()))
+
+        headers = _unique_headers(raw_data[0])
+        rows = raw_data[1:]
+
+        max_cols = len(headers)
+        normalized_rows: List[List[str]] = []
+        for row in rows:
+            row_copy = list(row)
+            if len(row_copy) < max_cols:
+                row_copy.extend([""] * (max_cols - len(row_copy)))
+            elif len(row_copy) > max_cols:
+                row_copy = row_copy[:max_cols]
+            normalized_rows.append(row_copy)
+
+        df = pd.DataFrame(normalized_rows, columns=headers)
+        df = _canonicalize_consolidated_comments_columns(df)
+
+        required_cols = list(CONSOLIDATED_COMMENTS_CANONICAL.values())
+        missing = [col for col in required_cols if col not in df.columns]
+        if missing:
+            logger.error(
+                "Faltan columnas requeridas en 'Comentarios Consolidados': %s. Disponibles: %s",
+                missing,
+                list(df.columns),
+            )
+            return pd.DataFrame(columns=required_cols)
+
+        df = df[required_cols].copy()
+        df = df.dropna(how="all")
+
+        text_cols = ["institucion", "fuente", "comentario", "sentimiento_etiqueta", "categoria"]
+        for col in text_cols:
+            df[col] = df[col].fillna("").astype(str).str.strip()
+
+        df["fecha_carga"] = pd.to_datetime(df["fecha_carga"], errors="coerce")
+        df["sentimiento_score"] = pd.to_numeric(df["sentimiento_score"], errors="coerce")
+
+        df["institucion_nombre"] = df["institucion"].apply(normalize_institution_name)
+        df["institucion_codigo"] = df["institucion_nombre"].apply(_institution_name_to_code)
+
+        df["fecha_carga"] = df["fecha_carga"].dt.strftime("%Y-%m-%d")
+
+        # Filtro de seguridad contra recargas duplicadas del mismo CSV.
+        before_dedup = len(df)
+        df = df.drop_duplicates(
+            subset=["institucion_nombre", "fecha_carga", "comentario"],
+            keep="last",
+        )
+        after_dedup = len(df)
+
+        df = df[(df["comentario"] != "") & df["fecha_carga"].notna()]
+        logger.info(
+            "Comentarios Consolidados: %s filas leidas, %s duplicados removidos, %s filas validas",
+            before_dedup,
+            before_dedup - after_dedup,
+            len(df),
+        )
+
+        return df.reset_index(drop=True)
+    except Exception as e:
+        logger.error(f"Error cargando Comentarios Consolidados: {e}")
+        return pd.DataFrame(columns=list(CONSOLIDATED_COMMENTS_CANONICAL.values()))
 
 
 # Función de testing (comentada para uso en desarrollo)
