@@ -309,11 +309,40 @@ SOCIAL_NEGATIVE_PHRASES = {
     "pandemia que me quito",
     "no me dejo disfrutar",
     "se me metio un",
+    "descansa en paz",
+    "ultimo ano",
+    "ano perdido",
+    "tiempo perdido",
+    "me quito mi viaje",
 }
 
 SOCIAL_POSITIVE_PHRASES = {
     "por siempre",
     "amo amo",
+    "gracias por tanto",
+    "el mejor",
+    "siempre el mejor",
+    "viva el profe",
+    "leyenda",
+    "amamos",
+}
+
+SOCIAL_NOSTALGIA_POSITIVE_PHRASES = {
+    "que recuerdos",
+    "tantos recuerdos",
+    "los mejores anos",
+    "por siempre marista",
+    "siempre en mi corazon",
+    "los voy a extranar",
+}
+
+SOCIAL_TEACHER_PRAISE_PHRASES = {
+    "maestro alejandro",
+    "profe ale",
+    "excelente maestro",
+    "maestrazo",
+    "el mejor maestro",
+    "top globales",
 }
 
 POSITIVE_EMOJI = {
@@ -329,6 +358,14 @@ POSITIVE_EMOJI = {
     "\U0001faf6",
     "\U0001f60a",
     "\U0001f929",
+    "\U0001f44f",
+    "\U0001f64c",
+    "\U0001f389",
+    "\U0001f31f",
+    "\U0001f31e",
+    "\U0001f3c6",
+    "\U0001f393",
+    "\U0001f44d",
 }
 
 NEGATIVE_EMOJI = {
@@ -338,11 +375,15 @@ NEGATIVE_EMOJI = {
     "\U0001f625",
     "\U0001f494",
     "\U0001f97a",
-    "\U0001f97a",
     "\U0001f972",
     "\U0001fa79",
-    "\U0001f97a",
+    "\U0001f612",
+    "\U0001f61e",
+    "\U0001f61f",
 }
+
+POSITIVE_EMOTICONS = {":)", ":d", "<3", "xd", "jaja", "jeje", "jiji"}
+NEGATIVE_EMOTICONS = {":(", "):", "d:", "pff", "ouch"}
 
 # Regex para patrones de boilerplate que no se pueden capturar con frases exactas.
 # Ejemplos: "Hace 2 aÃ±os", "Hace 5 meses", "A. B.", "J. L. M."
@@ -354,13 +395,17 @@ _BOILERPLATE_REGEX = re.compile(
     r"|foto\s+\d+\s+de\s+la\s+opinion\s+de.*"
     r"|\d+\s+opinion(?:es)?(?:\s*Â·\s*\d+\s+foto(?:s)?)?"
     r"|[a-z]\.(?:\s+[a-z]\.)+\s*$"  # Iniciales normalizadas: a. b. / j. l. m.
-    r"|(?:â¤ï¸|ðŸ™|ðŸ”¥|ðŸ‘|ðŸ‘|ðŸ’¯|ðŸ˜€|ðŸ˜|ðŸ¥°|ðŸ˜¡|ðŸ˜¢|ðŸ˜‚|ðŸ¤£|ðŸ˜­|ðŸ˜Ž|ðŸ˜®|ðŸ˜±)+\d*"
-    r"|(?:\d+)?(?:â¤ï¸|ðŸ™|ðŸ”¥|ðŸ‘|ðŸ‘|ðŸ’¯|ðŸ˜€|ðŸ˜|ðŸ¥°|ðŸ˜¡|ðŸ˜¢|ðŸ˜‚|ðŸ¤£|ðŸ˜­|ðŸ˜Ž|ðŸ˜®|ðŸ˜±)+"
     r"|(?:&#\d+;){2,}\d*"
     r"|\d+\s*sem(?:\s*\d+\s*me\s*gusta)?(?:\s*responder)?"
-    r"|(?:@[_a-z0-9\.]+\s*){1,5}"
     r")"
 )
+
+# Bloques de reacciones compuestos solo por emojis/simbolos (sin texto semantico).
+_EMOJI_ONLY_SPAM_REGEX = re.compile(
+    r"^(?:[\U0001F1E6-\U0001F1FF\U0001F300-\U0001FAFF\u2600-\u27BF\u200d\ufe0f\s])+\d*$"
+)
+
+_MENTION_REGEX = re.compile(r"@[A-Za-z0-9_.]+")
 
 # Nombre simple de perfil: "Pedro Is", "Lenin Tonatiuh Carbajal Ortega", "Manuel"
 _PROFILE_NAME_REGEX = re.compile(r"^[A-ZÃÃ‰ÃÃ“ÃšÃ‘][A-Za-zÃÃ‰ÃÃ“ÃšÃ‘Ã¡Ã©Ã­Ã³ÃºÃ±]+(?:\s+[A-ZÃÃ‰ÃÃ“ÃšÃ‘][A-Za-zÃÃ‰ÃÃ“ÃšÃ‘Ã¡Ã©Ã­Ã³ÃºÃ±]+){0,4}$")
@@ -576,6 +621,11 @@ def _detect_platform_boilerplate(text: str) -> bool:
         return True
 
     for phrase in PLATFORM_BOILERPLATE:
+        # Evita descartar comentarios reales como "me gusta mucho esta escuela".
+        if phrase in SOCIAL_METADATA_EXACT:
+            if normalized == phrase:
+                return True
+            continue
         if phrase in normalized:
             return True
 
@@ -586,11 +636,13 @@ def _detect_platform_boilerplate(text: str) -> bool:
     if _BOILERPLATE_REGEX.match(normalized):
         return True
 
-    # Reacciones puras tipo "â¤ï¸ðŸ™10" (simbolos + digitos, sin letras).
-    only_symbols_and_digits = re.fullmatch(r"[^A-Za-zÃÃ‰ÃÃ“ÃšÃ¡Ã©Ã­Ã³ÃºÃ‘Ã±]*", stripped) is not None
-    has_reaction_signal = any(ch.isdigit() for ch in stripped) and any(not ch.isalnum() and not ch.isspace() for ch in stripped)
-    if only_symbols_and_digits and has_reaction_signal:
-        return True
+    # Reacciones puras tipo emojis/simbolos (+ opcional contador numerico).
+    # Conserva mensajes emocionales cortos de 1-3 emojis.
+    if _EMOJI_ONLY_SPAM_REGEX.match(stripped):
+        has_digits = any(ch.isdigit() for ch in stripped)
+        emoji_count = sum(text.count(emo) for emo in POSITIVE_EMOJI.union(NEGATIVE_EMOJI))
+        if has_digits or emoji_count >= 6:
+            return True
 
     if _PROFILE_NAME_REGEX.match(stripped):
         return True
@@ -625,7 +677,7 @@ def tokenize_spanish(text: str) -> list[str]:
     if not text:
         return []
     tokens = [tok for tok in TOKEN_RE.findall(text) if len(tok) >= 2 and not tok.isdigit()]
-    return [tok for tok in tokens if tok not in SPANISH_STOPWORDS]
+    return [tok for tok in tokens if tok not in SPANISH_STOPWORDS or tok in NEGATION_WORDS]
 
 
 def _find_subsequence_start(tokens: list[str], subsequence: list[str]) -> int | None:
@@ -639,13 +691,21 @@ def _find_subsequence_start(tokens: list[str], subsequence: list[str]) -> int | 
     return None
 
 
-def _has_negation_before(tokens: list[str], index: int, *, window: int = 5) -> bool:
+def _has_negation_before(tokens: list[str], index: int, *, window: int = 7) -> bool:
     """Detecta negacion en una ventana de tokens previa a un indice."""
     start = max(0, index - window)
     for tok in tokens[start:index]:
         if tok in NEGATION_WORDS:
             return True
     return False
+
+
+def _contains_sentiment_emoji(text: str) -> bool:
+    return any(emo in text for emo in POSITIVE_EMOJI) or any(emo in text for emo in NEGATIVE_EMOJI)
+
+
+def _strip_mentions(text: str) -> str:
+    return _MENTION_REGEX.sub(" ", text)
 
 
 def _segment_social_blob(raw_text: str) -> list[str]:
@@ -671,8 +731,12 @@ def _segment_social_blob(raw_text: str) -> list[str]:
 
 def _emoji_sentiment_score(text: str) -> int:
     """Calcula una contribucion ligera de sentimiento con emojis comunes."""
-    positive = sum(text.count(emo) for emo in POSITIVE_EMOJI)
-    negative = sum(text.count(emo) for emo in NEGATIVE_EMOJI)
+    lowered = text.lower()
+    # Presencia por tipo para evitar sobrepeso por repeticion de un mismo emoji.
+    positive = sum(1 for emo in POSITIVE_EMOJI if emo in text)
+    negative = sum(1 for emo in NEGATIVE_EMOJI if emo in text)
+    positive += sum(1 for emot in POSITIVE_EMOTICONS if emot in lowered)
+    negative += sum(1 for emot in NEGATIVE_EMOTICONS if emot in lowered)
     return positive - negative
 
 
@@ -743,8 +807,8 @@ def clean_raw_text(raw_text: str, *, min_chars: int = 4) -> dict:
             descarte_detalles.append(("metadata_social", cleaned))
             continue
 
-        # Filtro 1: Longitud minima
-        if len(cleaned) < min_chars:
+        # Filtro 1: Longitud minima (permitir expresiones breves con carga emocional).
+        if len(cleaned) < min_chars and not _contains_sentiment_emoji(cleaned):
             descarte_detalles.append(("longitud_insuficiente", cleaned))
             continue
 
@@ -770,8 +834,11 @@ def clean_raw_text(raw_text: str, *, min_chars: int = 4) -> dict:
 
         # Filtro 5: Nombre de usuario con caracteres especiales de internet
         if _USERNAME_PATTERN.search(cleaned) and len(cleaned.split()) <= 5:
-            descarte_detalles.append(("username_especial", cleaned))
-            continue
+            # Conservar menciones utiles cuando existe contenido semantico aparte del handle.
+            semantic_text = _strip_mentions(cleaned)
+            if not tokenize_spanish(normalize_text(semantic_text)):
+                descarte_detalles.append(("username_especial", cleaned))
+                continue
 
         # Filtro 6: Duplicados exactos
         if cleaned in seen:
@@ -801,6 +868,7 @@ def classify_sentiment(comment: str) -> tuple[str, int]:
     original_text = _strip_invisible_chars(str(comment or ""))
     emoji_score = _emoji_sentiment_score(original_text)
     normalized = normalize_text(original_text)
+    normalized_wo_mentions = normalize_text(_strip_mentions(original_text))
     if not normalized:
         if emoji_score >= 2:
             return "Muy Positivo", 5
@@ -812,7 +880,7 @@ def classify_sentiment(comment: str) -> tuple[str, int]:
             return "Negativo", 2
         return "Neutral", 3
 
-    tokens = tokenize_spanish(normalized)
+    tokens = tokenize_spanish(normalized_wo_mentions)
 
     # Regla de seguridad: cualquier termino critico debe escalar a muy negativo.
     if any(term in normalized for term in CRITICAL_ALERT_WORDS):
@@ -826,6 +894,9 @@ def classify_sentiment(comment: str) -> tuple[str, int]:
     for phrase in SOCIAL_NEGATIVE_PHRASES:
         if phrase in normalized:
             return "Negativo", 2
+
+    if "pandemia" in normalized and "no" in tokens and "dejo" in tokens:
+        return "Negativo", 2
     
     # PASO 2: Buscar frases muy positivas
     # Si hay palabras muy negativas en el texto, no retornar automáticamente Muy Positivo
@@ -847,6 +918,14 @@ def classify_sentiment(comment: str) -> tuple[str, int]:
     for phrase in SOCIAL_POSITIVE_PHRASES:
         if phrase in normalized:
             return "Positivo", 4
+
+    for phrase in SOCIAL_NOSTALGIA_POSITIVE_PHRASES:
+        if phrase in normalized:
+            return "Positivo", 4
+
+    for phrase in SOCIAL_TEACHER_PRAISE_PHRASES:
+        if phrase in normalized:
+            return "Muy Positivo", 5
 
     # PASO 3: Buscar frases negativas
     for phrase in NEGATIVE_PHRASES:
@@ -918,8 +997,19 @@ def classify_sentiment(comment: str) -> tuple[str, int]:
     negation_penalty = 0
     for pos, tok in enumerate(tokens):
         if tok in POSITIVE_WORDS or tok in VERY_POSITIVE_WORDS:
-            if _has_negation_before(tokens, pos, window=20):
+            if _has_negation_before(tokens, pos, window=4):
                 negation_penalty += 1
+
+    # Si la negacion invalida una critica de pandemia ("no impacto", "no afecto"),
+    # reducimos una unidad de negativo para evitar sobrecastigo.
+    pandemic_markers = {"pandemia", "covid", "covid19", "cuarentena"}
+    pandemic_impact_words = {"impacto", "afecto", "perjudico"}
+    for idx, tok in enumerate(tokens):
+        if tok in pandemic_markers:
+            tail = tokens[idx: min(len(tokens), idx + 6)]
+            if any(w in tail for w in pandemic_impact_words) and any(neg in tail for neg in NEGATION_WORDS):
+                negative_hits = max(0, negative_hits - 1)
+                break
 
     # Si hay contraste adversativo ("pero", "aunque") y seÃ±ales negativas,
     # reducimos el peso de lo positivo para evitar falsos "Muy Positivo".
@@ -945,6 +1035,50 @@ def classify_sentiment(comment: str) -> tuple[str, int]:
     if weighted_score == -1:
         return "Negativo", 2
     return "Neutral", 3
+
+
+# Expansion de lexico social (sin romper contrato de etiquetas).
+VERY_POSITIVE_WORDS.update(
+    {
+        "amamos", "crack", "leyenda", "master", "rifado", "rifa", "epico", "goat", "wow", "omg",
+        "tqm", "forever", "idolo", "chingon", "chingona", "maestrazo", "jefazo", "campeonas", "campeones", "exitazo",
+        "joya", "insuperable", "inigualable", "inolvidable", "supremo", "espectacular", "fascinante", "bendicion",
+        "impecable", "fregon", "fregona", "iconico", "icono", "reina", "rey", "deidad", "titan", "heroe",
+        "heroina", "victoria", "invencible", "triunfador", "ganadores", "ganadoras", "incondicional", "infinito",
+        "alucinante", "bestial", "gozada", "brutalidad",
+        "chingonas", "chingones", "tops", "tatuado", "tatuaje", "lealtad",
+    }
+)
+
+POSITIVE_WORDS.update(
+    {
+        "chido", "padre", "chida", "cool", "nice", "super", "tiernas", "cute", "nostalgia", "recuerdos",
+        "bro", "hermano", "compa", "animo", "apoyo", "felicidades", "congrats", "talento", "luz", "progreso",
+        "bonito", "lindo", "fino", "tierno", "alegria", "felicidad", "sonrisa", "divertido", "agradable", "agusto",
+        "tranquilo", "calma", "relax", "gracioso", "chistoso", "genialidad", "brillante", "genio", "habil", "fuerte",
+        "noble", "leal", "amiga", "cuate", "pana", "carnal", "carnala", "camarada", "yei", "yupi",
+        "etapa", "etapas", "disfruten", "disfrutar", "prepa", "generacion", "cobertura", "presupuesto",
+    }
+)
+
+NEGATIVE_WORDS.update(
+    {
+        "ouch", "rip", "sad", "pandemia", "cuarentena", "encierro", "estres", "llorando", "tristeza", "melancolia",
+        "bajon", "duele", "aislamiento", "separacion", "temblor", "sismo", "chale", "chin", "lastima", "depre",
+        "hueva", "flojera", "pesado", "dificil", "complicado", "raro", "cringe", "lloro", "gris", "apagado",
+        "lento", "tardado", "demora", "atraso", "caro", "costoso", "molestia", "incomodo", "obsoleto", "anticuado",
+        "susto", "temor", "duda", "confuso", "problema", "falla", "error", "perdido", "perdida", "vacio",
+    }
+)
+
+VERY_NEGATIVE_WORDS.update(
+    {
+        "funa", "funado", "toxico", "redflag", "nefasto", "odio", "detesto", "corrupto", "impunidad", "humillacion",
+        "asco", "estafa", "basura", "porqueria", "horrible", "terror", "infierno", "pesadilla", "atrocidad", "aberracion",
+        "ratero", "ladrones", "acoso", "violencia", "encubrimiento", "cinico", "descarado", "vergonzoso", "insulto", "ofensa",
+        "machista", "racista", "clasista", "prepotente", "arrogante", "infame", "delincuente", "criminal", "crimen", "muerte",
+    }
+)
 
 
 def detect_categories(comment: str) -> str:
