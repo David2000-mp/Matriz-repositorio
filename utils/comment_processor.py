@@ -40,6 +40,8 @@ CSV_HEADERS_DEFAULT = {
     "sentimiento_etiqueta": "sentimiento_etiqueta",
     "sentimiento_score": "sentimiento_score",
     "categoria": "categoria",
+    "categoria_detalle": "categoria_detalle",
+    "categoria_confianza": "categoria_confianza",
 }
 
 SPANISH_STOPWORDS = {
@@ -554,6 +556,247 @@ CATEGORY_KEYWORDS = [
 
 CATEGORY_KEYWORDS_MAP = {category_name: set(keywords) for category_name, keywords in CATEGORY_KEYWORDS}
 
+# Taxonomia de segundo nivel (detalle) para clasificacion tematica por evidencia.
+# Mantiene macro-categorias actuales, pero permite mayor especificidad analitica.
+CATEGORY_DETAIL_RULES = [
+    {
+        "macro": "Academico/Calidad",
+        "detail": "Docencia y Pedagogia",
+        "phrases": {
+            "nivel academico",
+            "maestros muy preparados",
+            "buen nivel academico",
+            "plan de estudios",
+        },
+        "ngrams": {
+            "nivel academico",
+            "plan estudios",
+            "metodo ensenanza",
+            "clase dinamica",
+        },
+        "tokens": {
+            "profesor", "profesores", "maestro", "maestros", "docente", "docentes",
+            "pedagogia", "pedagogico", "ensenanza", "clase", "clases", "metodo", "didactica",
+            "aprendizaje", "formacion", "academico", "academica", "tutoria", "asesoria",
+        },
+        "ambiguous_tokens": set(),
+        "required_context": set(),
+    },
+    {
+        "macro": "Academico/Calidad",
+        "detail": "Evaluacion y Logros",
+        "phrases": {
+            "nivel de egreso",
+            "certificaciones internacionales",
+            "validez ante la sep",
+        },
+        "ngrams": {
+            "nivel egreso",
+            "pensamiento critico",
+            "razonamiento logico",
+        },
+        "tokens": {
+            "calificacion", "calificaciones", "evaluacion", "evaluaciones", "examen", "examenes",
+            "promedio", "acreditacion", "certificacion", "certificaciones", "logro", "logros",
+            "egreso", "ingles", "sep", "competencia", "competencias", "olimpiadas",
+        },
+        "ambiguous_tokens": set(),
+        "required_context": set(),
+    },
+    {
+        "macro": "Infraestructura",
+        "detail": "Espacios Fisicos",
+        "phrases": {
+            "buenas instalaciones",
+            "areas verdes",
+            "gran cantidad de salones",
+        },
+        "ngrams": {
+            "espacios fisicos",
+            "aire acondicionado",
+            "areas verdes",
+            "estacionamiento salida",
+        },
+        "tokens": {
+            "instalaciones", "aula", "aulas", "salon", "salones", "bano", "banos", "patio",
+            "cancha", "canchas", "edificio", "estacionamiento", "entrada", "pasillos", "techo",
+            "piso", "ventanas", "limpieza", "cafeteria", "comedor", "sombra", "remodelacion",
+        },
+        "ambiguous_tokens": {"limpieza"},
+        "required_context": {"instalaciones", "edificio", "aula", "aulas", "salon", "salones", "banos", "patio", "cancha", "canchas"},
+    },
+    {
+        "macro": "Infraestructura",
+        "detail": "Equipamiento y Tecnologia",
+        "phrases": {
+            "centro de computo",
+            "red de fibra optica",
+            "proyectores inteligentes",
+            "laboratorios de quimica",
+        },
+        "ngrams": {
+            "equipamiento tecnologia",
+            "laboratorio quimica",
+            "aula magna",
+            "fibra optica",
+        },
+        "tokens": {
+            "laboratorio", "laboratorios", "computadora", "computadoras", "wifi", "internet",
+            "tecnologia", "conectividad", "proyector", "proyectores", "software", "hardware",
+            "plataforma", "digital", "equipo", "equipamiento", "red",
+        },
+        "ambiguous_tokens": {"red", "digital"},
+        "required_context": {"wifi", "internet", "tecnologia", "laboratorio", "laboratorios", "software", "hardware", "proyector", "proyectores"},
+    },
+    {
+        "macro": "Precio/Valor",
+        "detail": "Colegiaturas y Tramites",
+        "phrases": {
+            "costo beneficio",
+            "estado de cuenta",
+            "pago referenciado",
+            "recargos por mora",
+        },
+        "ngrams": {
+            "costo beneficio",
+            "estado cuenta",
+            "calidad precio",
+            "pago referenciado",
+        },
+        "tokens": {
+            "costo", "costos", "precio", "precios", "colegiatura", "colegiaturas", "mensualidad", "mensualidades",
+            "inscripcion", "reinscripcion", "tramite", "tramites", "pago", "pagos", "recargo", "recargos",
+            "factura", "adeudo", "intereses", "cuota", "cuotas", "presupuesto", "cobranza",
+        },
+        "ambiguous_tokens": {"tramite", "tramites"},
+        "required_context": {"costo", "costos", "precio", "precios", "colegiatura", "colegiaturas", "mensualidad", "mensualidades", "pago", "pagos", "cuota", "cuotas"},
+    },
+    {
+        "macro": "Precio/Valor",
+        "detail": "Becas y Apoyos",
+        "phrases": {
+            "apoyo financiero",
+            "descuento por hermanos",
+            "seguro de orfandad",
+        },
+        "ngrams": {
+            "apoyo financiero",
+            "apoyo economico",
+            "descuento hermanos",
+        },
+        "tokens": {
+            "beca", "becas", "descuento", "descuentos", "financiamiento", "credito", "apoyo",
+            "economico", "economica", "apoyos", "beneficio", "beneficios", "convenio",
+        },
+        "ambiguous_tokens": {"apoyo", "beneficio"},
+        "required_context": {"beca", "becas", "descuento", "descuentos", "financiamiento", "credito", "economico", "economica"},
+    },
+    {
+        "macro": "Servicio/Atencion",
+        "detail": "Gestion Administrativa",
+        "phrases": {
+            "control escolar",
+            "atencion a padres",
+            "secretaria academica",
+            "mesa de ayuda",
+        },
+        "ngrams": {
+            "gestion administrativa",
+            "control escolar",
+            "atencion padres",
+            "respuesta rapida",
+        },
+        "tokens": {
+            "gestion", "administrativa", "tramite", "tramites", "control", "escolar", "secretaria",
+            "respuesta", "tiempo", "tiempos", "demora", "fila", "filas", "admisiones", "coordinacion",
+            "direccion", "seguimiento", "informacion", "comunicacion",
+        },
+        "ambiguous_tokens": {"comunicacion", "informacion", "seguimiento"},
+        "required_context": {"control", "escolar", "secretaria", "gestion", "tramite", "tramites", "admisiones", "coordinacion", "direccion"},
+    },
+    {
+        "macro": "Servicio/Atencion",
+        "detail": "Trato Humano",
+        "phrases": {
+            "trato humano",
+            "personal amable",
+            "atencion deficiente",
+        },
+        "ngrams": {
+            "trato humano",
+            "trato amable",
+            "trato prepotente",
+        },
+        "tokens": {
+            "amabilidad", "amable", "amables", "empatia", "paciencia", "calidez", "trato", "humano",
+            "prepotente", "grosero", "grosera", "disposicion", "voluntad", "escucha", "asertividad",
+            "profesionalismo", "actitud", "respeto",
+        },
+        "ambiguous_tokens": {"trato", "actitud"},
+        "required_context": {"amabilidad", "amable", "amables", "empatia", "prepotente", "grosero", "grosera", "calidez", "respeto"},
+    },
+    {
+        "macro": "Ambiente/Comunidad",
+        "detail": "Identidad y Valores Maristas",
+        "phrases": {
+            "un solo corazon marista",
+            "valores maristas",
+            "fraternidad marista",
+            "sentido de pertenencia",
+        },
+        "ngrams": {
+            "valores maristas",
+            "identidad marista",
+            "sentido pertenencia",
+            "pastoral juvenil",
+        },
+        "tokens": {
+            "marista", "valores", "identidad", "fraternidad", "humanismo", "humanista", "orgullo",
+            "pertenencia", "misiones", "retiro", "retiros", "pastoral", "espiritualidad", "carisma",
+            "tradicion", "fe", "comunidad",
+        },
+        "ambiguous_tokens": {"comunidad", "tradicion"},
+        "required_context": {"marista", "valores", "identidad", "fraternidad", "humanismo", "humanista", "pastoral", "misiones", "retiro", "retiros"},
+    },
+    {
+        "macro": "Ambiente/Comunidad",
+        "detail": "Clima Escolar",
+        "phrases": {
+            "ambiente libre de acoso",
+            "sana convivencia",
+            "clima escolar",
+            "caso de bullying",
+        },
+        "ngrams": {
+            "clima escolar",
+            "sana convivencia",
+            "ambiente acoso",
+        },
+        "tokens": {
+            "convivencia", "bullying", "acoso", "violencia", "discriminacion", "inclusion", "amistad",
+            "amigos", "equipo", "companerismo", "respeto", "equidad", "diversidad", "paz", "seguridad",
+        },
+        "ambiguous_tokens": {"equipo", "amigos", "seguridad"},
+        "required_context": {"bullying", "acoso", "violencia", "discriminacion", "convivencia", "inclusion", "diversidad", "equidad"},
+    },
+]
+
+CATEGORY_SCORING_WEIGHTS = {
+    "phrase": 3,
+    "ngram": 2,
+    "token": 1,
+}
+
+CATEGORY_MIN_SCORE = 2
+
+CLIMA_ESCOLAR_RISK_TERMS = {"bullying", "acoso", "violencia", "discriminacion"}
+
+PRICE_VALUE_CONTEXT_TERMS_BASE = {
+    "inscripcion", "reinscripcion", "mensualidad", "mensualidades", "colegiatura", "colegiaturas",
+    "cuota", "cuotas", "pago", "pagos", "presupuesto", "factura", "adeudo", "costo", "costos",
+    "precio", "precios",
+}
+
 PRICE_TRIGGER_WORDS = {
     "costo", "costos", "precio", "precios", "caro", "cara", "carisimo", "carisima",
     "cuota", "cuotas", "mensualidad", "mensualidades", "colegiatura", "colegiaturas",
@@ -561,6 +804,8 @@ PRICE_TRIGGER_WORDS = {
     "dinero", "economico", "economica", "recargo", "recargos", "tarifa", "tarifas",
     "inversion", "inversiones", "barato", "barata", "gasto", "gastos",
 }
+
+PRICE_VALUE_CONTEXT_TERMS = PRICE_TRIGGER_WORDS.union(PRICE_VALUE_CONTEXT_TERMS_BASE)
 
 ADVERSATIVE_WORDS = {"pero", "aunque", "sin", "embargo"}
 NEGATION_WORDS = {"no", "tampoco", "nunca", "jamas"}
@@ -1082,35 +1327,103 @@ VERY_NEGATIVE_WORDS.update(
 
 
 def detect_categories(comment: str) -> str:
-    """Detecta categoria con prioridad de busqueda especifica -> generica."""
+    """Detecta macro-categoria; mantiene compatibilidad con el contrato historico."""
+    macro, _, _ = detect_category_with_detail(comment)
+    return macro
+
+
+def _count_ngram_hits(tokens: list[str], ngrams: set[str]) -> tuple[int, set[str]]:
+    hits = 0
+    matched: set[str] = set()
+    for ngram in ngrams:
+        gram_tokens = tokenize_spanish(normalize_text(ngram))
+        if not gram_tokens:
+            continue
+        if _find_subsequence_start(tokens, gram_tokens) is not None:
+            hits += 1
+            matched.add(ngram)
+    return hits, matched
+
+
+def detect_category_with_detail(comment: str) -> tuple[str, str, int]:
+    """Detecta categoria por scoring de evidencia y retorna macro, detalle y confianza."""
     normalized = normalize_text(comment)
     if not normalized:
-        return "Otro"
+        return "Otro", "", 0
 
-    tokens = set(tokenize_spanish(normalized))
-    if not tokens:
-        return "Otro"
+    token_list = tokenize_spanish(normalized)
+    token_set = set(token_list)
+    if not token_set:
+        return "Otro", "", 0
 
-    if tokens.intersection(CATEGORY_KEYWORDS_MAP["Academico/Calidad"]):
-        return "Academico/Calidad"
+    candidates: list[tuple[int, int, int, int, str, str]] = []
 
-    if tokens.intersection(CATEGORY_KEYWORDS_MAP["Infraestructura"]):
-        return "Infraestructura"
+    for priority, rule in enumerate(CATEGORY_DETAIL_RULES):
+        phrase_hits = {phrase for phrase in rule["phrases"] if phrase in normalized}
+        ngram_count, ngram_hits = _count_ngram_hits(token_list, rule["ngrams"])
+        token_hits = token_set.intersection(rule["tokens"])
 
-    # Precio/Valor requiere contexto economico explicito para evitar falsos positivos
-    # por palabras ambiguas como "eventos", "ruta" o "tramites".
-    if tokens.intersection(CATEGORY_KEYWORDS_MAP["Precio/Valor"]) and (
-        tokens.intersection(PRICE_TRIGGER_WORDS) or "vale la pena" in normalized
-    ):
-        return "Precio/Valor"
+        score = (
+            len(phrase_hits) * CATEGORY_SCORING_WEIGHTS["phrase"]
+            + ngram_count * CATEGORY_SCORING_WEIGHTS["ngram"]
+            + len(token_hits) * CATEGORY_SCORING_WEIGHTS["token"]
+        )
 
-    if tokens.intersection(CATEGORY_KEYWORDS_MAP["Servicio/Atencion"]):
-        return "Servicio/Atencion"
+        # Penaliza terminos ambiguos sin contexto suficiente de la misma subcategoria.
+        ambiguous_hits = token_hits.intersection(rule["ambiguous_tokens"])
+        if ambiguous_hits and not token_set.intersection(rule["required_context"]):
+            score -= len(ambiguous_hits)
 
-    if tokens.intersection(CATEGORY_KEYWORDS_MAP["Ambiente/Comunidad"]):
-        return "Ambiente/Comunidad"
+        # Precio/Valor requiere contexto economico para evitar falsos positivos.
+        if rule["macro"] == "Precio/Valor":
+            has_price_context = bool(token_set.intersection(PRICE_VALUE_CONTEXT_TERMS)) or "vale la pena" in normalized
+            if not has_price_context:
+                score = 0
 
-    return "Otro"
+        # Refuerzo de seguridad para riesgos de clima escolar.
+        if rule["detail"] == "Clima Escolar" and token_set.intersection(CLIMA_ESCOLAR_RISK_TERMS):
+            score += 2
+
+        if score > 0:
+            unique_hits = len(phrase_hits) + len(ngram_hits) + len(token_hits)
+            candidates.append((score, len(phrase_hits), unique_hits, -priority, rule["macro"], rule["detail"]))
+
+    if not candidates:
+        return "Otro", "", 0
+
+    # Desempate: score > frases > evidencia unica > prioridad estable.
+    best = max(candidates)
+    best_score, _, _, _, best_macro, best_detail = best
+
+    if best_score < CATEGORY_MIN_SCORE:
+        return "Otro", "", int(best_score)
+
+    return best_macro, best_detail, int(best_score)
+
+
+def detect_category_detail(comment: str) -> str:
+    """Retorna detalle de categoria para analitica de segundo nivel."""
+    _, detail, _ = detect_category_with_detail(comment)
+    return detail
+
+
+def detect_category_confidence(comment: str) -> int:
+    """Retorna score de evidencia de categoria para auditoria."""
+    _, _, confidence = detect_category_with_detail(comment)
+    return int(confidence)
+
+
+def add_category_analysis(df: pd.DataFrame, comment_column: str = "comentario_original") -> pd.DataFrame:
+    """Agrega categoria macro, detalle y confianza sin romper contratos existentes."""
+    if comment_column not in df.columns:
+        raise ValueError(f"La columna requerida '{comment_column}' no existe en el DataFrame.")
+
+    enriched = df.copy()
+    payload = enriched[comment_column].fillna("").astype(str).map(detect_category_with_detail)
+    enriched["categoria"] = payload.map(lambda item: item[0])
+    enriched["categoria_detalle"] = payload.map(lambda item: item[1])
+    enriched["categoria_confianza"] = payload.map(lambda item: int(item[2]))
+    return enriched
 
 
 def add_sentiment_analysis(df: pd.DataFrame, comment_column: str = "comentario_original") -> pd.DataFrame:
@@ -1167,6 +1480,8 @@ def create_dataframe_from_comments(
     source: str,
     *,
     load_date: datetime | None = None,
+    include_category_detail: bool = False,
+    include_category_confidence: bool = False,
 ) -> pd.DataFrame:
     """Construye DataFrame estructurado desde comentarios limpios.
     
@@ -1193,9 +1508,15 @@ def create_dataframe_from_comments(
         return base[CSV_COLUMN_ORDER].copy()
 
     with_sentiment = add_sentiment_analysis(base, comment_column="comentario_original")
-    with_sentiment["categoria"] = with_sentiment["comentario_original"].map(detect_categories)
+    with_categories = add_category_analysis(with_sentiment, comment_column="comentario_original")
 
-    return with_sentiment[CSV_COLUMN_ORDER].copy()
+    output_columns = list(CSV_COLUMN_ORDER)
+    if include_category_detail:
+        output_columns.append("categoria_detalle")
+    if include_category_confidence:
+        output_columns.append("categoria_confianza")
+
+    return with_categories[output_columns].copy()
 
 
 def validate_and_align_columns(
@@ -1243,9 +1564,15 @@ def export_full_csv(df: pd.DataFrame, *, header_mapping: dict[str, str] | None =
 
     Incluye al final un bloque de resumen ejecutivo para lectura rapida.
     """
+    full_columns = list(CSV_COLUMN_ORDER)
+    if "categoria_detalle" in df.columns:
+        full_columns.append("categoria_detalle")
+    if "categoria_confianza" in df.columns:
+        full_columns.append("categoria_confianza")
+
     aligned = validate_and_align_columns(
         df,
-        required_order=CSV_COLUMN_ORDER,
+        required_order=full_columns,
         header_mapping=header_mapping,
     )
 
