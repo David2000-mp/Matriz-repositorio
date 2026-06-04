@@ -260,9 +260,26 @@ VERY_NEGATIVE_PHRASES = {
 
 # Terminos de riesgo critico: si aparecen, priorizar severidad maxima.
 CRITICAL_ALERT_WORDS = {
-    "abuso", "abusos", "abusaron", "abusador", "violacion", "violencia", "acoso",
-    "maltrato", "negligencia", "corrupcion", "impune", "encubren", "encubrimiento",
+    # Abuso sexual
+    "abuso", "abusos", "abusado", "abusados", "abusaron", "abusador", "abusadora",
+    # Violencia
+    "violacion", "violaciones", "violada", "violado", "violador", "violencia",
+    # Acoso
+    "acoso", "acosado", "acosados", "acosador", "acosan",
+    # Maltrato
+    "maltrato", "maltratos", "maltratado", "maltratados", "maltratador",
+    # Negligencia
+    "negligencia", "negligente",
+    # Corrupción
+    "corrupcion", "corrupto",
+    # Impunidad
+    "impune", "impunidad",
+    # Encubrimiento
+    "encubren", "encubrimiento", "encubridor",
+    # Clausura
     "clausurado", "clausurados", "clausura",
+    # Discriminación
+    "discriminacion", "discriminado", "discriminados",
 }
 
 # Frases boilerplate de plataformas (Google Maps, Facebook, etc) + escuelas
@@ -559,6 +576,50 @@ CATEGORY_KEYWORDS_MAP = {category_name: set(keywords) for category_name, keyword
 # Taxonomia de segundo nivel (detalle) para clasificacion tematica por evidencia.
 # Mantiene macro-categorias actuales, pero permite mayor especificidad analitica.
 CATEGORY_DETAIL_RULES = [
+    {
+        "macro": "Riesgos/Alertas",
+        "detail": "Crítico - Seguridad",
+        "phrases": {
+            "abuso sexual",
+            "violencia escolar",
+            "acoso escolar",
+            "discriminacion",
+            "maltrato infantil",
+            "negligencia escolar",
+        },
+        "ngrams": {
+            "abuso sexual",
+            "violencia escolar",
+            "acoso escolar",
+            "maltrato infantil",
+            "negligencia escolar",
+        },
+        "tokens": {
+            "abuso", "abusos", "abusado", "abusados", "abusador", "abusaron",
+            "violencia", "violaciones", "violacion", "violada", "violado",
+            "acoso", "acosado", "acosador", "acosan", "acosadores",
+            "maltrato", "maltratos", "maltratado", "maltratados", "maltratador",
+            "negligencia", "negligente",
+            "corrupcion", "corrupto",
+            "impune", "impunidad",
+            "encubrimiento", "encubren", "encubridor",
+            "clausurado", "clausurados", "clausura",
+            "discriminacion", "discriminado", "discriminados",
+        },
+        "ambiguous_tokens": set(),
+        "required_context": {
+            "abuso", "abusos", "abusado", "abusador", "abusaron",
+            "violencia", "violacion", "violada", "violado",
+            "acoso", "acosado", "acosador", "acosan",
+            "maltrato", "maltratos", "maltratado",
+            "negligencia",
+            "corrupcion", "corrupto",
+            "impune", "impunidad",
+            "encubrimiento", "encubren",
+            "clausurado", "clausura",
+            "discriminacion", "discriminado",
+        },
+    },
     {
         "macro": "Academico/Calidad",
         "detail": "Docencia y Pedagogia",

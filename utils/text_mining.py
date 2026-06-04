@@ -63,6 +63,97 @@ TEXT_COLUMNS_DEFAULT = (
 TOKEN_RE = re.compile(r"[a-zA-Z0-9_]+", re.UNICODE)
 
 
+def _is_repeated_pattern(token: str, min_pattern_len: int = 2, min_repetitions: int = 3) -> bool:
+    """
+    Detecta si un token contiene una repetición de un patrón corto.
+    Ej: 'FacebookFacebookFacebook' → patrón 'facebook' repetido 3+ veces
+    Ej: 'aaaa' → patrón 'a' repetido 4 veces
+    Ej: 'facebookfacebookfaceook...' → detecta aunque esté parcialmente
+    """
+    if len(token) < min_pattern_len * min_repetitions:
+        return False
+    
+    # Intenta encontrar patrones repetidos desde el más corto hasta la mitad
+    for pattern_len in range(min_pattern_len, len(token) // min_repetitions + 1):
+        pattern = token[:pattern_len]
+        # Cuenta cuántas veces el patrón aparece consecutivamente al inicio
+        consecutive_count = 0
+        pos = 0
+        while pos + pattern_len <= len(token) and token[pos:pos + pattern_len] == pattern:
+            consecutive_count += 1
+            pos += pattern_len
+        
+        # Si el patrón aparece 3+ veces consecutivamente, es ruido
+        if consecutive_count >= min_repetitions:
+            return True
+    return False
+
+
+def _is_noise_token(token: str) -> bool:
+    """
+    Detecta tokens que parecen ruido (caracteres aleatorios sin estructura lingüística).
+    Criterios:
+    - Muy pocos caracteres únicos (spam simple)
+    - Clusters de consonantes sin vocales
+    - Patrón de números y letras aleatorias
+    - Token muy largo sin palabras conocidas
+    """
+    if len(token) < 5:
+        return False
+    
+    vowels = set('aeiou')
+    consonants = set('bcdfghjklmnpqrstvwxyz')
+    vowel_count = sum(1 for ch in token if ch in vowels)
+    digit_count = sum(1 for ch in token if ch.isdigit())
+    unique_chars = len(set(token))
+    
+    # Muy pocos caracteres únicos (e.g. "123123123" o "zzzzzzz")
+    if unique_chars <= 2 and len(token) >= 5:
+        return True
+    
+    # Token largo con pocas vocales (ruido aleatorio)
+    if len(token) >= 10:
+        vowel_ratio = vowel_count / len(token)
+        if vowel_ratio < 0.15:
+            return True
+    
+    # Detecta clusters de consonantes (3+ consonantes seguidas sin vocales)
+    consonant_clusters = 0
+    consecutive_consonants = 0
+    for ch in token:
+        if ch in consonants:
+            consecutive_consonants += 1
+        else:
+            if consecutive_consonants >= 3:
+                consonant_clusters += 1
+            consecutive_consonants = 0
+    if consecutive_consonants >= 3:
+        consonant_clusters += 1
+    
+    # Clusters de consonantes = ruido típico
+    if len(token) < 10 and consonant_clusters >= 1:
+        return True
+    if 10 <= len(token) < 15 and consonant_clusters >= 1:
+        return True
+    if len(token) >= 15 and consonant_clusters >= 1:
+        return True
+    
+    # Tokens cortos (5-10 chars) con MUCHOS números intercalados = ruido
+    # ej: "62b10", "2eem6"
+    if 5 <= len(token) <= 10:
+        digit_ratio = digit_count / len(token)
+        if digit_count >= 2 and digit_ratio >= 0.3:  # 30%+ dígitos
+            return True
+    
+    # Mucha mezcla de números y letras sin estructura en tokens largos
+    if digit_count >= 3 and len(token) >= 12:
+        digit_ratio = digit_count / len(token)
+        if digit_ratio >= 0.15:  # 15%+ dígitos intercalados
+            return True
+    
+    return False
+
+
 def _to_ascii_fold(text: str) -> str:
     normalized = unicodedata.normalize("NFD", text)
     return "".join(ch for ch in normalized if unicodedata.category(ch) != "Mn")
@@ -83,7 +174,15 @@ def tokenize_spanish(text: str) -> list[str]:
     if not text:
         return []
     tokens = [tok for tok in TOKEN_RE.findall(text) if len(tok) >= 3]
-    return [tok for tok in tokens if tok not in SPANISH_STOPWORDS and not tok.isdigit()]
+    
+    # Filtra stopwords, dígitos puros, repeticiones y ruido
+    return [
+        tok for tok in tokens 
+        if tok not in SPANISH_STOPWORDS 
+        and not tok.isdigit()
+        and not _is_repeated_pattern(tok)
+        and not _is_noise_token(tok)
+    ]
 
 
 def sentiment_from_tokens(tokens: Iterable[str]) -> tuple[str, float]:
