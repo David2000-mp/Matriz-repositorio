@@ -577,7 +577,7 @@ CATEGORY_DETAIL_RULES = [
         "tokens": {
             "profesor", "profesores", "maestro", "maestros", "docente", "docentes",
             "pedagogia", "pedagogico", "ensenanza", "clase", "clases", "metodo", "didactica",
-            "aprendizaje", "formacion", "academico", "academica", "tutoria", "asesoria",
+            "aprendizaje", "formacion", "academico", "academica", "tutoria", "asesoria", "profe",
         },
         "ambiguous_tokens": set(),
         "required_context": set(),
@@ -743,6 +743,10 @@ CATEGORY_DETAIL_RULES = [
             "valores maristas",
             "fraternidad marista",
             "sentido de pertenencia",
+            "por siempre marista",
+            "siempre en mi corazon",
+            "gracias por tanto",
+            "los mejores anos",
         },
         "ngrams": {
             "valores maristas",
@@ -753,7 +757,8 @@ CATEGORY_DETAIL_RULES = [
         "tokens": {
             "marista", "valores", "identidad", "fraternidad", "humanismo", "humanista", "orgullo",
             "pertenencia", "misiones", "retiro", "retiros", "pastoral", "espiritualidad", "carisma",
-            "tradicion", "fe", "comunidad",
+            "tradicion", "fe", "comunidad", "corazon", "nostalgia", "recuerdos", "generacion",
+            "generaciones", "amo", "amamos", "campeonas", "campeones", "gamos",
         },
         "ambiguous_tokens": {"comunidad", "tradicion"},
         "required_context": {"marista", "valores", "identidad", "fraternidad", "humanismo", "humanista", "pastoral", "misiones", "retiro", "retiros"},
@@ -787,7 +792,7 @@ CATEGORY_SCORING_WEIGHTS = {
     "token": 1,
 }
 
-CATEGORY_MIN_SCORE = 2
+CATEGORY_MIN_SCORE = 1
 
 CLIMA_ESCOLAR_RISK_TERMS = {"bullying", "acoso", "violencia", "discriminacion"}
 
@@ -921,7 +926,9 @@ def tokenize_spanish(text: str) -> list[str]:
     """Tokeniza y elimina stopwords/ruido para analisis lexicografico."""
     if not text:
         return []
-    tokens = [tok for tok in TOKEN_RE.findall(text) if len(tok) >= 2 and not tok.isdigit()]
+    # Reduce elongaciones de redes sociales: "amoooo" -> "amo", "maristaaaa" -> "marista".
+    normalized_for_tokens = re.sub(r"(.)\1{2,}", r"\1", text)
+    tokens = [tok for tok in TOKEN_RE.findall(normalized_for_tokens) if len(tok) >= 2 and not tok.isdigit()]
     return [tok for tok in tokens if tok not in SPANISH_STOPWORDS or tok in NEGATION_WORDS]
 
 
