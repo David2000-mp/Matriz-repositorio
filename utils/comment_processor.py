@@ -292,6 +292,56 @@ PLATFORM_BOILERPLATE = {
     "opinion",
     "opiniones",
     "local guide",
+    "me gusta",
+    "responder",
+    "ver mas",
+}
+
+SOCIAL_METADATA_EXACT = {
+    "me gusta",
+    "responder",
+    "ver mas",
+    "sem",
+}
+
+SOCIAL_NEGATIVE_PHRASES = {
+    "pandemia no me dejo",
+    "pandemia que me quito",
+    "no me dejo disfrutar",
+    "se me metio un",
+}
+
+SOCIAL_POSITIVE_PHRASES = {
+    "por siempre",
+    "amo amo",
+}
+
+POSITIVE_EMOJI = {
+    "\u2764",
+    "\u2764\ufe0f",
+    "\U0001f499",
+    "\U0001f49e",
+    "\U0001f49d",
+    "\U0001f49f",
+    "\U0001f60d",
+    "\U0001f970",
+    "\U0001f973",
+    "\U0001faf6",
+    "\U0001f60a",
+    "\U0001f929",
+}
+
+NEGATIVE_EMOJI = {
+    "\U0001f622",
+    "\U0001f62d",
+    "\U0001f614",
+    "\U0001f625",
+    "\U0001f494",
+    "\U0001f97a",
+    "\U0001f97a",
+    "\U0001f972",
+    "\U0001fa79",
+    "\U0001f97a",
 }
 
 # Regex para patrones de boilerplate que no se pueden capturar con frases exactas.
@@ -307,6 +357,8 @@ _BOILERPLATE_REGEX = re.compile(
     r"|(?:â¤ï¸|ðŸ™|ðŸ”¥|ðŸ‘|ðŸ‘|ðŸ’¯|ðŸ˜€|ðŸ˜|ðŸ¥°|ðŸ˜¡|ðŸ˜¢|ðŸ˜‚|ðŸ¤£|ðŸ˜­|ðŸ˜Ž|ðŸ˜®|ðŸ˜±)+\d*"
     r"|(?:\d+)?(?:â¤ï¸|ðŸ™|ðŸ”¥|ðŸ‘|ðŸ‘|ðŸ’¯|ðŸ˜€|ðŸ˜|ðŸ¥°|ðŸ˜¡|ðŸ˜¢|ðŸ˜‚|ðŸ¤£|ðŸ˜­|ðŸ˜Ž|ðŸ˜®|ðŸ˜±)+"
     r"|(?:&#\d+;){2,}\d*"
+    r"|\d+\s*sem(?:\s*\d+\s*me\s*gusta)?(?:\s*responder)?"
+    r"|(?:@[_a-z0-9\.]+\s*){1,5}"
     r")"
 )
 
@@ -596,6 +648,34 @@ def _has_negation_before(tokens: list[str], index: int, *, window: int = 5) -> b
     return False
 
 
+def _segment_social_blob(raw_text: str) -> list[str]:
+    """Segmenta bloques continuos exportados de redes sociales en lineas comentables."""
+    text = _strip_invisible_chars(raw_text)
+    if not text.strip():
+        return []
+
+    hint = normalize_text(text)
+    looks_like_social_blob = ("responder" in hint and "sem" in hint)
+
+    if looks_like_social_blob:
+        # Delimitador comun de Instagram/Facebook en pegado continuo.
+        text = re.sub(
+            r"(?i)\s*\d+\s*sem(?:\s*\d+\s*me\s*gusta)?\s*responder\s*",
+            "\n",
+            text,
+        )
+        text = re.sub(r"(?i)\s+responder\s+", "\n", text)
+
+    return [re.sub(r"\s+", " ", ln).strip() for ln in text.splitlines() if ln.strip()]
+
+
+def _emoji_sentiment_score(text: str) -> int:
+    """Calcula una contribucion ligera de sentimiento con emojis comunes."""
+    positive = sum(text.count(emo) for emo in POSITIVE_EMOJI)
+    negative = sum(text.count(emo) for emo in NEGATIVE_EMOJI)
+    return positive - negative
+
+
 def clean_raw_text(raw_text: str, *, min_chars: int = 4) -> dict:
     """Limpia texto pegado por bloque, filtra ruido y devuelve metricas detalladas.
 
@@ -649,11 +729,20 @@ def clean_raw_text(raw_text: str, *, min_chars: int = 4) -> dict:
     descarte_detalles: list[tuple[str, str]] = []
     total_original = 0
 
-    lines = [_strip_invisible_chars(ln).strip() for ln in str(raw_text).splitlines()]
-    lines = [re.sub(r"\s+", " ", ln) for ln in lines]
+    lines = _segment_social_blob(str(raw_text))
     total_original = len(lines)
 
     for idx, cleaned in enumerate(lines):
+        normalized_cleaned = normalize_text(cleaned)
+
+        # Filtro 0: metadata social exacta o compacta (IG/FB) sin contenido de opinion.
+        if normalized_cleaned in SOCIAL_METADATA_EXACT:
+            descarte_detalles.append(("metadata_social", cleaned))
+            continue
+        if re.fullmatch(r"(?i)\d+\s*sem(?:\s*\d+\s*me\s*gusta)?", normalized_cleaned):
+            descarte_detalles.append(("metadata_social", cleaned))
+            continue
+
         # Filtro 1: Longitud minima
         if len(cleaned) < min_chars:
             descarte_detalles.append(("longitud_insuficiente", cleaned))
@@ -709,8 +798,18 @@ def classify_sentiment(comment: str) -> tuple[str, int]:
     3. Busca palabras individuales con scoring
     4. Detecta negaciones para bajar score de palabras positivas
     """
-    normalized = normalize_text(comment)
+    original_text = _strip_invisible_chars(str(comment or ""))
+    emoji_score = _emoji_sentiment_score(original_text)
+    normalized = normalize_text(original_text)
     if not normalized:
+        if emoji_score >= 2:
+            return "Muy Positivo", 5
+        if emoji_score == 1:
+            return "Positivo", 4
+        if emoji_score <= -2:
+            return "Muy Negativo", 1
+        if emoji_score == -1:
+            return "Negativo", 2
         return "Neutral", 3
 
     tokens = tokenize_spanish(normalized)
@@ -723,6 +822,10 @@ def classify_sentiment(comment: str) -> tuple[str, int]:
     for phrase in VERY_NEGATIVE_PHRASES:
         if phrase in normalized:
             return "Muy Negativo", 1
+
+    for phrase in SOCIAL_NEGATIVE_PHRASES:
+        if phrase in normalized:
+            return "Negativo", 2
     
     # PASO 2: Buscar frases muy positivas
     # Si hay palabras muy negativas en el texto, no retornar automáticamente Muy Positivo
@@ -740,6 +843,10 @@ def classify_sentiment(comment: str) -> tuple[str, int]:
             # Si hay sarcasmo O hay palabras muy negativas en el texto, no retornar
             if not (has_adversative_after and has_very_neg_after) and not has_very_negative_word:
                 return "Muy Positivo", 5
+
+    for phrase in SOCIAL_POSITIVE_PHRASES:
+        if phrase in normalized:
+            return "Positivo", 4
 
     # PASO 3: Buscar frases negativas
     for phrase in NEGATIVE_PHRASES:
@@ -822,7 +929,12 @@ def classify_sentiment(comment: str) -> tuple[str, int]:
         positive_hits = max(0, positive_hits - 1)
         very_positive_hits = max(0, very_positive_hits - 1)
 
-    weighted_score = (2 * very_positive_hits + positive_hits) - (2 * very_negative_hits + negative_hits) - negation_penalty
+    weighted_score = (
+        (2 * very_positive_hits + positive_hits)
+        - (2 * very_negative_hits + negative_hits)
+        - negation_penalty
+        + emoji_score
+    )
 
     if weighted_score >= 2:
         return "Muy Positivo", 5
