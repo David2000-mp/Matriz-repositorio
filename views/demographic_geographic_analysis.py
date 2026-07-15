@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from io import BytesIO
-from typing import Dict
+from typing import Dict, Optional, Tuple
 
 import pandas as pd
 import plotly.express as px
@@ -309,13 +309,21 @@ def render_demography_block(df_filtered: pd.DataFrame):
     st.plotly_chart(fig, width="stretch", config=PLOTLY_CONFIG)
 
 
-def _to_excel_bytes(df: pd.DataFrame) -> bytes:
-    """Exporta DataFrame a XLSX en memoria."""
+def _to_excel_bytes(df: pd.DataFrame) -> Tuple[Optional[bytes], Optional[str]]:
+    """Exporta DataFrame a XLSX en memoria con fallback cuando falta openpyxl."""
     buffer = BytesIO()
-    with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
-        df.to_excel(writer, index=False, sheet_name="reporte_ciudades")
+    try:
+        with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
+            df.to_excel(writer, index=False, sheet_name="reporte_ciudades")
+    except ModuleNotFoundError as exc:
+        if getattr(exc, "name", "") == "openpyxl":
+            return None, "El exportador Excel no esta disponible (falta openpyxl en el entorno)."
+        return None, f"No se pudo generar Excel: {exc}"
+    except Exception as exc:
+        return None, f"No se pudo generar Excel: {exc}"
+
     buffer.seek(0)
-    return buffer.getvalue()
+    return buffer.getvalue(), None
 
 
 def render_map_block(df_filtered: pd.DataFrame, colegio: str):
@@ -431,7 +439,7 @@ def render_map_block(df_filtered: pd.DataFrame, colegio: str):
     )
 
     csv_bytes = city_report[display_cols].to_csv(index=False).encode("utf-8-sig")
-    xlsx_bytes = _to_excel_bytes(city_report[display_cols])
+    xlsx_bytes, xlsx_error = _to_excel_bytes(city_report[display_cols])
 
     col_dl1, col_dl2 = st.columns(2)
     with col_dl1:
@@ -443,13 +451,18 @@ def render_map_block(df_filtered: pd.DataFrame, colegio: str):
             use_container_width=True,
         )
     with col_dl2:
-        st.download_button(
-            "Descargar Excel",
-            data=xlsx_bytes,
-            file_name=f"reporte_ciudades_{colegio}.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            use_container_width=True,
-        )
+        if xlsx_bytes is not None:
+            st.download_button(
+                "Descargar Excel",
+                data=xlsx_bytes,
+                file_name=f"reporte_ciudades_{colegio}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True,
+            )
+        else:
+            st.info("Descarga Excel no disponible en este entorno. Usa CSV.")
+            if xlsx_error:
+                st.caption(xlsx_error)
 
     if not unmapped.empty:
         st.caption("Ciudades sin coordenadas en diccionario interno: " + ", ".join(unmapped["ubicacion"].tolist()))
