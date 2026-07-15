@@ -185,6 +185,8 @@ from utils.data_loader import (
     COLS_CONFIG,
     COLS_COMENTARIOS,
     COLS_USERNAMES_EDITADOS,
+    COLS_BASE_MAESTRA_COLEGIOS,
+    COLS_BASE_DEMOGRAFICA_COLEGIOS,
     METRICAS_CSV,
     CUENTAS_CSV,
 )
@@ -195,6 +197,8 @@ from utils.data_loader import (
     load_usernames_editados,
     load_comments,
     load_configs,
+    load_base_maestra_colegios,
+    load_base_demografica_colegios,
 )
 
 

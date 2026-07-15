@@ -38,3 +38,23 @@ COLS_METRICAS = [
     "novedoso_video_viral",
     "calificacion_diseno",
 ]
+
+# Nuevas hojas para analisis demografico y geografico
+COLS_BASE_MAESTRA_COLEGIOS = [
+    "fecha",
+    "colegio",
+    "plataforma",
+    "metrica",
+    "valor",
+]
+
+COLS_BASE_DEMOGRAFICA_COLEGIOS = [
+    "fecha_reporte",
+    "colegio",
+    "plataforma",
+    "criterio",
+    "sexo",
+    "edad",
+    "ubicacion",
+    "valor",
+]

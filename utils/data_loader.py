@@ -16,7 +16,12 @@ from pathlib import Path
 from typing import Tuple, Optional
 import os
 from utils.logger import get_logger
-from utils.schema_columns import COLS_CUENTAS, COLS_METRICAS
+from utils.schema_columns import (
+    COLS_CUENTAS,
+    COLS_METRICAS,
+    COLS_BASE_MAESTRA_COLEGIOS,
+    COLS_BASE_DEMOGRAFICA_COLEGIOS,
+)
 
 logger = get_logger(__name__)
 
@@ -29,6 +34,29 @@ SAMPLE_UPLOAD_FULL_CSV = DATA_DIR / "sample_upload_full.csv"
 COLS_CONFIG = ["entidad", "meta_seguidores", "meta_engagement"]
 COLS_COMENTARIOS = ["entidad", "mes", "comentario"]
 COLS_USERNAMES_EDITADOS = ["entidad", "plataforma", "usuario_editado", "fecha_modificacion"]
+
+_DEMOGRAPHIC_ALIASES = {
+    "fecha de reporte": "fecha_reporte",
+    "fecha_reporte": "fecha_reporte",
+    "fecha": "fecha_reporte",
+    "colegio": "colegio",
+    "plataforma": "plataforma",
+    "criterio": "criterio",
+    "sexo": "sexo",
+    "edad": "edad",
+    "ubicacion": "ubicacion",
+    "ubicación": "ubicacion",
+    "valor": "valor",
+}
+
+_MAESTRA_ALIASES = {
+    "fecha": "fecha",
+    "colegio": "colegio",
+    "plataforma": "plataforma",
+    "metrica": "metrica",
+    "métrica": "metrica",
+    "valor": "valor",
+}
 
 
 def _normalize_id_column(df: pd.DataFrame, col: str = "id_cuenta") -> pd.DataFrame:
@@ -63,6 +91,41 @@ def validate_and_fill_columns(df: pd.DataFrame, expected_cols: list) -> pd.DataF
         df = _normalize_id_column(df, 'id_cuenta')
     
     return df
+
+
+def _rename_columns_with_aliases(df: pd.DataFrame, aliases: dict) -> pd.DataFrame:
+    """Renombra columnas usando aliases tolerantes a variaciones de nombre."""
+    if df is None or df.empty:
+        return df
+
+    rename_map = {}
+    for col in df.columns:
+        key = str(col).strip().lower()
+        if key in aliases:
+            rename_map[col] = aliases[key]
+
+    if rename_map:
+        df = df.rename(columns=rename_map)
+    return df
+
+
+def _load_sheet_as_dataframe(sheet_name: str) -> pd.DataFrame:
+    """Carga una hoja de Google Sheets como DataFrame limpio."""
+    try:
+        from utils.sheets_connector import get_sheets_connection
+
+        ss = get_sheets_connection()
+        if not ss:
+            return pd.DataFrame()
+
+        ws = ss.worksheet(sheet_name)
+        records = ws.get_all_records()
+        if not records:
+            return pd.DataFrame()
+        return pd.DataFrame(records).fillna("")
+    except Exception as e:
+        logger.warning(f"Error cargando hoja '{sheet_name}': {e}")
+        return pd.DataFrame()
 
 
 def get_form_schema_hash() -> str:
@@ -307,3 +370,61 @@ def load_configs() -> pd.DataFrame:
     except Exception as e:
         logger.warning(f"Error cargando config: {e}")
         return pd.DataFrame(columns=COLS_CONFIG)
+
+
+@st.cache_data(ttl=300)
+def load_base_maestra_colegios() -> pd.DataFrame:
+    """
+    Carga y normaliza la hoja Base_Maestra_Colegios.
+
+    Columnas esperadas:
+    - fecha, colegio, plataforma, metrica, valor
+    """
+    df = _load_sheet_as_dataframe("Base_Maestra_Colegios")
+    if df.empty:
+        return pd.DataFrame(columns=COLS_BASE_MAESTRA_COLEGIOS)
+
+    df = _rename_columns_with_aliases(df, _MAESTRA_ALIASES)
+    df.columns = df.columns.str.strip().str.lower()
+
+    for col in COLS_BASE_MAESTRA_COLEGIOS:
+        if col not in df.columns:
+            df[col] = ""
+
+    df = df[COLS_BASE_MAESTRA_COLEGIOS].copy()
+    df["fecha"] = pd.to_datetime(df["fecha"], errors="coerce")
+    df["valor"] = pd.to_numeric(df["valor"], errors="coerce").fillna(0)
+
+    for col in ["colegio", "plataforma", "metrica"]:
+        df[col] = df[col].fillna("").astype(str).str.strip()
+
+    return df
+
+
+@st.cache_data(ttl=300)
+def load_base_demografica_colegios() -> pd.DataFrame:
+    """
+    Carga y normaliza la hoja Base_Demografica_Colegios.
+
+    Columnas esperadas:
+    - fecha_reporte, colegio, plataforma, criterio, sexo, edad, ubicacion, valor
+    """
+    df = _load_sheet_as_dataframe("Base_Demografica_Colegios")
+    if df.empty:
+        return pd.DataFrame(columns=COLS_BASE_DEMOGRAFICA_COLEGIOS)
+
+    df = _rename_columns_with_aliases(df, _DEMOGRAPHIC_ALIASES)
+    df.columns = df.columns.str.strip().str.lower()
+
+    for col in COLS_BASE_DEMOGRAFICA_COLEGIOS:
+        if col not in df.columns:
+            df[col] = ""
+
+    df = df[COLS_BASE_DEMOGRAFICA_COLEGIOS].copy()
+    df["fecha_reporte"] = pd.to_datetime(df["fecha_reporte"], errors="coerce")
+    df["valor"] = pd.to_numeric(df["valor"], errors="coerce").fillna(0)
+
+    for col in ["colegio", "plataforma", "criterio", "sexo", "edad", "ubicacion"]:
+        df[col] = df[col].fillna("").astype(str).str.strip()
+
+    return df
