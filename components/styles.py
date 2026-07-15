@@ -176,6 +176,19 @@ def inject_layout_compact_css(hide_streamlit_header: bool = False):
             margin-top: 0 !important;
         }}
 
+        /* Asegura legibilidad de textos en graficas Plotly sobre fondos blancos. */
+        .js-plotly-plot .main-svg text,
+        .js-plotly-plot .main-svg .gtitle,
+        .js-plotly-plot .main-svg .xtick text,
+        .js-plotly-plot .main-svg .ytick text,
+        .js-plotly-plot .main-svg .legend text,
+        .js-plotly-plot .main-svg .annotation text,
+        .js-plotly-plot .main-svg .ytitle,
+        .js-plotly-plot .main-svg .xtitle {{
+            fill: #111827 !important;
+            color: #111827 !important;
+        }}
+
         {header_rules}
         </style>
         """,
@@ -195,14 +208,19 @@ def scroll_to_top_on_nav_change(nav_state_key: str = "page_selection", tracker_k
         st.html(
             """
             <script>
-            const moveTop = () => {
-              window.scrollTo({ top: 0, left: 0, behavior: "instant" });
-              const main = parent.document.querySelector('section[data-testid="stMain"]');
-              if (main) main.scrollTop = 0;
-            };
-            moveTop();
-            setTimeout(moveTop, 40);
-            setTimeout(moveTop, 120);
+                        (() => {
+                            const moveTop = () => {
+                                window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+                                try {
+                                    const main = parent.document.querySelector('section[data-testid="stMain"]');
+                                    if (main) main.scrollTop = 0;
+                                } catch (_) {}
+                            };
+
+                            moveTop();
+                            setTimeout(moveTop, 40);
+                            setTimeout(moveTop, 120);
+                        })();
             </script>
             """,
             unsafe_allow_javascript=True,
