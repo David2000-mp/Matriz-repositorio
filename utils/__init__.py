@@ -33,6 +33,33 @@ from .helpers import (
     generar_reporte_html,
 )
 
+from .ollama_provider import (
+    ollama_provider,
+    OllamaProvider,
+    SentimentAnalysis,
+    SentimentLevel,
+    ThemeClassification,
+    RecommendationItem,
+)
+
+from .ollama_extensions import (
+    classify_sentiment_with_ollama,
+    add_sentiment_analysis_with_ollama,
+    get_sentiment_with_rationale,
+)
+
+from .ollama_extensions_report import (
+    generate_summary_with_ollama,
+    generate_insights_narrative,
+    generate_recommendations_for_account,
+)
+
+from .ollama_extensions_content import (
+    classify_content_with_ollama,
+    detect_emerging_themes,
+    enrich_content_with_themes,
+)
+
 from . import comment_processor
 
 __all__ = [
@@ -65,5 +92,25 @@ __all__ = [
     "get_banner_css",
     "simular",
     "generar_reporte_html",
+    # Ollama / LLM Integration - Core
+    "ollama_provider",
+    "OllamaProvider",
+    "SentimentAnalysis",
+    "SentimentLevel",
+    "ThemeClassification",
+    "RecommendationItem",
+    # Ollama Extensions - Comment Processing
+    "classify_sentiment_with_ollama",
+    "add_sentiment_analysis_with_ollama",
+    "get_sentiment_with_rationale",
+    # Ollama Extensions - Report Generation
+    "generate_summary_with_ollama",
+    "generate_insights_narrative",
+    "generate_recommendations_for_account",
+    # Ollama Extensions - Content Analysis
+    "classify_content_with_ollama",
+    "detect_emerging_themes",
+    "enrich_content_with_themes",
+    # Comment Processing
     "comment_processor",
 ]

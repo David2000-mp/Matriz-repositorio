@@ -24,6 +24,8 @@ from utils.comment_processor import (
     export_manual_load_csv,
 )
 from utils.data_provider import data_provider
+from utils.ollama_extensions import add_sentiment_analysis_with_ollama
+from utils.ollama_provider import ollama_provider
 from utils.text_mining import (
     TEXT_COLUMNS_DEFAULT,
     build_manual_observations,
@@ -181,7 +183,7 @@ def _contract_sentiment_distribution(
     if mode == "legacy_3":
         enriched = add_sentiment_analysis_legacy_3(base, comment_column="comentario_original")
     else:
-        enriched = add_sentiment_analysis(base, comment_column="comentario_original")
+        enriched = add_sentiment_analysis_with_ollama(base, comment_column="comentario_original")
 
     dist = (
         enriched["sentimiento_etiqueta"]
@@ -223,7 +225,7 @@ def _contract_sentiment_monthly_trend(
     if mode == "legacy_3":
         enriched = add_sentiment_analysis_legacy_3(trend_input, comment_column="comentario_original")
     else:
-        enriched = add_sentiment_analysis(trend_input, comment_column="comentario_original")
+        enriched = add_sentiment_analysis_with_ollama(trend_input, comment_column="comentario_original")
 
     enriched["mes"] = enriched[date_column].dt.to_period("M").dt.to_timestamp()
     result = (
@@ -638,6 +640,13 @@ def render_text_analysis_dashboard() -> None:
 
     badge_title, badge_message = SENTIMENT_CONTRACT_BADGE[sentiment_mode]
     st.info(f"{badge_title} | {badge_message}")
+
+    if sentiment_mode == "canonical_5":
+        ollama_available = ollama_provider.is_available()
+        if ollama_available:
+            st.success(f"Ollama activo: modelo '{ollama_provider.model}' en {ollama_provider.base_url}")
+        else:
+            st.warning("Ollama no disponible en este momento. El analisis usa fallback heuristico.")
 
     sentiment_global = _contract_global_sentiment(filtered, selected_cols, sentiment_mode)
     total_texts = _safe_total_texts(filtered, selected_cols)
