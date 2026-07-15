@@ -224,7 +224,7 @@ Para entender la evolución y el estado actual del proyecto, consulta los siguie
 
 ## 👨‍💻 Autor
 
-**David Hernández**
+**David Morán 
 - GitHub: [@David2000-mp](https://github.com/David2000-mp)
 
 ## 📄 Licencia
