@@ -247,6 +247,8 @@ def main():
                 "Segmentación de Audiencias y Riesgo",
                 "Tipo de contenidos",
                 "Analisis de textos",
+                "Analisis Demografico y Geografico",
+                "Vista de Inteligencia Cruzada",
                 "Calc. Engagement",
             ],
             "data_management": [
@@ -267,6 +269,7 @@ def main():
             "🎯 Segmentación de Audiencias y Riesgo": "Segmentación de Audiencias y Riesgo",
             "🆕 Tipo de contenidos": "Tipo de contenidos",
             "🧠 Analisis de textos": "Analisis de textos",
+            "🗺️ Analisis Demografico y Geografico": "Analisis Demografico y Geografico",
             "📐 Registro Estadistico": "Registro Estadistico",
             "💡 Calc. Engagement": "Calc. Engagement",
             "📝 Captura": "Captura",
@@ -544,6 +547,14 @@ def main():
         from views import text_analysis_dashboard
 
         text_analysis_dashboard.render_text_analysis_dashboard()
+    elif selected == "Analisis Demografico y Geografico":
+        from views import demographic_geographic_analysis
+
+        demographic_geographic_analysis.render_demographic_geographic_analysis()
+    elif selected == "Vista de Inteligencia Cruzada":
+        from views import cross_intelligence_view
+
+        cross_intelligence_view.render_cross_intelligence_view()
     elif selected == "Registro Estadistico":
         from views import statistical_registry_dashboard
 
