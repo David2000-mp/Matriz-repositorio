@@ -78,6 +78,10 @@ MEXICO_CITY_COORDS = {
     "lopez mateos": (19.5558, -99.2492),
     "ciudad lopez mateos": (19.5558, -99.2492),
     "ixtapaluca": (19.3181, -98.8825),
+    "municipio de almoloya de juarez": (19.3667, -99.7611),
+    "almoloya de juarez": (19.3667, -99.7611),
+    "lerma": (19.2908, -99.5113),
+    "ocoyoacac": (19.2731, -99.4600),
 
     # Jalisco y zonas aledanas
     "zapopan": (20.7203, -103.3919),
@@ -99,7 +103,7 @@ MEXICO_CITY_COORDS = {
     "piedras negras": (28.7062, -100.5226),
     "los mochis": (25.7928, -108.9902),
 
-    # Centro y Bajio
+    # Centro y Bajio (Guanajuato, Michoacan, etc)
     "celaya": (20.5222, -100.8122),
     "irapuato": (20.6736, -101.3508),
     "salamanca": (20.5728, -101.1969),
@@ -112,10 +116,23 @@ MEXICO_CITY_COORDS = {
     "juventino rosas": (20.6433, -100.9942),
     "uruapan": (19.3967, -102.0392),
     "zamora": (19.9831, -102.2858),
-    "tehuacan": (18.4608, -97.3942),
     "abasolo": (20.4497, -101.5308),
     "cuchicuato": (20.6408, -101.4022),
+
+    # Bloque Hidalgo
     "chapantongo": (20.2858, -99.4125),
+    "san agustin tlaxiaca": (20.1167, -98.8833),
+    "carboneras": (20.1245, -98.7183),
+    "municipio de zempoala": (19.9142, -98.6678),
+    "zempoala": (19.9142, -98.6678),
+    "pachuquilla": (20.0717, -98.6947),
+    "zapotlan de juarez": (19.9722, -98.8611),
+    "santiago tulantepec": (20.0381, -98.4086),
+    "santa maria la calera": (20.0989, -98.7667),
+    "epazoyucan": (20.0167, -98.6333),
+    "tulancingo de bravo": (20.0825, -98.3697),
+    "tulancingo": (20.0825, -98.3697),
+    "tepatepec": (20.2411, -99.0713),
 
     # Bloque Sahuayo / Michoacan
     "sahuayo de morelos": (20.0569, -102.7236),
@@ -164,9 +181,20 @@ MEXICO_CITY_COORDS = {
     "santa maria del rio": (21.7981, -100.7336),
     "matehuala": (23.6489, -100.6425),
 
-    # Otros
+    # Puebla y Veracruz (Bloque Orizaba-Cordoba)
+    "tehuacan": (18.4608, -97.3942),
     "ciudad avila camacho": (20.3850, -97.8767),
     "orizaba": (18.8497, -97.1036),
+    "municipio de ixtaczoquitlan": (18.8488, -97.0601),
+    "ixtaczoquitlan": (18.8488, -97.0601),
+    "rio blanco": (18.8350, -97.1472),
+    "mariano escobedo": (18.9167, -97.1333),
+    "cordoba": (18.8844, -96.9255),
+    "camerino z. mendoza": (18.8155, -97.1819),
+    "camerino z mendoza": (18.8155, -97.1819),
+    "rafael delgado": (18.8180, -97.0752),
+    "coatzacoalcos": (18.1333, -94.4333),
+    "minatitlan": (18.0000, -94.5500),
 
     # Sur y Peninsula
     "acapulco": (16.8531, -99.8236),
@@ -174,11 +202,9 @@ MEXICO_CITY_COORDS = {
     "tapachula": (14.9080, -92.2617),
     "las margaritas": (16.3158, -91.9817),
     "san cristobal de las casas": (16.7370, -92.6375),
-    "playa del carmen": (20.6296, -87.0739),
-    "coatzacoalcos": (18.1333, -94.4333),
-    "minatitlan": (18.0000, -94.5500),
-    "ciudad del carmen": (18.6450, -91.8217),
     "santo domingo tehuantepec": (16.3236, -95.2408),
+    "playa del carmen": (20.6296, -87.0739),
+    "ciudad del carmen": (18.6450, -91.8217),
 
     # Internacionales (añadido por solicitud)
     "maracaibo": (10.6417, -71.6295),
@@ -203,6 +229,9 @@ RAW_CITY_COORDS = {
     "La Magdalena Chichicaspa": (19.4125, -99.3242),
     "López Mateos": (19.5558, -99.2492),
     "Ixtapaluca": (19.3181, -98.8825),
+    "Municipio de Almoloya de Juárez": (19.3667, -99.7611),
+    "Lerma": (19.2908, -99.5113),
+    "Ocoyoacac": (19.2731, -99.4600),
 
     # Resto del pais
     "Puebla de Zaragoza": (19.0453, -98.1975),
@@ -271,8 +300,30 @@ RAW_CITY_COORDS = {
     "Ciudad Valles": (21.9847, -99.0172),
     "Tamazunchale": (21.2603, -98.7881),
     "Cerritos": (22.4272, -100.2764),
-    "Chapantongo": (20.2858, -99.4125),
     "Los Mochis": (25.7928, -108.9902),
+
+    # Agregados Hidalgo
+    "Chapantongo": (20.2858, -99.4125),
+    "San Agustín Tlaxiaca": (20.1167, -98.8833),
+    "Carboneras": (20.1245, -98.7183),
+    "Municipio de Zempoala": (19.9142, -98.6678),
+    "Pachuquilla": (20.0717, -98.6947),
+    "Zapotlán de Juárez": (19.9722, -98.8611),
+    "Santiago Tulantepec": (20.0381, -98.4086),
+    "Santa María La Calera": (20.0989, -98.7667),
+    "Epazoyucan": (20.0167, -98.6333),
+    "Tulancingo de Bravo": (20.0825, -98.3697),
+    "Tepatepec": (20.2411, -99.0713),
+
+    # Agregados Veracruz / Zonas limítrofes
+    "Municipio de Ixtaczoquitlán": (18.8488, -97.0601),
+    "Río Blanco": (18.8350, -97.1472),
+    "Mariano Escobedo": (18.9167, -97.1333),
+    "Córdoba": (18.8844, -96.9255),
+    "Camerino Z. Mendoza": (18.8155, -97.1819),
+    "Rafael Delgado": (18.8180, -97.0752),
+
+    # Internacional
     "Monasterio de Yuste": (40.1142, -5.7389),
     "Maracaibo": (10.6417, -71.6295),
 }
