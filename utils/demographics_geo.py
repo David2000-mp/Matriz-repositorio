@@ -338,6 +338,25 @@ AGE_ORDER = [
     "65+",
 ]
 
+OTHER_AGE_LABEL = "Otros"
+
+
+def _filter_nonnegative_values(df: pd.DataFrame) -> pd.DataFrame:
+    """Conserva solo filas con un valor numerico valido y no negativo."""
+    local = df.copy()
+    local["valor"] = pd.to_numeric(local["valor"], errors="coerce")
+    return local[local["valor"].notna() & (local["valor"] >= 0)].copy()
+
+
+def _prepare_demographic_categories(df: pd.DataFrame) -> pd.DataFrame:
+    """Limpia sexo/edad y agrupa rangos no catalogados bajo ``Otros``."""
+    local = df[df["edad"].notna() & df["sexo"].notna()].copy()
+    local["edad"] = local["edad"].astype(str).str.strip()
+    local["sexo"] = local["sexo"].astype(str).str.strip()
+    local = local[(local["edad"] != "") & (local["sexo"] != "")].copy()
+    local.loc[~local["edad"].isin(AGE_ORDER), "edad"] = OTHER_AGE_LABEL
+    return local
+
 
 def normalize_text(value: str) -> str:
     """Normaliza texto para comparaciones robustas."""
@@ -350,7 +369,7 @@ def normalize_text(value: str) -> str:
 
 
 def _resolve_city_coords(city_norm: str):
-    """Resuelve coordenadas con fallback para variantes de nombre de ciudad."""
+    """Resuelve coordenadas exactas tras normalizar variantes controladas."""
     if not city_norm:
         return pd.NA, pd.NA
 
@@ -358,12 +377,6 @@ def _resolve_city_coords(city_norm: str):
         return MEXICO_CITY_COORDS[city_norm]
 
     candidates = [city_norm]
-
-    if "," in city_norm:
-        candidates.extend([part.strip() for part in city_norm.split(",") if part.strip()])
-
-    if " - " in city_norm:
-        candidates.extend([part.strip() for part in city_norm.split(" - ") if part.strip()])
 
     qualifiers = [
         "estado de mexico",
@@ -383,17 +396,6 @@ def _resolve_city_coords(city_norm: str):
         if cand in MEXICO_CITY_COORDS:
             return MEXICO_CITY_COORDS[cand]
 
-    # Fallback: mejor coincidencia por inclusion (permite variantes como sufijos de estado).
-    best_key = None
-    for cand in candidates:
-        for key in MEXICO_CITY_COORDS:
-            if cand in key or key in cand:
-                if best_key is None or len(key) > len(best_key):
-                    best_key = key
-
-    if best_key is not None:
-        return MEXICO_CITY_COORDS[best_key]
-
     return pd.NA, pd.NA
 
 
@@ -410,6 +412,14 @@ def apply_demographic_filters(
 
     filtered = df.copy()
 
+    if "valor" in filtered.columns:
+        filtered = _filter_nonnegative_values(filtered)
+
+    if "fecha_reporte" in filtered.columns:
+        filtered["fecha_reporte"] = pd.to_datetime(
+            filtered["fecha_reporte"], errors="coerce", format="mixed"
+        )
+
     if colegio:
         filtered = filtered[filtered["colegio"].astype(str) == str(colegio)]
 
@@ -417,12 +427,14 @@ def apply_demographic_filters(
         filtered = filtered[filtered["plataforma"].astype(str) == str(plataforma)]
 
     if start_date is not None:
-        start_date = pd.to_datetime(start_date)
+        start_date = pd.to_datetime(start_date).normalize()
         filtered = filtered[filtered["fecha_reporte"] >= start_date]
 
     if end_date is not None:
-        end_date = pd.to_datetime(end_date)
-        filtered = filtered[filtered["fecha_reporte"] <= end_date]
+        # Streamlit entrega una fecha a medianoche. Usar un limite exclusivo al
+        # inicio del dia siguiente conserva registros con cualquier hora del fin.
+        end_exclusive = pd.to_datetime(end_date).normalize() + pd.Timedelta(days=1)
+        filtered = filtered[filtered["fecha_reporte"] < end_exclusive]
 
     return filtered
 
@@ -432,11 +444,10 @@ def build_demography_base(df: pd.DataFrame) -> pd.DataFrame:
     if df is None or df.empty:
         return pd.DataFrame(columns=["edad", "sexo", "valor", "participacion_pct"])
 
-    local = df.copy()
+    local = _filter_nonnegative_values(df)
     local["criterio_norm"] = local["criterio"].apply(normalize_text)
     local = local[local["criterio_norm"] == "demografia base"]
-
-    local = local[(local["edad"].astype(str).str.strip() != "") & (local["sexo"].astype(str).str.strip() != "")]
+    local = _prepare_demographic_categories(local)
 
     if local.empty:
         return pd.DataFrame(columns=["edad", "sexo", "valor", "participacion_pct"])
@@ -450,7 +461,8 @@ def build_demography_base(df: pd.DataFrame) -> pd.DataFrame:
     total = float(agg["valor"].sum())
     agg["participacion_pct"] = (agg["valor"] / total * 100.0) if total else 0.0
 
-    agg["edad"] = pd.Categorical(agg["edad"], categories=AGE_ORDER, ordered=True)
+    age_categories = [*AGE_ORDER, OTHER_AGE_LABEL]
+    agg["edad"] = pd.Categorical(agg["edad"], categories=age_categories, ordered=True)
     agg = agg.sort_values(["edad", "sexo"]).reset_index(drop=True)
     agg["edad"] = agg["edad"].astype(str)
     return agg
@@ -467,7 +479,7 @@ def build_city_report(df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame]:
         empty = pd.DataFrame(columns=["ubicacion", "valor_total", "participacion_pct", "lat", "lon"])
         return empty, empty
 
-    local = df.copy()
+    local = _filter_nonnegative_values(df)
     local["criterio_norm"] = local["criterio"].apply(normalize_text)
     local = local[local["criterio_norm"] == "ciudad"]
     local = local[local["ubicacion"].astype(str).str.strip() != ""]
@@ -524,10 +536,10 @@ def build_network_comparison(df: pd.DataFrame, selected_school: str) -> pd.DataF
             ]
         )
 
-    local = df.copy()
+    local = _filter_nonnegative_values(df)
     local["criterio_norm"] = local["criterio"].apply(normalize_text)
     base = local[local["criterio_norm"] == "demografia base"].copy()
-    base = base[(base["edad"].astype(str).str.strip() != "") & (base["sexo"].astype(str).str.strip() != "")]
+    base = _prepare_demographic_categories(base)
     if base.empty:
         return pd.DataFrame()
 
@@ -557,7 +569,8 @@ def build_network_comparison(df: pd.DataFrame, selected_school: str) -> pd.DataF
     merged = pd.merge(selected_agg, network_agg, on=["edad", "sexo"], how="outer").fillna(0)
     merged["delta_pp"] = merged["colegio_pct"] - merged["red_pct"]
     merged["segmento"] = merged["edad"].astype(str) + " | " + merged["sexo"].astype(str)
-    merged["edad"] = pd.Categorical(merged["edad"], categories=AGE_ORDER, ordered=True)
+    age_categories = [*AGE_ORDER, OTHER_AGE_LABEL]
+    merged["edad"] = pd.Categorical(merged["edad"], categories=age_categories, ordered=True)
     merged = merged.sort_values(["edad", "sexo"]).reset_index(drop=True)
     merged["edad"] = merged["edad"].astype(str)
     return merged

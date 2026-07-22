@@ -3,6 +3,7 @@
 import pandas as pd
 
 from utils.demographics_geo import (
+    apply_demographic_filters,
     build_city_report,
     build_demography_base,
     build_network_comparison,
@@ -77,3 +78,56 @@ def test_build_network_comparison_excludes_selected_school():
     assert hombres["red_valor"] == 100
     assert mujeres["colegio_valor"] == 130
     assert mujeres["red_valor"] == 110
+
+
+def test_date_filter_includes_records_with_time_on_end_date():
+    df = pd.DataFrame(
+        {
+            "fecha_reporte": [
+                "2026-07-31 00:00:00",
+                "2026-07-31 23:59:59",
+                "2026-08-01 00:00:00",
+            ],
+            "colegio": ["Colegio A"] * 3,
+            "plataforma": ["Instagram"] * 3,
+            "valor": [1, 2, 3],
+        }
+    )
+
+    result = apply_demographic_filters(df, end_date=pd.Timestamp("2026-07-31"))
+
+    assert result["valor"].tolist() == [1, 2]
+
+
+def test_unknown_ages_are_grouped_as_otros_without_losing_rows():
+    df = pd.DataFrame(
+        {
+            "criterio": ["Demografia base"] * 3,
+            "sexo": ["Mujeres"] * 3,
+            "edad": ["18-24", "75-84", "75-84"],
+            "valor": [100, 50, -999],
+        }
+    )
+
+    result = build_demography_base(df)
+
+    assert result["valor"].sum() == 150
+    assert set(result["edad"]) == {"18-24", "Otros"}
+    assert result.loc[result["edad"] == "Otros", "valor"].iloc[0] == 50
+    assert abs(result["participacion_pct"].sum() - 100.0) < 1e-6
+
+
+def test_city_lookup_is_exact_and_negative_values_are_rejected():
+    df = pd.DataFrame(
+        {
+            "criterio": ["Ciudad"] * 4,
+            "ubicacion": ["Ciudad Victoria", "Victoria", "Nueva Ciudad Victoria", "Guadalajara"],
+            "valor": [20, 10, 5, -100],
+        }
+    )
+
+    mapped, unmapped = build_city_report(df)
+
+    assert mapped["ubicacion"].tolist() == ["Ciudad Victoria"]
+    assert set(unmapped["ubicacion"]) == {"Victoria", "Nueva Ciudad Victoria"}
+    assert "Guadalajara" not in set(mapped["ubicacion"]) | set(unmapped["ubicacion"])

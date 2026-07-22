@@ -49,6 +49,22 @@ def _normalize_text(value: str) -> str:
     return " ".join(text.split())
 
 
+def _filter_nonnegative_values(df: pd.DataFrame) -> pd.DataFrame:
+    """Conserva únicamente valores numéricos válidos y no negativos.
+
+    Las funciones analíticas también se usan directamente en pruebas y en
+    futuras vistas, no sólo a través de ``load_normalized_bases``. Aplicar la
+    misma salvaguarda aquí evita que una llamada directa vuelva a introducir
+    valores inválidos en porcentajes o totales.
+    """
+    if df is None or df.empty or "valor" not in df.columns:
+        return df.copy() if df is not None else pd.DataFrame()
+
+    local = df.copy()
+    local["valor"] = pd.to_numeric(local["valor"], errors="coerce")
+    return local[local["valor"].notna() & (local["valor"] >= 0)].copy()
+
+
 def _normalize_maestra(df: pd.DataFrame) -> pd.DataFrame:
     expected = ["fecha", "colegio", "plataforma", "metrica", "valor"]
     if df is None or df.empty:
@@ -60,13 +76,14 @@ def _normalize_maestra(df: pd.DataFrame) -> pd.DataFrame:
             out[col] = ""
 
     out = out[expected].copy()
-    out["fecha"] = pd.to_datetime(out["fecha"], errors="coerce")
-    out["valor"] = pd.to_numeric(out["valor"], errors="coerce").fillna(0.0)
+    out["fecha"] = pd.to_datetime(out["fecha"], errors="coerce", format="mixed")
+    out["valor"] = pd.to_numeric(out["valor"], errors="coerce")
 
     for col in ["colegio", "plataforma", "metrica"]:
         out[col] = out[col].fillna("").astype(str).str.strip()
 
-    out = out.dropna(subset=["fecha"]).copy()
+    out = out.dropna(subset=["fecha", "valor"]).copy()
+    out = out[out["valor"] >= 0].copy()
     out["month_key"] = out["fecha"].dt.strftime("%Y-%m")
     out["metrica_norm"] = out["metrica"].apply(_normalize_text)
     return out
@@ -100,13 +117,16 @@ def _normalize_demografica(df: pd.DataFrame) -> pd.DataFrame:
             out[col] = ""
 
     out = out[expected].copy()
-    out["fecha_reporte"] = pd.to_datetime(out["fecha_reporte"], errors="coerce")
-    out["valor"] = pd.to_numeric(out["valor"], errors="coerce").fillna(0.0)
+    out["fecha_reporte"] = pd.to_datetime(
+        out["fecha_reporte"], errors="coerce", format="mixed"
+    )
+    out["valor"] = pd.to_numeric(out["valor"], errors="coerce")
 
     for col in ["colegio", "plataforma", "criterio", "sexo", "edad", "ubicacion"]:
         out[col] = out[col].fillna("").astype(str).str.strip()
 
-    out = out.dropna(subset=["fecha_reporte"]).copy()
+    out = out.dropna(subset=["fecha_reporte", "valor"]).copy()
+    out = out[out["valor"] >= 0].copy()
     out["month_key"] = out["fecha_reporte"].dt.strftime("%Y-%m")
     out["criterio_norm"] = out["criterio"].apply(_normalize_text)
     return out
@@ -160,7 +180,7 @@ def get_month_bounds(month_key: str) -> Tuple[Optional[pd.Timestamp], Optional[p
     try:
         period = pd.Period(str(month_key), freq="M")
         start = period.start_time.normalize()
-        end = period.end_time.normalize()
+        end = period.end_time
         return start, end
     except Exception:
         return None, None
@@ -271,7 +291,7 @@ def _metric_total(df_maestra: pd.DataFrame, aliases: set[str]) -> float:
     if df_maestra is None or df_maestra.empty:
         return 0.0
 
-    local = df_maestra.copy()
+    local = _filter_nonnegative_values(df_maestra)
     if "metrica_norm" not in local.columns:
         local["metrica_norm"] = local["metrica"].apply(_normalize_text)
 
@@ -309,7 +329,7 @@ def get_dominant_demographic(df_demo: pd.DataFrame) -> Optional[Dict[str, object
     if df_demo is None or df_demo.empty:
         return None
 
-    local = df_demo.copy()
+    local = _filter_nonnegative_values(df_demo)
     local = local[local["criterio_norm"] == "demografia base"]
     local = local[(local["sexo"].astype(str).str.strip() != "") & (local["edad"].astype(str).str.strip() != "")]
     if local.empty:
@@ -333,7 +353,7 @@ def get_top_city(df_demo: pd.DataFrame) -> Optional[Dict[str, object]]:
     if df_demo is None or df_demo.empty:
         return None
 
-    local = df_demo.copy()
+    local = _filter_nonnegative_values(df_demo)
     local = local[local["criterio_norm"] == "ciudad"]
     local = local[local["ubicacion"].astype(str).str.strip() != ""]
     if local.empty:
@@ -356,8 +376,8 @@ def build_daily_performance_series(df_maestra: pd.DataFrame) -> pd.DataFrame:
     if df_maestra is None or df_maestra.empty:
         return pd.DataFrame(columns=["fecha", "interacciones", "visualizaciones"])
 
-    local = df_maestra.copy()
-    local["fecha"] = pd.to_datetime(local["fecha"], errors="coerce")
+    local = _filter_nonnegative_values(df_maestra)
+    local["fecha"] = pd.to_datetime(local["fecha"], errors="coerce", format="mixed")
     local = local.dropna(subset=["fecha"])
 
     inter = local[local["metrica_norm"].isin(INTERACTION_ALIASES)].groupby("fecha", as_index=False)["valor"].sum()
@@ -397,7 +417,7 @@ def build_demographic_time_share(df_demo: pd.DataFrame, top_n: int = 2) -> Tuple
     if df_demo is None or df_demo.empty:
         return pd.DataFrame(columns=["month_key", "segmento", "pct"]), []
 
-    local = df_demo.copy()
+    local = _filter_nonnegative_values(df_demo)
     local = local[local["criterio_norm"] == "demografia base"]
     local = local[(local["sexo"].astype(str).str.strip() != "") & (local["edad"].astype(str).str.strip() != "")]
     if local.empty:
@@ -427,7 +447,7 @@ def build_city_performance_drilldown(df_maestra_month: pd.DataFrame, df_demo_mon
     if df_maestra_month is None or df_maestra_month.empty or df_demo_month is None or df_demo_month.empty:
         return pd.DataFrame(columns=cols)
 
-    city = df_demo_month.copy()
+    city = _filter_nonnegative_values(df_demo_month)
     city = city[city["criterio_norm"] == "ciudad"]
     city = city[city["ubicacion"].astype(str).str.strip() != ""]
     if city.empty:
@@ -456,7 +476,7 @@ def build_school_ranking(df_maestra_month_network: pd.DataFrame) -> pd.DataFrame
     if df_maestra_month_network is None or df_maestra_month_network.empty:
         return pd.DataFrame(columns=cols)
 
-    local = df_maestra_month_network.copy()
+    local = _filter_nonnegative_values(df_maestra_month_network)
     inter = (
         local[local["metrica_norm"].isin(INTERACTION_ALIASES)]
         .groupby("colegio", as_index=False)["valor"]
@@ -485,7 +505,7 @@ def build_segment_distribution(df_demo_month: pd.DataFrame) -> pd.DataFrame:
     if df_demo_month is None or df_demo_month.empty:
         return pd.DataFrame(columns=cols)
 
-    local = df_demo_month.copy()
+    local = _filter_nonnegative_values(df_demo_month)
     local = local[local["criterio_norm"] == "demografia base"]
     local = local[(local["sexo"].astype(str).str.strip() != "") & (local["edad"].astype(str).str.strip() != "")]
     if local.empty:
@@ -506,7 +526,7 @@ def build_performance_vs_network(df_maestra_scope: pd.DataFrame, selected_school
     if df_maestra_scope is None or df_maestra_scope.empty or not selected_school or selected_school == "Todos":
         return pd.DataFrame(columns=cols)
 
-    local = df_maestra_scope.copy()
+    local = _filter_nonnegative_values(df_maestra_scope)
     selected = local[local["colegio"].astype(str) == str(selected_school)].copy()
     network = local[local["colegio"].astype(str) != str(selected_school)].copy()
     if selected.empty or network.empty:
@@ -552,7 +572,7 @@ def build_demographic_vs_network(df_demo_scope: pd.DataFrame, selected_school: s
     if df_demo_scope is None or df_demo_scope.empty or not selected_school or selected_school == "Todos":
         return pd.DataFrame(columns=cols)
 
-    local = df_demo_scope.copy()
+    local = _filter_nonnegative_values(df_demo_scope)
     local = local[local["criterio_norm"] == "demografia base"]
     local = local[(local["sexo"].astype(str).str.strip() != "") & (local["edad"].astype(str).str.strip() != "")]
     if local.empty:

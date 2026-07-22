@@ -1,15 +1,16 @@
-import os
-from utils.data_manager import COLS_CUENTAS, COLS_METRICAS, CUENTAS_CSV, METRICAS_CSV
+from utils.data_manager import COLS_CUENTAS, COLS_METRICAS
 
 import pytest
 import pandas as pd
 
 
 @pytest.fixture(autouse=True)
-def setup_local_data():
+def setup_local_data(tmp_path, monkeypatch):
     """
-    Crea archivos CSV locales con datos dummy antes de cada test
-    y los limpia después. Esto evita fallos por DataFrames vacíos.
+    Crea CSV dummy aislados en el directorio temporal de cada test.
+
+    Todas las rutas de escritura conocidas se parchean para impedir que la
+    suite modifique los archivos locales de desarrollo.
     """
     # 1. Crear datos dummy
     df_cuentas = pd.DataFrame(
@@ -39,16 +40,29 @@ def setup_local_data():
         columns=COLS_METRICAS,
     )
 
-    # 2. Guardar en las rutas reales que usa data_manager
-    os.makedirs(os.path.dirname(CUENTAS_CSV), exist_ok=True)
-    df_cuentas.to_csv(CUENTAS_CSV, index=False)
-    df_metricas.to_csv(METRICAS_CSV, index=False)
+    # 2. Desviar las rutas de persistencia al directorio temporal del test
+    temp_data_dir = tmp_path / "data"
+    temp_data_dir.mkdir(parents=True, exist_ok=True)
+    cuentas_csv = temp_data_dir / "cuentas.csv"
+    metricas_csv = temp_data_dir / "metricas.csv"
 
-    yield  # Ejecutar el test
+    from utils import data_loader, data_manager, data_saver, feedback_system
 
-    # 3. Limpieza (Opcional: Si quieres borrar los archivos después)
-    # if os.path.exists(CUENTAS_CSV): os.remove(CUENTAS_CSV)
-    # if os.path.exists(METRICAS_CSV): os.remove(METRICAS_CSV)
+    monkeypatch.setattr(data_loader, "DATA_DIR", temp_data_dir)
+    monkeypatch.setattr(data_loader, "CUENTAS_CSV", cuentas_csv)
+    monkeypatch.setattr(data_loader, "METRICAS_CSV", metricas_csv)
+    monkeypatch.setattr(data_manager, "DATA_DIR", temp_data_dir)
+    monkeypatch.setattr(data_manager, "CUENTAS_CSV", cuentas_csv)
+    monkeypatch.setattr(data_manager, "METRICAS_CSV", metricas_csv)
+    monkeypatch.setattr(data_saver, "DATA_DIR", temp_data_dir)
+    monkeypatch.setattr(data_saver, "CUENTAS_CSV", cuentas_csv)
+    monkeypatch.setattr(data_saver, "METRICAS_CSV", metricas_csv)
+    monkeypatch.setattr(feedback_system, "_FEEDBACK_FILE", temp_data_dir / "comment_feedback.csv")
+
+    df_cuentas.to_csv(cuentas_csv, index=False)
+    df_metricas.to_csv(metricas_csv, index=False)
+
+    yield  # tmp_path se elimina automáticamente al terminar la sesión de pytest
 
 
 """
