@@ -3,10 +3,12 @@
 import pandas as pd
 
 from utils.demographics_geo import (
+    CITY_IMPACT_COLORS,
     apply_demographic_filters,
     build_city_report,
     build_demography_base,
     build_network_comparison,
+    classify_city_impact,
 )
 
 
@@ -131,3 +133,21 @@ def test_city_lookup_is_exact_and_negative_values_are_rejected():
     assert mapped["ubicacion"].tolist() == ["Ciudad Victoria"]
     assert set(unmapped["ubicacion"]) == {"Victoria", "Nueva Ciudad Victoria"}
     assert "Guadalajara" not in set(mapped["ubicacion"]) | set(unmapped["ubicacion"])
+
+
+def test_city_impact_uses_red_blue_and_yellow_terciles():
+    levels = classify_city_impact(pd.Series([10, 20, 30, 40, 50, 60]))
+
+    assert levels.tolist() == [
+        "Impacto bajo",
+        "Impacto bajo",
+        "Impacto medio",
+        "Impacto medio",
+        "Impacto alto",
+        "Impacto alto",
+    ]
+    assert CITY_IMPACT_COLORS == {
+        "Impacto bajo": "#D62828",
+        "Impacto medio": "#0756C9",
+        "Impacto alto": "#FFB81C",
+    }

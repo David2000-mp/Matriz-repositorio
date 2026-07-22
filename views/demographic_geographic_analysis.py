@@ -12,12 +12,15 @@ import streamlit as st
 
 from components import PLOTLY_CONFIG, ui
 from utils.analytics_repository import load_analytics_bases
-from utils.chart_theme import ESCALA_IMPACTO_AMARILLA, aplicar_tema_champileaks
+from utils.chart_theme import aplicar_tema_champileaks
 from utils.demographics_geo import (
+    CITY_IMPACT_COLORS,
+    CITY_IMPACT_ORDER,
     MEXICO_CENTER,
     AGE_ORDER,
     apply_demographic_filters,
     build_city_report,
+    classify_city_impact,
     build_demography_base,
     build_network_comparison,
 )
@@ -173,17 +176,21 @@ def render_map_block(df_filtered: pd.DataFrame, colegio: str):
         return
 
     if not mapped.empty:
+        map_data = mapped.copy()
+        map_data["nivel_impacto"] = classify_city_impact(map_data["valor_total"])
         fig = px.scatter_mapbox(
-            mapped,
+            map_data,
             lat="lat",
             lon="lon",
             size="valor_total",
-            color="valor_total",
-            color_continuous_scale=ESCALA_IMPACTO_AMARILLA,
+            color="nivel_impacto",
+            color_discrete_map=CITY_IMPACT_COLORS,
+            category_orders={"nivel_impacto": CITY_IMPACT_ORDER},
             hover_name="ubicacion",
             hover_data={
                 "valor_total": ":,.0f",
                 "participacion_pct": ":.2f",
+                "nivel_impacto": True,
                 "lat": False,
                 "lon": False,
             },
@@ -191,6 +198,11 @@ def render_map_block(df_filtered: pd.DataFrame, colegio: str):
             center=MEXICO_CENTER,
             mapbox_style="carto-positron",
             title="Mapa de ciudades por impacto",
+            labels={
+                "nivel_impacto": "Nivel de impacto",
+                "valor_total": "Valor",
+                "participacion_pct": "Participacion (%)",
+            },
         )
         st.plotly_chart(aplicar_tema_champileaks(fig), width="stretch", config=PLOTLY_CONFIG)
     else:

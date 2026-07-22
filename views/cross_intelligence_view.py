@@ -8,8 +8,9 @@ import streamlit as st
 
 from components import PLOTLY_CONFIG, ui
 from utils.chart_theme import (
-    AMARILLO_MARISTA,
-    ESCALA_IMPACTO_AMARILLA,
+    AZUL_INSTITUCIONAL,
+    AZUL_INTERACTIVO,
+    PALETA_AZULES,
     aplicar_tema_champileaks,
 )
 from utils.cross_intelligence import (
@@ -54,47 +55,53 @@ def _render_filters() -> tuple[str, str, str, str, str, str]:
     if not month_keys:
         return "Todos", "Todas", "", "interacciones", "Todos", "Todos"
 
-    with st.sidebar:
-        st.markdown("---")
-        st.subheader("Inteligencia Cruzada")
+    st.markdown("### Configura el análisis")
+    st.caption(
+        "Los filtros se aplican a todos los bloques de esta pestaña para mantener "
+        "una lectura consistente."
+    )
+    with st.container(border=True):
+        first_row = st.columns(3)
+        with first_row[0]:
+            colegio = st.selectbox(
+                "Colegio",
+                options=["Todos"] + catalogs.get("colegios", []),
+                key="cross_college",
+            )
+        with first_row[1]:
+            plataforma = st.selectbox(
+                "Plataforma",
+                options=["Todas"] + catalogs.get("plataformas", []),
+                key="cross_platform",
+            )
+        with first_row[2]:
+            month_key = st.selectbox(
+                "Periodo",
+                options=month_keys,
+                format_func=month_key_to_label,
+                key="cross_month_key",
+            )
 
-        colegio = st.selectbox(
-            "Colegio",
-            options=["Todos"] + catalogs.get("colegios", []),
-            key="cross_college",
-        )
-
-        plataforma = st.selectbox(
-            "Plataforma",
-            options=["Todas"] + catalogs.get("plataformas", []),
-            key="cross_platform",
-        )
-
-        metric_key = st.selectbox(
-            "Métrica de rendimiento",
-            options=catalogs.get("metric_keys", ["interacciones"]),
-            format_func=metric_label,
-            key="cross_metric",
-        )
-
-        sexo = st.selectbox(
-            "Sexo",
-            options=["Todos"] + catalogs.get("sexos", []),
-            key="cross_sex",
-        )
-
-        edad = st.selectbox(
-            "Rango de edad",
-            options=["Todos"] + catalogs.get("edades", []),
-            key="cross_age",
-        )
-
-        month_key = st.selectbox(
-            "Mes/Ano",
-            options=month_keys,
-            format_func=month_key_to_label,
-            key="cross_month_key",
-        )
+        second_row = st.columns(3)
+        with second_row[0]:
+            metric_key = st.selectbox(
+                "Métrica de rendimiento",
+                options=catalogs.get("metric_keys", ["interacciones"]),
+                format_func=metric_label,
+                key="cross_metric",
+            )
+        with second_row[1]:
+            sexo = st.selectbox(
+                "Sexo",
+                options=["Todos"] + catalogs.get("sexos", []),
+                key="cross_sex",
+            )
+        with second_row[2]:
+            edad = st.selectbox(
+                "Rango de edad",
+                options=["Todos"] + catalogs.get("edades", []),
+                key="cross_age",
+            )
 
     return colegio, plataforma, month_key, metric_key, sexo, edad
 
@@ -174,21 +181,45 @@ def _render_block_2(
     metric_key: str,
     sexo: str,
     edad: str,
+    colegio: str,
+    plataforma: str,
 ) -> None:
-    st.subheader("Bloque 2 - Correlación estadística y cohortes")
+    st.subheader("Bloque 2 - Relación y evolución en el tiempo")
+    st.caption(
+        "Este bloque separa tres preguntas: si audiencia y rendimiento se relacionan, "
+        "cómo cambia un segmento y cómo evoluciona la métrica seleccionada."
+    )
     segment_name = f"{sexo} | {edad}"
     tab_correlation, tab_cohort, tab_trend = st.tabs(
-        ["Correlación", "Cohorte mensual", "Tendencia de rendimiento"]
+        [
+            "Relación demografía–rendimiento",
+            "Evolución del segmento",
+            "Tendencia mensual",
+        ]
     )
 
     with tab_correlation:
-        method = st.radio(
-            "Método estadístico",
+        method = st.selectbox(
+            "Tipo de relación",
             options=["pearson", "spearman"],
-            format_func=lambda value: value.capitalize(),
-            horizontal=True,
+            format_func=lambda value: (
+                "Relación lineal (Pearson)"
+                if value == "pearson"
+                else "Relación por orden o tendencia (Spearman)"
+            ),
             key="cross_correlation_method",
         )
+        if method == "pearson":
+            st.info(
+                "Pearson responde: cuando aumenta el volumen del segmento, ¿también "
+                "aumenta el rendimiento de forma lineal? +1 indica que avanzan juntos, "
+                "0 que no hay una relación lineal clara y -1 que avanzan en sentidos opuestos."
+            )
+        else:
+            st.info(
+                "Spearman compara el orden de los meses. Es útil cuando ambas series "
+                "suben o bajan juntas aunque la relación no sea una línea recta."
+            )
         result = calculate_demographic_performance_correlation(
             maestra_historical,
             demo_historical,
@@ -198,35 +229,48 @@ def _render_block_2(
             method,
         )
 
-        col_coefficient, col_sample = st.columns(2)
-        coefficient_text = (
-            f"{result.coefficient:.3f}" if result.coefficient is not None else "N/D"
-        )
-        col_coefficient.metric(f"Coeficiente {method.capitalize()}", coefficient_text)
-        col_sample.metric("Meses comparables (n)", result.sample_size)
-        st.caption(result.interpretation)
-
-        if result.series.empty:
-            st.warning("No hay meses coincidentes entre demografía y rendimiento.")
+        if result.coefficient is None:
+            st.metric("Meses con ambas fuentes", f"{result.sample_size} de 3 mínimos")
+            if result.sample_size < 3:
+                st.warning(
+                    "Aún no se puede calcular una relación confiable. Se requieren al "
+                    "menos 3 meses que tengan, al mismo tiempo, datos demográficos y de rendimiento."
+                )
+            else:
+                st.warning(
+                    "No se puede calcular la relación porque una de las dos series no "
+                    "cambia entre los meses disponibles."
+                )
         else:
+            col_coefficient, col_sample = st.columns(2)
+            col_coefficient.metric(
+                "Qué tan relacionadas están", f"{result.coefficient:+.2f}"
+            )
+            col_sample.metric("Meses comparables", result.sample_size)
+            st.caption(f"Lectura: {result.interpretation}")
+            st.markdown(
+                f"#### {metric_label(metric_key)} frente al volumen de {segment_name}"
+            )
+            st.caption(
+                "Cada punto representa un mes con información coincidente en ambas fuentes."
+            )
             fig_correlation = go.Figure(
                 go.Scatter(
                     x=result.series["volumen_demografico"],
                     y=result.series["rendimiento"],
                     text=result.series["month_key"],
-                    mode="markers+text",
-                    textposition="top center",
-                    marker={
-                        "size": 13,
-                        "color": result.series["rendimiento"],
-                        "colorscale": ESCALA_IMPACTO_AMARILLA,
-                        "showscale": True,
-                    },
+                    customdata=result.series[["month_key"]],
+                    mode="markers",
+                    marker={"size": 14, "color": AZUL_INTERACTIVO},
                     name=metric_label(metric_key),
+                    hovertemplate=(
+                        "Mes: %{customdata[0]}<br>Volumen del segmento: %{x:,.0f}"
+                        f"<br>{metric_label(metric_key)}: %{{y:,.0f}}<extra></extra>"
+                    ),
                 )
             )
             fig_correlation.update_layout(
-                title=f"{metric_label(metric_key)} vs volumen demográfico · {segment_name}",
+                title=f"Relación mensual · {metric_label(metric_key)} y {segment_name}",
                 xaxis_title="Volumen demográfico del segmento",
                 yaxis_title=metric_label(metric_key),
             )
@@ -239,46 +283,87 @@ def _render_block_2(
             )
 
     with tab_cohort:
-        cohort = build_cohort_series(demo_historical, sexo, edad)
-        if cohort.empty:
-            st.warning("No hay historial demográfico para esta cohorte.")
+        if sexo == "Todos" and edad == "Todos":
+            st.info(
+                "Selecciona un sexo, un rango de edad o ambos para seguir un segmento "
+                "específico a lo largo del tiempo."
+            )
         else:
-            fig_cohort = go.Figure(
-                go.Scatter(
-                    x=cohort["month_date"],
-                    y=cohort["participacion_pct"],
-                    mode="lines+markers",
-                    line={"color": AMARILLO_MARISTA, "width": 4},
-                    marker={"size": 9, "color": "#6B3F00"},
-                    name=segment_name,
+            cohort = build_cohort_series(demo_historical, sexo, edad)
+            if len(cohort) < 2:
+                st.warning(
+                    "No hay tendencia disponible para este segmento. Se requieren al "
+                    "menos 2 meses de datos demográficos."
                 )
-            )
-            fig_cohort.update_layout(
-                title=f"Evolución mensual de la cohorte · {segment_name}",
-                xaxis_title="Mes",
-                yaxis_title="Participación demográfica (%)",
-            )
-            fig_cohort.update_yaxes(range=[0, 100], rangemode="tozero")
-            st.plotly_chart(
-                aplicar_tema_champileaks(fig_cohort),
-                width="stretch",
-                config=PLOTLY_CONFIG,
-            )
-            st.dataframe(cohort, width="stretch", hide_index=True)
+            else:
+                st.markdown(f"#### Cómo cambia la participación de {segment_name}")
+                st.caption(
+                    "Muestra qué porcentaje del volumen demográfico mensual pertenece "
+                    "al segmento seleccionado; no representa interacciones ni visualizaciones."
+                )
+                fig_cohort = go.Figure(
+                    go.Scatter(
+                        x=cohort["month_date"],
+                        y=cohort["participacion_pct"],
+                        customdata=cohort[["month_key", "volumen_segmento"]],
+                        mode="lines+markers",
+                        line={"color": AZUL_INSTITUCIONAL, "width": 4},
+                        marker={"size": 9, "color": AZUL_INTERACTIVO},
+                        name=segment_name,
+                        hovertemplate=(
+                            "Mes: %{customdata[0]}<br>Participación: %{y:.1f}%"
+                            "<br>Volumen del segmento: %{customdata[1]:,.0f}<extra></extra>"
+                        ),
+                    )
+                )
+                fig_cohort.update_layout(
+                    title=f"Participación mensual del segmento · {segment_name}",
+                    xaxis_title="Mes",
+                    yaxis_title="Participación del segmento (%)",
+                )
+                fig_cohort.update_yaxes(range=[0, 100], rangemode="tozero")
+                st.plotly_chart(
+                    aplicar_tema_champileaks(fig_cohort),
+                    width="stretch",
+                    config=PLOTLY_CONFIG,
+                )
+                with st.expander("Ver datos mensuales"):
+                    st.dataframe(cohort, width="stretch", hide_index=True)
 
     with tab_trend:
         performance = build_historical_performance_series(maestra_historical)
-        if performance.empty:
-            st.warning("No hay historial de rendimiento para la métrica seleccionada.")
+        if metric_key not in performance.columns or len(performance) < 2:
+            st.warning(
+                "No hay una tendencia de rendimiento disponible. Se requieren al menos "
+                "2 meses para mostrar una evolución y evitar una gráfica de un solo punto."
+            )
         else:
+            scope = " · ".join(
+                value
+                for value in [
+                    colegio if colegio != "Todos" else "Toda la red",
+                    plataforma if plataforma != "Todas" else "Todas las plataformas",
+                ]
+                if value
+            )
+            st.markdown(f"#### Tendencia mensual de {metric_label(metric_key)}")
+            st.caption(
+                f"{scope}. Cada punto suma únicamente {metric_label(metric_key).lower()} "
+                "registradas durante ese mes."
+            )
             fig_trend = go.Figure(
                 go.Scatter(
                     x=performance["month_date"],
                     y=performance[metric_key],
+                    customdata=performance[["month_key"]],
                     mode="lines+markers",
-                    line={"color": AMARILLO_MARISTA, "width": 4},
-                    marker={"size": 9, "color": "#6B3F00"},
+                    line={"color": AZUL_INSTITUCIONAL, "width": 4},
+                    marker={"size": 9, "color": AZUL_INTERACTIVO},
                     name=metric_label(metric_key),
+                    hovertemplate=(
+                        "Mes: %{customdata[0]}"
+                        f"<br>{metric_label(metric_key)}: %{{y:,.0f}}<extra></extra>"
+                    ),
                 )
             )
             month_start, month_end = get_month_bounds(month_key)
@@ -286,16 +371,16 @@ def _render_block_2(
                 fig_trend.add_vrect(
                     x0=month_start,
                     x1=month_end,
-                    fillcolor="#FFD91A",
-                    opacity=0.2,
+                    fillcolor=AZUL_INTERACTIVO,
+                    opacity=0.08,
                     layer="below",
                     line_width=0,
                     annotation_text=month_key_to_label(month_key),
                 )
             fig_trend.update_layout(
-                title=f"Tendencia mensual · {metric_label(metric_key)}",
+                title=f"{metric_label(metric_key)} por mes · {scope}",
                 xaxis_title="Mes",
-                yaxis_title=metric_label(metric_key),
+                yaxis_title=f"{metric_label(metric_key)} (suma mensual)",
             )
             fig_trend.update_yaxes(rangemode="tozero")
             st.plotly_chart(
@@ -314,13 +399,17 @@ def _render_block_3_drilldown(
     sexo: str,
     edad: str,
 ) -> None:
-    st.subheader("Bloque 3 - Desglose Multidimensional")
+    st.subheader("Bloque 3 - Desglose multidimensional")
+    st.caption(
+        "Explora el mismo corte por ciudad, colegio, composición de audiencia o "
+        "plataforma. Todas las barras utilizan la identidad azul de CHAMPILEAKS."
+    )
     tab_city, tab_school, tab_segment, tab_cross = st.tabs(
         [
-            "Desglose por Ciudad",
-            "Desglose por Colegio",
-            "Distribución demográfica",
-            "Segmentación cruzada",
+            "Ciudades",
+            "Colegios",
+            "Audiencia",
+            "Cruce del segmento",
         ]
     )
 
@@ -331,7 +420,11 @@ def _render_block_3_drilldown(
         if city_rank.empty:
             st.warning("No hay datos suficientes para construir el desglose por ciudad en este mes.")
         else:
-            st.subheader("Grafica: rendimiento estimado por ciudad")
+            st.markdown("#### Impacto estimado por ciudad")
+            st.caption(
+                "Distribuye la métrica observada según la participación demográfica "
+                "de cada ciudad; es una estimación, no una medición individual."
+            )
             show = city_rank.head(12).iloc[::-1]
             fig_city = go.Figure(
                 go.Bar(
@@ -339,21 +432,34 @@ def _render_block_3_drilldown(
                     x=show["rendimiento_estimado"],
                     name=f"{metric_label(metric_key)} est.",
                     orientation="h",
-                    marker={
-                        "color": show["rendimiento_estimado"],
-                        "colorscale": ESCALA_IMPACTO_AMARILLA,
-                    },
+                    marker_color=AZUL_INTERACTIVO,
+                    hovertemplate=(
+                        "%{y}<br>Rendimiento estimado: %{x:,.0f}<extra></extra>"
+                    ),
                 )
             )
             fig_city.update_layout(
-                title=f"Impacto estimado por ciudad · {metric_label(metric_key)}"
+                title=f"Impacto estimado por ciudad · {metric_label(metric_key)}",
+                xaxis_title=f"{metric_label(metric_key)} estimadas",
+                yaxis_title="Ciudad",
             )
             fig_city.update_xaxes(rangemode="tozero")
             st.plotly_chart(aplicar_tema_champileaks(fig_city), width="stretch", config=PLOTLY_CONFIG)
 
             table_city = city_rank.copy()
             table_city["city_pct"] = table_city["city_pct"] * 100.0
-            st.dataframe(table_city, width="stretch", hide_index=True)
+            st.dataframe(
+                table_city.rename(
+                    columns={
+                        "ciudad": "Ciudad",
+                        "valor_ciudad": "Volumen demográfico",
+                        "city_pct": "Participación (%)",
+                        "rendimiento_estimado": f"{metric_label(metric_key)} estimadas",
+                    }
+                ),
+                width="stretch",
+                hide_index=True,
+            )
 
     with tab_school:
         school_rank = build_school_ranking(network_maestra, metric_key)
@@ -365,7 +471,8 @@ def _render_block_3_drilldown(
                     "Filtro de colegio especifico activo. Se muestra ranking de red del mes como contexto comparativo."
                 )
 
-            st.subheader(f"Gráfica: ranking por {metric_label(metric_key).lower()}")
+            st.markdown(f"#### Ranking de colegios por {metric_label(metric_key).lower()}")
+            st.caption("Compara el valor observado del colegio con el resto de la red.")
             show = school_rank.head(12).iloc[::-1]
             fig_school = go.Figure()
             fig_school.add_trace(
@@ -374,11 +481,14 @@ def _render_block_3_drilldown(
                     x=show["rendimiento"],
                     orientation="h",
                     name=metric_label(metric_key),
-                    marker_color=AMARILLO_MARISTA,
+                    marker_color=AZUL_INSTITUCIONAL,
+                    hovertemplate="%{y}<br>Valor: %{x:,.0f}<extra></extra>",
                 )
             )
             fig_school.update_layout(
                 title=f"Ranking de colegios · {metric_label(metric_key)}",
+                xaxis_title=metric_label(metric_key),
+                yaxis_title="Colegio",
             )
             fig_school.update_xaxes(rangemode="tozero")
             st.plotly_chart(aplicar_tema_champileaks(fig_school), width="stretch", config=PLOTLY_CONFIG)
@@ -389,15 +499,25 @@ def _render_block_3_drilldown(
         if segment_dist.empty:
             st.warning("No hay datos de Demografia base para este mes en el desglose por segmento.")
         else:
-            st.subheader("Grafica: participacion por segmento demografico")
+            st.markdown("#### Composición de la audiencia")
+            st.caption(
+                "Porcentaje del volumen demográfico del periodo, separado por rango "
+                "de edad y sexo."
+            )
             fig_segment = go.Figure()
-            for sexo in segment_dist["sexo"].dropna().unique():
-                sub = segment_dist[segment_dist["sexo"] == sexo]
+            for color_index, segment_sex in enumerate(
+                segment_dist["sexo"].dropna().unique()
+            ):
+                sub = segment_dist[segment_dist["sexo"] == segment_sex]
                 fig_segment.add_trace(
                     go.Bar(
                         x=sub["edad"],
                         y=sub["pct"],
-                        name=str(sexo),
+                        name=str(segment_sex),
+                        marker_color=PALETA_AZULES[color_index % len(PALETA_AZULES)],
+                        hovertemplate=(
+                            "Edad: %{x}<br>Participación: %{y:.1f}%<extra></extra>"
+                        ),
                     )
                 )
             fig_segment.update_layout(
@@ -408,12 +528,19 @@ def _render_block_3_drilldown(
             )
             fig_segment.update_yaxes(rangemode="tozero")
             st.plotly_chart(aplicar_tema_champileaks(fig_segment), width="stretch", config=PLOTLY_CONFIG)
-            st.dataframe(segment_dist, width="stretch", hide_index=True)
+            st.dataframe(
+                segment_dist.rename(
+                    columns={"edad": "Edad", "sexo": "Sexo", "pct": "Participación (%)"}
+                ),
+                width="stretch",
+                hide_index=True,
+            )
 
     with tab_cross:
         segmented = build_segmented_performance(
             maestra_current, demo_current, metric_key, sexo, edad
         )
+        st.markdown(f"#### Rendimiento estimado de {sexo} | {edad}")
         st.caption(
             "Estimación = rendimiento observado × participación demográfica del "
             "segmento en el mismo mes, colegio y plataforma."
@@ -425,11 +552,12 @@ def _render_block_3_drilldown(
                 go.Bar(
                     x=segmented["plataforma"],
                     y=segmented["rendimiento_segmentado_estimado"],
-                    marker={
-                        "color": segmented["rendimiento_segmentado_estimado"],
-                        "colorscale": ESCALA_IMPACTO_AMARILLA,
-                    },
+                    marker_color=AZUL_INTERACTIVO,
                     name=f"{metric_label(metric_key)} estimadas",
+                    hovertemplate=(
+                        "Plataforma: %{x}<br>Rendimiento estimado: %{y:,.0f}"
+                        "<extra></extra>"
+                    ),
                 )
             )
             fig_cross.update_layout(
@@ -470,13 +598,19 @@ def _render_block_4_strict_comparison(
             st.subheader("Grafica comparativa de rendimiento: cuenta vs red promedio")
             fig_perf = go.Figure()
             fig_perf.add_trace(
-                go.Bar(x=perf_comp["metrica"], y=perf_comp["cuenta"], name="Cuenta")
+                go.Bar(
+                    x=perf_comp["metrica"],
+                    y=perf_comp["cuenta"],
+                    name="Cuenta",
+                    marker_color=AZUL_INSTITUCIONAL,
+                )
             )
             fig_perf.add_trace(
                 go.Bar(
                     x=perf_comp["metrica"],
                     y=perf_comp["red_promedio"],
                     name="Red promedio",
+                    marker_color=PALETA_AZULES[3],
                 )
             )
             fig_perf.update_layout(
@@ -496,10 +630,20 @@ def _render_block_4_strict_comparison(
             plot_demo = demo_comp.head(8).copy()
             fig_demo = go.Figure()
             fig_demo.add_trace(
-                go.Bar(x=plot_demo["segmento"], y=plot_demo["cuenta_pct"], name="Cuenta %")
+                go.Bar(
+                    x=plot_demo["segmento"],
+                    y=plot_demo["cuenta_pct"],
+                    name="Cuenta %",
+                    marker_color=AZUL_INSTITUCIONAL,
+                )
             )
             fig_demo.add_trace(
-                go.Bar(x=plot_demo["segmento"], y=plot_demo["red_pct"], name="Red %")
+                go.Bar(
+                    x=plot_demo["segmento"],
+                    y=plot_demo["red_pct"],
+                    name="Red %",
+                    marker_color=PALETA_AZULES[3],
+                )
             )
             fig_demo.update_layout(
                 title="Comparacion de perfil demografico: cuenta vs red",
@@ -582,6 +726,8 @@ def render_cross_intelligence_view() -> None:
         metric_key,
         sexo,
         edad,
+        colegio,
+        plataforma,
     )
     st.markdown("---")
     _render_block_3_drilldown(

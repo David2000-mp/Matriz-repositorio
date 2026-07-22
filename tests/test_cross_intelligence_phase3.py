@@ -3,7 +3,6 @@
 import pandas as pd
 import pytest
 
-from utils.chart_theme import ESCALA_IMPACTO_AMARILLA
 from utils.cross_intelligence import (
     build_city_performance_drilldown,
     build_cohort_series,
@@ -129,8 +128,3 @@ def test_cohort_tracks_monthly_share_for_a_stable_segment():
 
     assert cohort["participacion_pct"].tolist() == [10, 25]
     assert cohort["month_key"].tolist() == ["2026-01", "2026-02"]
-
-
-def test_yellow_impact_scale_has_light_and_dark_contrast():
-    assert len(ESCALA_IMPACTO_AMARILLA) >= 4
-    assert ESCALA_IMPACTO_AMARILLA[0][1] != ESCALA_IMPACTO_AMARILLA[-1][1]

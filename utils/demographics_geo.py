@@ -9,6 +9,12 @@ import pandas as pd
 
 
 MEXICO_CENTER = {"lat": 23.6345, "lon": -102.5528}
+CITY_IMPACT_ORDER = ["Impacto bajo", "Impacto medio", "Impacto alto"]
+CITY_IMPACT_COLORS = {
+    "Impacto bajo": "#D62828",
+    "Impacto medio": "#0756C9",
+    "Impacto alto": "#FFB81C",
+}
 
 # Coordenadas aproximadas para principales ciudades y localidades de Mexico.
 MEXICO_CITY_COORDS = {
@@ -514,6 +520,37 @@ def build_city_report(df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame]:
     mapped = mapped.drop(columns=["city_norm"]).reset_index(drop=True)
     unmapped = unmapped.drop(columns=["city_norm"]).reset_index(drop=True)
     return mapped, unmapped
+
+
+def classify_city_impact(values: pd.Series) -> pd.Series:
+    """Clasifica ciudades por terciles ordinales sin perder empates ni filas.
+
+    El menor impacto se pinta rojo, el intermedio azul y el mayor amarillo.
+    Para uno o dos registros se preservan los extremos visuales esperados.
+    """
+    numeric = pd.to_numeric(values, errors="coerce").fillna(0.0)
+    if numeric.empty:
+        return pd.Series(index=values.index, dtype="object")
+
+    labels = pd.Series("Impacto medio", index=values.index, dtype="object")
+    total = len(numeric)
+
+    if total == 1:
+        labels.iloc[0] = "Impacto alto"
+        return labels
+    if total == 2:
+        ordered_index = numeric.sort_values(kind="stable").index.tolist()
+        if numeric.nunique() == 1:
+            labels.loc[ordered_index] = "Impacto medio"
+            return labels
+        labels.loc[ordered_index[0]] = "Impacto bajo"
+        labels.loc[ordered_index[1]] = "Impacto alto"
+        return labels
+
+    percentiles = numeric.rank(method="average", pct=True)
+    labels.loc[percentiles <= 1 / 3] = "Impacto bajo"
+    labels.loc[percentiles > 2 / 3] = "Impacto alto"
+    return labels
 
 
 def build_network_comparison(df: pd.DataFrame, selected_school: str) -> pd.DataFrame:
