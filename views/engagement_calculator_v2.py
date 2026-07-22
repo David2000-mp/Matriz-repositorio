@@ -16,7 +16,7 @@ except Exception:
     px = None
     go = None
 from components import PLOTLY_CONFIG
-from utils.chart_theme import renderizar_grafica_champileaks
+from utils.chart_theme import aplicar_tema_champileaks
 from utils.report_generator import generate_engagement_report_html
 from utils.rules_engine import calculate_engagement_engine
 from utils.content_analyzer import (
@@ -275,14 +275,10 @@ def _render_plotly_bar_chart(
         else f"<b>%{{x}}</b><br>{value_col}: %{{y:,.0f}}<extra></extra>"
     )
     fig.update_traces(texttemplate=text_template, textposition="outside", hovertemplate=hover_template)
-    fig.update_layout(
-        showlegend=False,
-        margin=dict(t=60, r=10, b=10, l=10),
-    )
     if value_suffix:
         fig.update_yaxes(ticksuffix=value_suffix)
 
-    renderizar_grafica_champileaks(fig, width='stretch', config=PLOTLY_CONFIG)
+    st.plotly_chart(aplicar_tema_champileaks(fig), width='stretch', config=PLOTLY_CONFIG)
 
 
 def _render_engagement_gauge(platform: str, engagement_value: float, thresholds: dict) -> None:
@@ -300,26 +296,23 @@ def _render_engagement_gauge(platform: str, engagement_value: float, thresholds:
         go.Indicator(
             mode="gauge+number",
             value=float(engagement_value),
-            number={"suffix": "%", "font": {"size": 28, "color": "#003696"}},
+            number={"suffix": "%"},
             title={"text": f"Salud de engagement · {platform.title()}"},
             gauge={
-                "axis": {"range": [0, gauge_max], "tickcolor": "#000000"},
-                "bar": {"color": "#003696"},
+                "axis": {"range": [0, gauge_max]},
                 "steps": [
-                    {"range": [0, max(low_value, 0.01)], "color": "#FEE4E2"},
-                    {"range": [low_value, max(mid_value, low_value + 0.01)], "color": "#FFF6E0"},
-                    {"range": [mid_value, gauge_max], "color": "#E7F6EC"},
+                    {"range": [0, max(low_value, 0.01)]},
+                    {"range": [low_value, max(mid_value, low_value + 0.01)]},
+                    {"range": [mid_value, gauge_max]},
                 ],
                 "threshold": {
-                    "line": {"color": "#0A7D35", "width": 4},
                     "thickness": 0.8,
                     "value": good_value,
                 },
             },
         )
     )
-    fig.update_layout(height=280)
-    renderizar_grafica_champileaks(fig, width='stretch', config=PLOTLY_CONFIG)
+    st.plotly_chart(aplicar_tema_champileaks(fig), width='stretch', config=PLOTLY_CONFIG)
 
 
 # ============================================================================

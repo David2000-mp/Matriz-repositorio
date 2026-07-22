@@ -5,11 +5,10 @@ from __future__ import annotations
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
-import streamlit.components.v1 as components
 from plotly.subplots import make_subplots
 
 from components import EmptyState, PLOTLY_CONFIG
-from utils.chart_theme import aplicar_tema_champileaks, renderizar_grafica_champileaks
+from utils.chart_theme import aplicar_tema_champileaks
 from utils.cross_intelligence import (
     build_city_performance_drilldown,
     build_daily_performance_series,
@@ -158,7 +157,7 @@ def _render_block_2(maestra_historical, demo_historical, month_key: str) -> None
             y=perf["visualizaciones"],
             name="Visualizaciones",
             mode="lines+markers",
-            line={"color": "#1f77b4", "width": 3},
+            line={"width": 3},
         ),
         secondary_y=False,
     )
@@ -169,7 +168,7 @@ def _render_block_2(maestra_historical, demo_historical, month_key: str) -> None
             y=perf["interacciones"],
             name="Interacciones",
             mode="lines+markers",
-            line={"color": "#ff7f0e", "width": 2},
+            line={"width": 2},
         ),
         secondary_y=False,
     )
@@ -214,7 +213,6 @@ def _render_block_2(maestra_historical, demo_historical, month_key: str) -> None
         fig.add_vrect(
             x0=month_start,
             x1=month_end,
-            fillcolor="#dbeafe",
             opacity=0.28,
             layer="below",
             line_width=0,
@@ -222,10 +220,7 @@ def _render_block_2(maestra_historical, demo_historical, month_key: str) -> None
             annotation_position="top left",
         )
 
-    fig.update_layout(
-        title="Tendencia historica con resaltado del mes seleccionado",
-        hovermode="x unified",
-    )
+    fig.update_layout(title="Tendencia historica con resaltado del mes seleccionado")
 
     # Ambos ejes inician en 0 para evitar correlaciones visuales falsas por baseline flotante.
     fig.update_yaxes(title_text="Rendimiento (volumen)", rangemode="tozero", secondary_y=False, zeroline=True)
@@ -237,14 +232,8 @@ def _render_block_2(maestra_historical, demo_historical, month_key: str) -> None
         zeroline=True,
     )
     fig.update_xaxes(title_text="Fecha")
-    aplicar_tema_champileaks(fig)
-
     st.subheader("Grafica historica: rendimiento mensual y participacion demografica")
-    components.html(
-        fig.to_html(include_plotlyjs="cdn", full_html=False, config=PLOTLY_CONFIG),
-        height=520,
-        scrolling=False,
-    )
+    st.plotly_chart(aplicar_tema_champileaks(fig), width="stretch", config=PLOTLY_CONFIG)
 
     if top_segments:
         st.caption("Segmentos dominantes monitoreados: " + ", ".join(top_segments))
@@ -287,7 +276,7 @@ def _render_block_3_drilldown(maestra_current, demo_current, network_maestra, se
                 barmode="group",
             )
             fig_city.update_xaxes(rangemode="tozero")
-            renderizar_grafica_champileaks(fig_city, width="stretch", config=PLOTLY_CONFIG, theme=None)
+            st.plotly_chart(aplicar_tema_champileaks(fig_city), width="stretch", config=PLOTLY_CONFIG)
 
             table_city = city_rank.copy()
             table_city["city_pct"] = table_city["city_pct"] * 100.0
@@ -318,7 +307,7 @@ def _render_block_3_drilldown(maestra_current, demo_current, network_maestra, se
                 title="Ranking de colegios por volumen total del periodo",
             )
             fig_school.update_xaxes(rangemode="tozero")
-            renderizar_grafica_champileaks(fig_school, width="stretch", config=PLOTLY_CONFIG, theme=None)
+            st.plotly_chart(aplicar_tema_champileaks(fig_school), width="stretch", config=PLOTLY_CONFIG)
             st.dataframe(school_rank, width="stretch", hide_index=True)
 
     with tab_segment:
@@ -344,7 +333,7 @@ def _render_block_3_drilldown(maestra_current, demo_current, network_maestra, se
                 xaxis_title="Rango de edad",
             )
             fig_segment.update_yaxes(rangemode="tozero")
-            renderizar_grafica_champileaks(fig_segment, width="stretch", config=PLOTLY_CONFIG, theme=None)
+            st.plotly_chart(aplicar_tema_champileaks(fig_segment), width="stretch", config=PLOTLY_CONFIG)
             st.dataframe(segment_dist, width="stretch", hide_index=True)
 
 
@@ -382,7 +371,7 @@ def _render_block_4_strict_comparison(network_maestra, network_demo, colegio: st
                 barmode="group",
             )
             fig_perf.update_yaxes(rangemode="tozero")
-            renderizar_grafica_champileaks(fig_perf, width="stretch", config=PLOTLY_CONFIG, theme=None)
+            st.plotly_chart(aplicar_tema_champileaks(fig_perf), width="stretch", config=PLOTLY_CONFIG)
             st.dataframe(perf_comp, width="stretch", hide_index=True)
 
     with col_right:
@@ -405,7 +394,7 @@ def _render_block_4_strict_comparison(network_maestra, network_demo, colegio: st
             )
             fig_demo.update_xaxes(tickangle=-35)
             fig_demo.update_yaxes(rangemode="tozero")
-            renderizar_grafica_champileaks(fig_demo, width="stretch", config=PLOTLY_CONFIG, theme=None)
+            st.plotly_chart(aplicar_tema_champileaks(fig_demo), width="stretch", config=PLOTLY_CONFIG)
             st.dataframe(demo_comp, width="stretch", hide_index=True)
 
 

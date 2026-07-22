@@ -11,7 +11,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from components import EmptyState, PLOTLY_CONFIG
-from utils.chart_theme import renderizar_grafica_champileaks
+from utils.chart_theme import aplicar_tema_champileaks
 from utils.demographics_geo import (
     MEXICO_CENTER,
     AGE_ORDER,
@@ -264,7 +264,7 @@ def render_demography_block(df_filtered: pd.DataFrame):
         hovermode="x unified",
     )
 
-    renderizar_grafica_champileaks(fig, width="stretch", config=PLOTLY_CONFIG)
+    st.plotly_chart(aplicar_tema_champileaks(fig), width="stretch", config=PLOTLY_CONFIG)
 
 
 def _to_excel_bytes(df: pd.DataFrame) -> Tuple[Optional[bytes], Optional[str]]:
@@ -363,9 +363,8 @@ def render_map_block(df_filtered: pd.DataFrame, colegio: str):
             center=MEXICO_CENTER,
             mapbox_style="carto-positron",
             title="Mapa de ciudades por impacto",
-            color_continuous_scale="Turbo",
         )
-        renderizar_grafica_champileaks(fig, width="stretch", config=PLOTLY_CONFIG)
+        st.plotly_chart(aplicar_tema_champileaks(fig), width="stretch", config=PLOTLY_CONFIG)
     else:
         st.warning("No hay ciudades con coordenadas disponibles en el diccionario interno.")
 
@@ -452,7 +451,7 @@ def render_comparison_block(df_for_network: pd.DataFrame, colegio: str):
         yaxis_title="Distribucion (%)",
     )
     fig.update_xaxes(tickangle=-35)
-    renderizar_grafica_champileaks(fig, width="stretch", config=PLOTLY_CONFIG)
+    st.plotly_chart(aplicar_tema_champileaks(fig), width="stretch", config=PLOTLY_CONFIG)
 
     table = comp[["edad", "sexo", "colegio_pct", "red_pct", "delta_pp"]].copy()
     table = table.sort_values("delta_pp", key=lambda s: s.abs(), ascending=False)

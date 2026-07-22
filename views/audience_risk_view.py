@@ -21,7 +21,7 @@ except Exception:
     go = None
 
 from components import EmptyState, MetricCard, PLOTLY_CONFIG
-from utils.chart_theme import renderizar_grafica_champileaks
+from utils.chart_theme import aplicar_tema_champileaks
 from utils.data_provider import data_provider
 from utils.analytics import calculate_health_score
 from views.dashboard import calcular_kpi_engagement_global
@@ -705,7 +705,7 @@ def render(df: pd.DataFrame | None = None) -> None:
                 yaxis=dict(title="Seguidores"),
                 yaxis2=dict(title="Engagement (%)", overlaying="y", side="right"),
             )
-            renderizar_grafica_champileaks(fig_bar, width="stretch", config=PLOTLY_CONFIG)
+            st.plotly_chart(aplicar_tema_champileaks(fig_bar), width="stretch", config=PLOTLY_CONFIG)
 
             fig_donut = px.pie(
                 level_summary,
@@ -714,7 +714,7 @@ def render(df: pd.DataFrame | None = None) -> None:
                 hole=0.45,
                 title="Participacion de seguidores por segmento educativo",
             )
-            renderizar_grafica_champileaks(fig_donut, width="stretch", config=PLOTLY_CONFIG)
+            st.plotly_chart(aplicar_tema_champileaks(fig_donut), width="stretch", config=PLOTLY_CONFIG)
 
     with tab_trend:
         st.subheader("Tendencia mensual por segmento educativo")
@@ -746,7 +746,7 @@ def render(df: pd.DataFrame | None = None) -> None:
                         "segmento_educativo": "Segmento educativo",
                     },
                 )
-                renderizar_grafica_champileaks(fig_eng_month, width="stretch", config=PLOTLY_CONFIG)
+                st.plotly_chart(aplicar_tema_champileaks(fig_eng_month), width="stretch", config=PLOTLY_CONFIG)
 
                 fig_growth_month = px.bar(
                     monthly_segment,
@@ -761,7 +761,7 @@ def render(df: pd.DataFrame | None = None) -> None:
                         "segmento_educativo": "Segmento educativo",
                     },
                 )
-                renderizar_grafica_champileaks(fig_growth_month, width="stretch", config=PLOTLY_CONFIG)
+                st.plotly_chart(aplicar_tema_champileaks(fig_growth_month), width="stretch", config=PLOTLY_CONFIG)
 
         st.subheader("Tendencia por red social dentro de cada segmento")
         if monthly_platform.empty:
@@ -794,7 +794,7 @@ def render(df: pd.DataFrame | None = None) -> None:
                         "plataforma": "Red social",
                     },
                 )
-                renderizar_grafica_champileaks(fig_platform_eng, width="stretch", config=PLOTLY_CONFIG)
+                st.plotly_chart(aplicar_tema_champileaks(fig_platform_eng), width="stretch", config=PLOTLY_CONFIG)
 
     with tab_risk:
         st.subheader("Matriz de riesgo institucional")
@@ -885,7 +885,7 @@ def render(df: pd.DataFrame | None = None) -> None:
                         "tipo_contenido": "Tipo de contenido",
                     },
                 )
-                renderizar_grafica_champileaks(fig_content, width="stretch", config=PLOTLY_CONFIG)
+                st.plotly_chart(aplicar_tema_champileaks(fig_content), width="stretch", config=PLOTLY_CONFIG)
 
             top_content = (
                 content_summary.sort_values("engagement_promedio", ascending=False)
@@ -923,7 +923,7 @@ def render(df: pd.DataFrame | None = None) -> None:
                         "segmento_educativo": "Segmento educativo",
                     },
                 )
-                renderizar_grafica_champileaks(fig_topics, width="stretch", config=PLOTLY_CONFIG)
+                st.plotly_chart(aplicar_tema_champileaks(fig_topics), width="stretch", config=PLOTLY_CONFIG)
 
             st.dataframe(
                 top_topics.rename(
@@ -973,7 +973,7 @@ def render(df: pd.DataFrame | None = None) -> None:
                     "segmento_educativo": "Segmento educativo",
                 },
             )
-            renderizar_grafica_champileaks(fig_scatter, width="stretch", config=PLOTLY_CONFIG)
+            st.plotly_chart(aplicar_tema_champileaks(fig_scatter), width="stretch", config=PLOTLY_CONFIG)
 
             if "plataforma" in snapshot.columns:
                 platform_strength = (
@@ -995,4 +995,4 @@ def render(df: pd.DataFrame | None = None) -> None:
                             "plataforma": "Red social",
                         },
                     )
-                    renderizar_grafica_champileaks(fig_strength, width="stretch", config=PLOTLY_CONFIG)
+                    st.plotly_chart(aplicar_tema_champileaks(fig_strength), width="stretch", config=PLOTLY_CONFIG)

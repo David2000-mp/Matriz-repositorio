@@ -15,7 +15,7 @@ import plotly.express as px
 import streamlit as st
 
 from components import EmptyState, PLOTLY_CONFIG
-from utils.chart_theme import renderizar_grafica_champileaks
+from utils.chart_theme import aplicar_tema_champileaks
 from utils.comment_processor import (
     add_sentiment_analysis,
     add_sentiment_analysis_legacy_3,
@@ -43,12 +43,6 @@ COLUMN_LABELS = {
     "notas_operacionales": "Notas operacionales",
     "alertas_riesgos": "Alertas y riesgos",
     "publicacion_destacada": "Publicacion destacada",
-}
-
-SENTIMENT_COLORS = {
-    "positivo": "#0A7D35",
-    "neutral": "#CC7000",
-    "negativo": "#B42318",
 }
 
 IMPORTER_MASTER_HEADERS = {
@@ -305,8 +299,7 @@ def _render_consolidated_executive_panel(df: pd.DataFrame) -> None:
                 orientation="h",
                 title="Top instituciones por score promedio",
             )
-            fig_rank.update_layout(showlegend=False)
-            renderizar_grafica_champileaks(fig_rank, width="stretch", config=PLOTLY_CONFIG)
+            st.plotly_chart(aplicar_tema_champileaks(fig_rank), width="stretch", config=PLOTLY_CONFIG)
 
     with tabs[1]:
         praises = (
@@ -654,9 +647,13 @@ def render_text_analysis_dashboard() -> None:
             values="total",
             title="Distribucion global de sentimiento",
             color="sentimiento",
-            color_discrete_map=SENTIMENT_COLORS,
         )
-        renderizar_grafica_champileaks(fig_pie, width="stretch", config=PLOTLY_CONFIG, key="text_global_sentiment_pie")
+        st.plotly_chart(
+            aplicar_tema_champileaks(fig_pie),
+            width="stretch",
+            config=PLOTLY_CONFIG,
+            key="text_global_sentiment_pie",
+        )
 
     tabs = st.tabs([COLUMN_LABELS.get(col, col) for col in selected_cols])
     for tab, source_col in zip(tabs, selected_cols):
@@ -677,9 +674,8 @@ def render_text_analysis_dashboard() -> None:
                         color="sentimiento",
                         title=f"Sentimiento en {COLUMN_LABELS.get(source_col, source_col)}",
                     )
-                    fig_bar.update_layout(showlegend=False)
-                    renderizar_grafica_champileaks(
-                        fig_bar,
+                    st.plotly_chart(
+                        aplicar_tema_champileaks(fig_bar),
                         width="stretch",
                         config=PLOTLY_CONFIG,
                         key=f"text_sentiment_bar_{source_col}",
@@ -695,9 +691,8 @@ def render_text_analysis_dashboard() -> None:
                         orientation="h",
                         title="Top palabras clave",
                     )
-                    fig_kw.update_layout(showlegend=False)
-                    renderizar_grafica_champileaks(
-                        fig_kw,
+                    st.plotly_chart(
+                        aplicar_tema_champileaks(fig_kw),
                         width="stretch",
                         config=PLOTLY_CONFIG,
                         key=f"text_keywords_bar_{source_col}",
@@ -713,8 +708,8 @@ def render_text_analysis_dashboard() -> None:
                     markers=True,
                     title="Tendencia mensual de sentimiento (score promedio)",
                 )
-                renderizar_grafica_champileaks(
-                    fig_trend,
+                st.plotly_chart(
+                    aplicar_tema_champileaks(fig_trend),
                     width="stretch",
                     config=PLOTLY_CONFIG,
                     key=f"text_trend_line_{source_col}",

@@ -10,7 +10,8 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import re
 
-from components import PLOTLY_CONFIG, PLOTLY_LAYOUT_DEFAULTS
+from components import PLOTLY_CONFIG
+from utils.chart_theme import aplicar_tema_champileaks
 from utils.data_provider import data_provider
 
 
@@ -53,14 +54,6 @@ METRIC_THRESHOLDS = {
     "engagement_contenido_imagenes": (1.0, 3.0),
     "engagement_contenido_videos": (1.0, 3.0),
     "publicaciones_por_semana": (2.0, 5.0),
-}
-
-METRIC_COLOR_MAP = {
-    "engagement_rate": "#003696",
-    "engagement_contenido_imagenes": "#C13584",
-    "engagement_contenido_links": "#0A66C2",
-    "engagement_contenido_videos": "#FF0000",
-    "engagement_tema_mas_visto": "#CC7000",
 }
 
 COMPARISON_METRICS = [
@@ -261,12 +254,9 @@ def _render_institution_rankings(df: pd.DataFrame, plataforma_sel: str) -> None:
                 orientation="h",
                 color="registros",
                 title="Ranking general de contenido (score compuesto)",
-                color_continuous_scale=[[0.0, "#CC7000"], [1.0, "#003696"]],
             )
-            fig_rank_general.update_layout(**PLOTLY_LAYOUT_DEFAULTS)
-            _apply_dark_chart_text(fig_rank_general)
             st.plotly_chart(
-                fig_rank_general,
+                aplicar_tema_champileaks(fig_rank_general),
                 width="stretch",
                 config=PLOTLY_CONFIG,
                 key="tipo_rank_general_instituciones",
@@ -361,12 +351,9 @@ def _render_institution_rankings(df: pd.DataFrame, plataforma_sel: str) -> None:
                 y="entidad",
                 orientation="h",
                 title=f"Ranking por institución - {selected_format_label}",
-                color_discrete_sequence=["#003696"],
             )
-            fig_rank_format.update_layout(**{**PLOTLY_LAYOUT_DEFAULTS, "showlegend": False})
-            _apply_dark_chart_text(fig_rank_format)
             st.plotly_chart(
-                fig_rank_format,
+                aplicar_tema_champileaks(fig_rank_format),
                 width="stretch",
                 config=PLOTLY_CONFIG,
                 key=f"tipo_rank_formato_{selected_format_col}",
@@ -726,37 +713,6 @@ def _render_paginated_table(df: pd.DataFrame, page_key: str = "tipo_contenidos_p
     return df.iloc[start:end]
 
 
-def _apply_dark_chart_text(fig):
-    """Fuerza tipografía oscura para evitar textos blancos en temas oscuros."""
-    fig.update_layout(
-        font={"color": "#212529"},
-        title={"font": {"color": "#212529"}},
-        legend={"font": {"color": "#212529"}},
-        paper_bgcolor="#FFFFFF",
-        plot_bgcolor="#FFFFFF",
-    )
-    fig.update_xaxes(
-        title_font={"color": "#212529"},
-        tickfont={"color": "#212529"},
-        color="#212529",
-        gridcolor="#E0E0E0",
-    )
-    fig.update_yaxes(
-        title_font={"color": "#212529"},
-        tickfont={"color": "#212529"},
-        color="#212529",
-        gridcolor="#E0E0E0",
-    )
-    # Eje secundario (cuando existe)
-    fig.update_layout(
-        yaxis2={
-            "title": {"font": {"color": "#212529"}},
-            "tickfont": {"color": "#212529"},
-            "color": "#212529",
-        }
-    )
-
-
 def _get_reference_row(monthly_sorted: pd.DataFrame, mode: str):
     if monthly_sorted.empty:
         return None, "Sin referencia"
@@ -838,11 +794,8 @@ def _render_side_by_side_comparison(monthly: pd.DataFrame, mode: str) -> None:
         color="periodo",
         barmode="group",
         title="Comparativa por formato de contenido",
-        color_discrete_sequence=["#003696", "#CC7000"],
     )
-    fig_comp.update_layout(**PLOTLY_LAYOUT_DEFAULTS)
-    _apply_dark_chart_text(fig_comp)
-    st.plotly_chart(fig_comp, width="stretch", config=PLOTLY_CONFIG)
+    st.plotly_chart(aplicar_tema_champileaks(fig_comp), width="stretch", config=PLOTLY_CONFIG)
 
 
 def _render_data_quality_details(df: pd.DataFrame) -> None:
@@ -870,11 +823,8 @@ def _render_data_quality_details(df: pd.DataFrame) -> None:
         y="Completitud",
         title="Completitud por campo",
         color="Completitud",
-        color_continuous_scale=[[0.0, "#B42318"], [0.6, "#CC7000"], [1.0, "#0A7D35"]],
     )
-    fig_quality.update_layout(**PLOTLY_LAYOUT_DEFAULTS)
-    _apply_dark_chart_text(fig_quality)
-    st.plotly_chart(fig_quality, width="stretch", config=PLOTLY_CONFIG)
+    st.plotly_chart(aplicar_tema_champileaks(fig_quality), width="stretch", config=PLOTLY_CONFIG)
     st.dataframe(quality_df, width="stretch", hide_index=True)
 
 
@@ -904,11 +854,8 @@ def _render_format_diagnostic(monthly: pd.DataFrame) -> None:
         y="Engagement (%)",
         title="Ranking de formatos en el ultimo periodo",
         color="Engagement (%)",
-        color_continuous_scale=[[0.0, "#CC7000"], [1.0, "#003696"]],
     )
-    fig_diag.update_layout(**PLOTLY_LAYOUT_DEFAULTS)
-    _apply_dark_chart_text(fig_diag)
-    st.plotly_chart(fig_diag, width="stretch", config=PLOTLY_CONFIG)
+    st.plotly_chart(aplicar_tema_champileaks(fig_diag), width="stretch", config=PLOTLY_CONFIG)
 
     best = diag_df.iloc[0]
     worst = diag_df.iloc[-1]
@@ -1030,7 +977,7 @@ def render_new_data_dashboard() -> None:
                         y=monthly["engagement_rate"],
                         mode="lines+markers",
                         name="Engagement rate",
-                        line={"color": "#003696", "width": 2},
+                        line={"width": 2},
                     ),
                     secondary_y=False,
                 )
@@ -1039,19 +986,13 @@ def render_new_data_dashboard() -> None:
                         x=monthly["mes"],
                         y=monthly["publicaciones_por_semana"],
                         name="Publicaciones/semana",
-                        marker_color="#CC7000",
-                        opacity=0.45,
                     ),
                     secondary_y=True,
                 )
-                fig_dual.update_layout(
-                    title="Tendencia ejecutiva: engagement vs volumen de publicacion",
-                    **PLOTLY_LAYOUT_DEFAULTS,
-                )
+                fig_dual.update_layout(title="Tendencia ejecutiva: engagement vs volumen de publicacion")
                 fig_dual.update_yaxes(title_text="Engagement (%)", secondary_y=False)
                 fig_dual.update_yaxes(title_text="Publicaciones/semana", secondary_y=True)
-                _apply_dark_chart_text(fig_dual)
-                st.plotly_chart(fig_dual, width="stretch", config=PLOTLY_CONFIG)
+                st.plotly_chart(aplicar_tema_champileaks(fig_dual), width="stretch", config=PLOTLY_CONFIG)
 
             _render_side_by_side_comparison(monthly, compare_mode)
 
@@ -1089,11 +1030,8 @@ def render_new_data_dashboard() -> None:
                 color="metrica",
                 markers=True,
                 title="Comparativa mensual de engagement (histórico vs nuevos campos)",
-                color_discrete_map=METRIC_COLOR_MAP,
             )
-            fig_line.update_layout(**PLOTLY_LAYOUT_DEFAULTS)
-            _apply_dark_chart_text(fig_line)
-            st.plotly_chart(fig_line, width="stretch", config=PLOTLY_CONFIG)
+            st.plotly_chart(aplicar_tema_champileaks(fig_line), width="stretch", config=PLOTLY_CONFIG)
 
         # Volumen mensual de publicaciones
         if has_social_data and "publicaciones_por_semana" in monthly.columns:
@@ -1102,11 +1040,8 @@ def render_new_data_dashboard() -> None:
                 x="mes",
                 y="publicaciones_por_semana",
                 title="Evolución mensual de publicaciones por semana",
-                color_discrete_sequence=["#003696"],
             )
-            fig_bar.update_layout(**PLOTLY_LAYOUT_DEFAULTS)
-            _apply_dark_chart_text(fig_bar)
-            st.plotly_chart(fig_bar, width="stretch", config=PLOTLY_CONFIG)
+            st.plotly_chart(aplicar_tema_champileaks(fig_bar), width="stretch", config=PLOTLY_CONFIG)
 
     with st.expander("Desglose avanzado por institución y temas", expanded=False):
         # Rankings comparativos de rendimiento por institución
@@ -1134,11 +1069,8 @@ def render_new_data_dashboard() -> None:
                     y="engagement_promedio",
                     color="registros",
                     title="Promedio de engagement por tema principal",
-                    color_continuous_scale=[[0.0, "#CC7000"], [1.0, "#003696"]],
                 )
-                fig_tema.update_layout(**PLOTLY_LAYOUT_DEFAULTS)
-                _apply_dark_chart_text(fig_tema)
-                st.plotly_chart(fig_tema, width="stretch", config=PLOTLY_CONFIG)
+                st.plotly_chart(aplicar_tema_champileaks(fig_tema), width="stretch", config=PLOTLY_CONFIG)
 
         if has_social_data and "tuvo_cambios_operacionales" in social_filtered.columns and "engagement_rate" in social_filtered.columns:
             cambios_df = social_filtered.copy()
@@ -1165,11 +1097,8 @@ def render_new_data_dashboard() -> None:
                     y="engagement_promedio",
                     color="tuvo_cambios_operacionales",
                     title="Engagement promedio con/sin cambios operacionales",
-                    color_discrete_map={"Con cambios": "#003696", "Sin cambios": "#CC7000"},
                 )
-                fig_cambios.update_layout(**{**PLOTLY_LAYOUT_DEFAULTS, "showlegend": False})
-                _apply_dark_chart_text(fig_cambios)
-                st.plotly_chart(fig_cambios, width="stretch", config=PLOTLY_CONFIG)
+                st.plotly_chart(aplicar_tema_champileaks(fig_cambios), width="stretch", config=PLOTLY_CONFIG)
 
     # Tabla de detalle para auditoría operativa
     show_cols = [
