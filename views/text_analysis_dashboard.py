@@ -14,7 +14,8 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-from components import PLOTLY_CONFIG, PLOTLY_LAYOUT_DEFAULTS
+from components import PLOTLY_CONFIG
+from utils.chart_theme import renderizar_grafica_champileaks
 from utils.comment_processor import (
     add_sentiment_analysis,
     add_sentiment_analysis_legacy_3,
@@ -104,28 +105,6 @@ CRITICAL_KEYWORDS = {
     "riesgo",
     "denuncia",
 }
-
-
-def _apply_dark_chart_text(fig):
-    fig.update_layout(
-        font={"color": "#212529"},
-        title={"font": {"color": "#212529"}},
-        legend={"font": {"color": "#212529"}},
-        paper_bgcolor="#FFFFFF",
-        plot_bgcolor="#FFFFFF",
-    )
-    fig.update_xaxes(
-        title_font={"color": "#212529"},
-        tickfont={"color": "#212529"},
-        color="#212529",
-        gridcolor="#E0E0E0",
-    )
-    fig.update_yaxes(
-        title_font={"color": "#212529"},
-        tickfont={"color": "#212529"},
-        color="#212529",
-        gridcolor="#E0E0E0",
-    )
 
 
 def _resolve_global_filters(df: pd.DataFrame) -> pd.DataFrame:
@@ -325,11 +304,9 @@ def _render_consolidated_executive_panel(df: pd.DataFrame) -> None:
                 y="entidad",
                 orientation="h",
                 title="Top instituciones por score promedio",
-                color_discrete_sequence=["#003696"],
             )
-            fig_rank.update_layout(**{**PLOTLY_LAYOUT_DEFAULTS, "showlegend": False})
-            _apply_dark_chart_text(fig_rank)
-            st.plotly_chart(fig_rank, width="stretch", config=PLOTLY_CONFIG)
+            fig_rank.update_layout(showlegend=False)
+            renderizar_grafica_champileaks(fig_rank, width="stretch", config=PLOTLY_CONFIG)
 
     with tabs[1]:
         praises = (
@@ -672,9 +649,7 @@ def render_text_analysis_dashboard() -> None:
             color="sentimiento",
             color_discrete_map=SENTIMENT_COLORS,
         )
-        fig_pie.update_layout(**PLOTLY_LAYOUT_DEFAULTS)
-        _apply_dark_chart_text(fig_pie)
-        st.plotly_chart(fig_pie, width="stretch", config=PLOTLY_CONFIG, key="text_global_sentiment_pie")
+        renderizar_grafica_champileaks(fig_pie, width="stretch", config=PLOTLY_CONFIG, key="text_global_sentiment_pie")
 
     tabs = st.tabs([COLUMN_LABELS.get(col, col) for col in selected_cols])
     for tab, source_col in zip(tabs, selected_cols):
@@ -694,11 +669,9 @@ def render_text_analysis_dashboard() -> None:
                         y="total",
                         color="sentimiento",
                         title=f"Sentimiento en {COLUMN_LABELS.get(source_col, source_col)}",
-                        color_discrete_sequence=px.colors.qualitative.Set2,
                     )
-                    fig_bar.update_layout(**{**PLOTLY_LAYOUT_DEFAULTS, "showlegend": False})
-                    _apply_dark_chart_text(fig_bar)
-                    st.plotly_chart(
+                    fig_bar.update_layout(showlegend=False)
+                    renderizar_grafica_champileaks(
                         fig_bar,
                         width="stretch",
                         config=PLOTLY_CONFIG,
@@ -714,11 +687,9 @@ def render_text_analysis_dashboard() -> None:
                         y="palabra",
                         orientation="h",
                         title="Top palabras clave",
-                        color_discrete_sequence=["#003696"],
                     )
-                    fig_kw.update_layout(**{**PLOTLY_LAYOUT_DEFAULTS, "showlegend": False})
-                    _apply_dark_chart_text(fig_kw)
-                    st.plotly_chart(
+                    fig_kw.update_layout(showlegend=False)
+                    renderizar_grafica_champileaks(
                         fig_kw,
                         width="stretch",
                         config=PLOTLY_CONFIG,
@@ -734,11 +705,8 @@ def render_text_analysis_dashboard() -> None:
                     y="score_promedio",
                     markers=True,
                     title="Tendencia mensual de sentimiento (score promedio)",
-                    color_discrete_sequence=["#CC7000"],
                 )
-                fig_trend.update_layout(**PLOTLY_LAYOUT_DEFAULTS)
-                _apply_dark_chart_text(fig_trend)
-                st.plotly_chart(
+                renderizar_grafica_champileaks(
                     fig_trend,
                     width="stretch",
                     config=PLOTLY_CONFIG,

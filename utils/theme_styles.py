@@ -216,13 +216,19 @@ def get_theme_css() -> str:
     }
 
     section[data-testid="stSidebar"] [data-testid="stSelectbox"] [data-baseweb="select"] {
-        background: #FFFFFF;
-        color: var(--champi-text);
-        border-color: rgba(255, 255, 255, 0.45);
+        background: #FFFFFF !important;
+        color: #002566 !important;
+        border-color: rgba(255, 255, 255, 0.65) !important;
     }
 
-    section[data-testid="stSidebar"] [data-testid="stSelectbox"] [data-baseweb="select"] * {
-        color: var(--champi-text);
+    section[data-testid="stSidebar"] [data-testid="stSelectbox"] [data-baseweb="select"] :is(div, span, input, svg) {
+        color: #002566 !important;
+        fill: currentColor !important;
+    }
+
+    section[data-testid="stSidebar"] [data-testid="stSelectbox"] [data-baseweb="select"] input::placeholder {
+        color: #495057 !important;
+        opacity: 1;
     }
 
     section[data-testid="stMain"] :is(input, textarea, [role="combobox"]) {

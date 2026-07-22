@@ -15,7 +15,8 @@ try:
 except Exception:
     px = None
     go = None
-from components import COLOR_MAP, PLOTLY_CONFIG
+from components import PLOTLY_CONFIG
+from utils.chart_theme import renderizar_grafica_champileaks
 from utils.report_generator import generate_engagement_report_html
 from utils.rules_engine import calculate_engagement_engine
 from utils.content_analyzer import (
@@ -265,7 +266,6 @@ def _render_plotly_bar_chart(
         y=value_col,
         color=category_col,
         text=value_col,
-        color_discrete_sequence=list(COLOR_MAP.values()),
         title=title,
     )
     text_template = "%{text:,.0f}" if not value_suffix else "%{text:.2f}" + value_suffix
@@ -277,19 +277,12 @@ def _render_plotly_bar_chart(
     fig.update_traces(texttemplate=text_template, textposition="outside", hovertemplate=hover_template)
     fig.update_layout(
         showlegend=False,
-        paper_bgcolor="white",
-        plot_bgcolor="white",
-        font={"color": "#000000"},
-        title_font={"color": "#000000"},
-        hoverlabel={"font": {"color": "#000000"}, "bgcolor": "#FFFFFF", "bordercolor": "#003696"},
-        xaxis={"color": "#000000", "tickfont": {"color": "#000000"}},
-        yaxis={"color": "#000000", "gridcolor": "#E0E0E0", "tickfont": {"color": "#000000"}},
         margin=dict(t=60, r=10, b=10, l=10),
     )
     if value_suffix:
         fig.update_yaxes(ticksuffix=value_suffix)
 
-    st.plotly_chart(fig, width='stretch', config=PLOTLY_CONFIG)
+    renderizar_grafica_champileaks(fig, width='stretch', config=PLOTLY_CONFIG)
 
 
 def _render_engagement_gauge(platform: str, engagement_value: float, thresholds: dict) -> None:
@@ -325,8 +318,8 @@ def _render_engagement_gauge(platform: str, engagement_value: float, thresholds:
             },
         )
     )
-    fig.update_layout(height=280, margin=dict(t=60, r=20, b=20, l=20), paper_bgcolor="white", font={"color": "#000000"})
-    st.plotly_chart(fig, width='stretch', config=PLOTLY_CONFIG)
+    fig.update_layout(height=280)
+    renderizar_grafica_champileaks(fig, width='stretch', config=PLOTLY_CONFIG)
 
 
 # ============================================================================

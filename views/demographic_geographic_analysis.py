@@ -11,6 +11,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from components import PLOTLY_CONFIG
+from utils.chart_theme import renderizar_grafica_champileaks
 from utils.demographics_geo import (
     MEXICO_CENTER,
     AGE_ORDER,
@@ -20,12 +21,6 @@ from utils.demographics_geo import (
     build_network_comparison,
     normalize_text,
 )
-
-
-SEX_COLORS = {
-    "Hombres": "#2667FF",
-    "Mujeres": "#F05A7E",
-}
 
 
 # Salvaguarda en vista para ciudades reportadas frecuentemente sin coordenadas.
@@ -65,40 +60,6 @@ CITY_COORDS_RECOVERY = {
     "Juventino Rosas": (20.6433, -100.9942),
     "Monasterio de Yuste": (40.1142, -5.7389),
 }
-
-
-def _apply_plotly_accessibility_theme(fig) -> None:
-    """Aplica un tema de alto contraste para evitar texto blanco/invisible."""
-    fig.update_layout(
-        template="plotly_white",
-        paper_bgcolor="#FFFFFF",
-        plot_bgcolor="#FFFFFF",
-        font={"color": "#111827", "size": 13},
-        title_font={"color": "#111827", "size": 18},
-        legend={
-            "font": {"color": "#111827", "size": 12},
-            "title": {"font": {"color": "#111827", "size": 12}},
-        },
-        hoverlabel={
-            "bgcolor": "#FFFFFF",
-            "font": {"color": "#111827", "size": 12},
-            "bordercolor": "#9CA3AF",
-        },
-    )
-    fig.update_xaxes(
-        title_font={"color": "#111827"},
-        tickfont={"color": "#111827"},
-        gridcolor="#E5E7EB",
-        zeroline=False,
-        automargin=True,
-    )
-    fig.update_yaxes(
-        title_font={"color": "#111827"},
-        tickfont={"color": "#111827"},
-        gridcolor="#E5E7EB",
-        zeroline=False,
-        automargin=True,
-    )
 
 
 def load_data() -> Dict[str, pd.DataFrame]:
@@ -287,7 +248,6 @@ def render_demography_block(df_filtered: pd.DataFrame):
         color="sexo",
         barmode="group",
         category_orders={"edad": AGE_ORDER},
-        color_discrete_map=SEX_COLORS,
         hover_data={"participacion_pct": ":.2f"},
         labels={
             "edad": "Rango de edad",
@@ -302,11 +262,9 @@ def render_demography_block(df_filtered: pd.DataFrame):
         yaxis_title="Valor",
         legend_title="Sexo",
         hovermode="x unified",
-        margin={"l": 10, "r": 10, "t": 60, "b": 10},
     )
-    _apply_plotly_accessibility_theme(fig)
 
-    st.plotly_chart(fig, width="stretch", config=PLOTLY_CONFIG)
+    renderizar_grafica_champileaks(fig, width="stretch", config=PLOTLY_CONFIG)
 
 
 def _to_excel_bytes(df: pd.DataFrame) -> Tuple[Optional[bytes], Optional[str]]:
@@ -407,15 +365,7 @@ def render_map_block(df_filtered: pd.DataFrame, colegio: str):
             title="Mapa de ciudades por impacto",
             color_continuous_scale="Turbo",
         )
-        fig.update_layout(margin={"l": 0, "r": 0, "t": 50, "b": 0})
-        fig.update_layout(
-            coloraxis_colorbar={
-                "title": {"font": {"color": "#111827"}},
-                "tickfont": {"color": "#111827"},
-            }
-        )
-        _apply_plotly_accessibility_theme(fig)
-        st.plotly_chart(fig, width="stretch", config=PLOTLY_CONFIG)
+        renderizar_grafica_champileaks(fig, width="stretch", config=PLOTLY_CONFIG)
     else:
         st.warning("No hay ciudades con coordenadas disponibles en el diccionario interno.")
 
@@ -486,7 +436,6 @@ def render_comparison_block(df_for_network: pd.DataFrame, colegio: str):
             x=comp["segmento"],
             y=comp["colegio_pct"],
             name=f"{colegio} (%)",
-            marker_color="#2667FF",
         )
     )
     fig.add_trace(
@@ -494,7 +443,6 @@ def render_comparison_block(df_for_network: pd.DataFrame, colegio: str):
             x=comp["segmento"],
             y=comp["red_pct"],
             name="Promedio red (%)",
-            marker_color="#8D99AE",
         )
     )
     fig.update_layout(
@@ -502,11 +450,9 @@ def render_comparison_block(df_for_network: pd.DataFrame, colegio: str):
         title="Comparacion de distribucion por segmento",
         xaxis_title="Segmento (Edad | Sexo)",
         yaxis_title="Distribucion (%)",
-        margin={"l": 10, "r": 10, "t": 60, "b": 120},
     )
     fig.update_xaxes(tickangle=-35)
-    _apply_plotly_accessibility_theme(fig)
-    st.plotly_chart(fig, width="stretch", config=PLOTLY_CONFIG)
+    renderizar_grafica_champileaks(fig, width="stretch", config=PLOTLY_CONFIG)
 
     table = comp[["edad", "sexo", "colegio_pct", "red_pct", "delta_pp"]].copy()
     table = table.sort_values("delta_pp", key=lambda s: s.abs(), ascending=False)

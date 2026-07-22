@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TypeVar
+from typing import Any, TypeVar
 
 import plotly.graph_objects as go
 
@@ -86,3 +86,10 @@ def aplicar_tema_champileaks(fig: FigureT) -> FigureT:
         automargin=True,
     )
     return fig
+
+
+def renderizar_grafica_champileaks(fig: FigureT, **kwargs: Any) -> None:
+    """Renderiza una figura con el tema visual central aplicado."""
+    import streamlit as st
+
+    st.plotly_chart(aplicar_tema_champileaks(fig), **kwargs)

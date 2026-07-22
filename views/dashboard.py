@@ -898,18 +898,6 @@ def render(df=None):
                 fig_platform.update_layout(
                     xaxis_title="",
                     yaxis_title="Seguidores",
-                    xaxis={
-                        "color": "#000000",
-                        "gridcolor": "#E0E0E0",
-                        "title": {"font": {"color": "#000000"}},
-                        "tickfont": {"color": "#000000"},
-                    },
-                    yaxis={
-                        "color": "#000000",
-                        "gridcolor": "#E0E0E0",
-                        "title": {"font": {"color": "#000000"}},
-                        "tickfont": {"color": "#000000"},
-                    },
                 )
 
                 # Limpiar skeleton y mostrar gráfico real
@@ -984,21 +972,6 @@ def render(df=None):
                             title="Tendencia de Seguidores por Plataforma",
                             markers=True,
                         )
-                        fig_area.update_layout(
-                            autosize=True,
-                            xaxis={
-                                "color": "#000000",
-                                "gridcolor": "#E0E0E0",
-                                "title": {"font": {"color": "#000000"}},
-                                "tickfont": {"color": "#000000"},
-                            },
-                            yaxis={
-                                "color": "#000000",
-                                "gridcolor": "#E0E0E0",
-                                "title": {"font": {"color": "#000000"}},
-                                "tickfont": {"color": "#000000"},
-                            },
-                        )
                         fig_area.update_xaxes(type="date")
                         
                         # DEBUG: Verificar traces de Plotly
@@ -1053,9 +1026,6 @@ def render(df=None):
                                 arrowhead=2,
                                 ax=35,
                                 ay=-25,
-                                bgcolor="rgba(255,255,255,0.9)",
-                                bordercolor="#D0D5DD",
-                                font={"size": 10, "color": "#101828"},
                             )
 
                         evolution_placeholder.empty()  # Remover skeleton
@@ -1116,21 +1086,6 @@ def render(df=None):
                             barmode="group",
                         )
                         fig_bar.update_traces(textposition="outside")
-                        fig_bar.update_layout(
-                            autosize=True,
-                            xaxis={
-                                "color": "#000000",
-                                "gridcolor": "#E0E0E0",
-                                "title": {"font": {"color": "#000000"}},
-                                "tickfont": {"color": "#000000"},
-                            },
-                            yaxis={
-                                "color": "#000000",
-                                "gridcolor": "#E0E0E0",
-                                "title": {"font": {"color": "#000000"}},
-                                "tickfont": {"color": "#000000"},
-                            },
-                        )
                         ranking_placeholder.empty()  # Remover skeleton
                         st.plotly_chart(
                             aplicar_tema_champileaks(fig_bar),
@@ -1208,21 +1163,6 @@ def render(df=None):
                                 hovertemplate='<b>%{y}</b><br>%{fullData.name}<br>ER: %{x:.2f}%<extra></extra>'
                             )
                             
-                            fig_engagement.update_layout(
-                                autosize=True,
-                                xaxis={
-                                    'color': '#000000',
-                                    'gridcolor': '#E0E0E0',
-                                    'title': {'font': {'color': '#000000'}},
-                                    'tickfont': {'color': '#000000'},
-                                },
-                                yaxis={
-                                    'color': '#000000',
-                                    'gridcolor': '#E0E0E0',
-                                    'title': {'font': {'color': '#000000'}},
-                                    'tickfont': {'color': '#000000'},
-                                },
-                            )
                             
                             engagement_placeholder.empty()
                             st.plotly_chart(
@@ -1310,9 +1250,7 @@ def render(df=None):
             texttemplate="<b>%{text:,}</b>",
             textposition="outside",
             textfont_size=11,
-            textfont_color="#2c3e50",
             marker_line_width=1,
-            marker_line_color="rgba(0,0,0,0.3)",
             hovertemplate="<b>%{x}</b><br>"
             + "📱 %{fullData.name}<br>"
             + "📈 Crecimiento abs: <b>%{y:,}</b> seguidores<br>"
@@ -1325,14 +1263,6 @@ def render(df=None):
 
         fig_growth.update_xaxes(
             tickangle=45,
-            tickfont=dict(size=10, color="#34495e"),
-            showgrid=False,
-        )
-
-        fig_growth.update_yaxes(
-            tickfont=dict(size=10, color="#34495e"),
-            showgrid=True,
-            gridcolor="rgba(0,0,0,0.1)",
         )
 
         st.plotly_chart(
@@ -1383,9 +1313,7 @@ def render(df=None):
                 texttemplate="<b>%{text:.2f}%</b>",
                 textposition="outside",
                 textfont_size=11,
-                textfont_color="#2c3e50",
                 marker_line_width=1,
-                marker_line_color="rgba(0,0,0,0.3)",
                 hovertemplate="<b>%{x}</b><br>"
                 + "📱 %{fullData.name}<br>"
                 + "📊 Crecimiento %: <b>%{y:.2f}%</b><br>"
@@ -1398,14 +1326,6 @@ def render(df=None):
 
             fig_growth_pct.update_xaxes(
                 tickangle=45,
-                tickfont=dict(size=10, color="#34495e"),
-                showgrid=False,
-            )
-
-            fig_growth_pct.update_yaxes(
-                tickfont=dict(size=10, color="#34495e"),
-                showgrid=True,
-                gridcolor="rgba(0,0,0,0.1)",
             )
 
             st.plotly_chart(
@@ -1559,22 +1479,9 @@ def render(df=None):
                 st.error("Plotly no está disponible. Instala `plotly` para ver gráficos.")
             else:
                 fig_health = px.line(x=labels, y=health_points, markers=True, labels={"x": "Mes", "y": "Salud"}, title="Evolución de la Salud Digital (últimos 6 meses)")
-                fig_health.update_traces(line=dict(color="#0056B3", width=3))  # Azul info WCAG AA
+                fig_health.update_traces(line=dict(width=3))
                 fig_health.update_layout(
-                    autosize=True,
-                    xaxis={
-                        "color": "#000000",
-                        "gridcolor": "#E0E0E0",
-                        "title": {"font": {"color": "#000000"}},
-                        "tickfont": {"color": "#000000"},
-                    },
-                    yaxis={
-                        "range": [0, 100],
-                        "color": "#000000",
-                        "gridcolor": "#E0E0E0",
-                        "title": {"font": {"color": "#000000"}},
-                        "tickfont": {"color": "#000000"},
-                    },
+                    yaxis={"range": [0, 100]},
                 )
                 health_placeholder.empty()  # Remover skeleton
                 st.plotly_chart(aplicar_tema_champileaks(fig_health), width='stretch', config=PLOTLY_CONFIG)

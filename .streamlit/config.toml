@@ -7,6 +7,7 @@ textColor = "#212529"
 linkColor = "#003696"
 font = "Inter:https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap, sans-serif"
 headingFont = "Inter:https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap, sans-serif"
+baseFontSize = 14
 baseRadius = "0.75rem"
 buttonRadius = "0.625rem"
 showSidebarBorder = true

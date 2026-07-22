@@ -9,6 +9,7 @@ import streamlit.components.v1 as components
 from plotly.subplots import make_subplots
 
 from components import PLOTLY_CONFIG
+from utils.chart_theme import aplicar_tema_champileaks, renderizar_grafica_champileaks
 from utils.cross_intelligence import (
     build_city_performance_drilldown,
     build_daily_performance_series,
@@ -41,63 +42,6 @@ def _metric_delta_text(current: float, previous: float, delta_abs: float, delta_
     if delta_pct is None:
         return f"{delta_abs:+,.0f}"
     return f"{delta_abs:+,.0f} ({delta_pct:+.1f}%)"
-
-
-def _apply_plotly_accessibility_theme(fig) -> None:
-    """Asegura contraste suficiente para textos, ejes y leyendas."""
-    fig.update_layout(
-        template="plotly_white",
-        paper_bgcolor="#FFFFFF",
-        plot_bgcolor="#FFFFFF",
-        font={"color": "#111827", "size": 13},
-        title_font={"color": "#111827", "size": 18},
-        legend={
-            "font": {"color": "#111827", "size": 12},
-            "title": {"font": {"color": "#111827", "size": 12}},
-        },
-        hoverlabel={
-            "bgcolor": "#FFFFFF",
-            "font": {"color": "#111827", "size": 12},
-            "bordercolor": "#9CA3AF",
-        },
-    )
-    fig.update_xaxes(
-        title_font={"color": "#111827"},
-        tickfont={"color": "#111827"},
-        gridcolor="#E5E7EB",
-        zeroline=False,
-        automargin=True,
-    )
-    fig.update_yaxes(
-        title_font={"color": "#111827"},
-        tickfont={"color": "#111827"},
-        gridcolor="#E5E7EB",
-        zeroline=False,
-        automargin=True,
-    )
-
-
-def _force_plotly_text_contrast() -> None:
-    """Inyecta CSS global para mantener alto contraste en los textos de Plotly."""
-    if st.session_state.get("_plotly_text_contrast_css_injected"):
-        return
-
-    st.html(
-        """
-        <style>
-        .js-plotly-plot svg.main-svg text,
-        .js-plotly-plot .xtick text,
-        .js-plotly-plot .ytick text,
-        .js-plotly-plot .gtitle,
-        .js-plotly-plot .legendtext,
-        .js-plotly-plot .annotation text {
-            fill: #111827 !important;
-            color: #111827 !important;
-        }
-        </style>
-        """
-    )
-    st.session_state["_plotly_text_contrast_css_injected"] = True
 
 
 def _render_filters() -> tuple[str, str, str]:
@@ -281,10 +225,6 @@ def _render_block_2(maestra_historical, demo_historical, month_key: str) -> None
     fig.update_layout(
         title="Tendencia historica con resaltado del mes seleccionado",
         hovermode="x unified",
-        margin={"l": 10, "r": 10, "t": 60, "b": 10},
-        paper_bgcolor="white",
-        plot_bgcolor="white",
-        legend={"orientation": "h", "y": 1.08},
     )
 
     # Ambos ejes inician en 0 para evitar correlaciones visuales falsas por baseline flotante.
@@ -297,7 +237,7 @@ def _render_block_2(maestra_historical, demo_historical, month_key: str) -> None
         zeroline=True,
     )
     fig.update_xaxes(title_text="Fecha")
-    _apply_plotly_accessibility_theme(fig)
+    aplicar_tema_champileaks(fig)
 
     st.subheader("Grafica historica: rendimiento mensual y participacion demografica")
     components.html(
@@ -332,7 +272,6 @@ def _render_block_3_drilldown(maestra_current, demo_current, network_maestra, se
                     x=show["visualizaciones_estimadas"],
                     name="Visualizaciones est.",
                     orientation="h",
-                    marker_color="#1f77b4",
                 )
             )
             fig_city.add_trace(
@@ -341,18 +280,14 @@ def _render_block_3_drilldown(maestra_current, demo_current, network_maestra, se
                     x=show["interacciones_estimadas"],
                     name="Interacciones est.",
                     orientation="h",
-                    marker_color="#ff7f0e",
                 )
             )
             fig_city.update_layout(
                 title="Desglose por ciudad: visualizaciones e interacciones estimadas",
                 barmode="group",
-                margin={"l": 10, "r": 10, "t": 50, "b": 10},
             )
             fig_city.update_xaxes(rangemode="tozero")
-            _apply_plotly_accessibility_theme(fig_city)
-            st.plotly_chart(fig_city, width="stretch", config=PLOTLY_CONFIG, theme=None)
-            _force_plotly_text_contrast()
+            renderizar_grafica_champileaks(fig_city, width="stretch", config=PLOTLY_CONFIG, theme=None)
 
             table_city = city_rank.copy()
             table_city["city_pct"] = table_city["city_pct"] * 100.0
@@ -376,18 +311,14 @@ def _render_block_3_drilldown(maestra_current, demo_current, network_maestra, se
                     y=show["colegio"],
                     x=show["volumen_total"],
                     orientation="h",
-                    marker_color="#2ca02c",
                     name="Volumen total",
                 )
             )
             fig_school.update_layout(
                 title="Ranking de colegios por volumen total del periodo",
-                margin={"l": 10, "r": 10, "t": 50, "b": 10},
             )
             fig_school.update_xaxes(rangemode="tozero")
-            _apply_plotly_accessibility_theme(fig_school)
-            st.plotly_chart(fig_school, width="stretch", config=PLOTLY_CONFIG, theme=None)
-            _force_plotly_text_contrast()
+            renderizar_grafica_champileaks(fig_school, width="stretch", config=PLOTLY_CONFIG, theme=None)
             st.dataframe(school_rank, width="stretch", hide_index=True)
 
     with tab_segment:
@@ -409,14 +340,11 @@ def _render_block_3_drilldown(maestra_current, demo_current, network_maestra, se
             fig_segment.update_layout(
                 title="Distribucion demografica por edad y sexo",
                 barmode="group",
-                margin={"l": 10, "r": 10, "t": 50, "b": 10},
                 yaxis_title="Participacion (%)",
                 xaxis_title="Rango de edad",
             )
             fig_segment.update_yaxes(rangemode="tozero")
-            _apply_plotly_accessibility_theme(fig_segment)
-            st.plotly_chart(fig_segment, width="stretch", config=PLOTLY_CONFIG, theme=None)
-            _force_plotly_text_contrast()
+            renderizar_grafica_champileaks(fig_segment, width="stretch", config=PLOTLY_CONFIG, theme=None)
             st.dataframe(segment_dist, width="stretch", hide_index=True)
 
 
@@ -440,25 +368,21 @@ def _render_block_4_strict_comparison(network_maestra, network_demo, colegio: st
             st.subheader("Grafica comparativa de rendimiento: cuenta vs red promedio")
             fig_perf = go.Figure()
             fig_perf.add_trace(
-                go.Bar(x=perf_comp["metrica"], y=perf_comp["cuenta"], name="Cuenta", marker_color="#1f77b4")
+                go.Bar(x=perf_comp["metrica"], y=perf_comp["cuenta"], name="Cuenta")
             )
             fig_perf.add_trace(
                 go.Bar(
                     x=perf_comp["metrica"],
                     y=perf_comp["red_promedio"],
                     name="Red promedio",
-                    marker_color="#7f7f7f",
                 )
             )
             fig_perf.update_layout(
                 title="Comparacion de rendimiento: cuenta vs red promedio",
                 barmode="group",
-                margin={"l": 10, "r": 10, "t": 50, "b": 10},
             )
             fig_perf.update_yaxes(rangemode="tozero")
-            _apply_plotly_accessibility_theme(fig_perf)
-            st.plotly_chart(fig_perf, width="stretch", config=PLOTLY_CONFIG, theme=None)
-            _force_plotly_text_contrast()
+            renderizar_grafica_champileaks(fig_perf, width="stretch", config=PLOTLY_CONFIG, theme=None)
             st.dataframe(perf_comp, width="stretch", hide_index=True)
 
     with col_right:
@@ -470,21 +394,18 @@ def _render_block_4_strict_comparison(network_maestra, network_demo, colegio: st
             plot_demo = demo_comp.head(8).copy()
             fig_demo = go.Figure()
             fig_demo.add_trace(
-                go.Bar(x=plot_demo["segmento"], y=plot_demo["cuenta_pct"], name="Cuenta %", marker_color="#2ca02c")
+                go.Bar(x=plot_demo["segmento"], y=plot_demo["cuenta_pct"], name="Cuenta %")
             )
             fig_demo.add_trace(
-                go.Bar(x=plot_demo["segmento"], y=plot_demo["red_pct"], name="Red %", marker_color="#bcbd22")
+                go.Bar(x=plot_demo["segmento"], y=plot_demo["red_pct"], name="Red %")
             )
             fig_demo.update_layout(
                 title="Comparacion de perfil demografico: cuenta vs red",
                 barmode="group",
-                margin={"l": 10, "r": 10, "t": 50, "b": 100},
             )
             fig_demo.update_xaxes(tickangle=-35)
             fig_demo.update_yaxes(rangemode="tozero")
-            _apply_plotly_accessibility_theme(fig_demo)
-            st.plotly_chart(fig_demo, width="stretch", config=PLOTLY_CONFIG, theme=None)
-            _force_plotly_text_contrast()
+            renderizar_grafica_champileaks(fig_demo, width="stretch", config=PLOTLY_CONFIG, theme=None)
             st.dataframe(demo_comp, width="stretch", hide_index=True)
 
 
