@@ -7,10 +7,65 @@ entre la capa visual y el modelo de datos.
 
 from __future__ import annotations
 
+import json
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
+from pathlib import Path
 
 import streamlit as st
+from streamlit_lottie import st_lottie
+
+
+_ANIMATIONS_DIR = Path(__file__).resolve().parents[1] / "assets" / "animations"
+
+
+def _load_lottie_local(filepath: str | Path) -> dict | None:
+    """Carga una animación Lottie local sin interrumpir la aplicación.
+
+    Las rutas relativas se resuelven dentro de ``assets/animations``. También
+    se aceptan rutas absolutas para facilitar pruebas aisladas del componente.
+    """
+    path = Path(filepath)
+    if not path.is_absolute():
+        path = _ANIMATIONS_DIR / path
+
+    try:
+        with path.open(encoding="utf-8") as animation_file:
+            return json.load(animation_file)
+    except (OSError, json.JSONDecodeError, TypeError):
+        return None
+
+
+def _render_lottie_centered(animation: dict | None, *, height: int) -> None:
+    """Renderiza una animación centrada cuando el asset está disponible."""
+    if animation is None:
+        return
+
+    _, animation_column, _ = st.columns([1, 2, 1])
+    with animation_column:
+        st_lottie(animation, height=height)
+
+
+def render_loader(tipo: str = "main") -> None:
+    """Renderiza el loader principal o el loader compacto de gráficas."""
+    is_chart = tipo == "chart"
+    filename = "loader_chart.json" if is_chart else "loader_main.json"
+    height = 100 if is_chart else 150
+    _render_lottie_centered(_load_lottie_local(filename), height=height)
+
+
+def render_empty_state(mensaje: str, tipo: str = "search") -> None:
+    """Muestra un estado vacío de búsqueda o geográfico con su mensaje."""
+    filename = "state_empty_geo.json" if tipo == "geo" else "state_empty_search.json"
+    _render_lottie_centered(_load_lottie_local(filename), height=150)
+    st.caption(mensaje)
+
+
+def render_status(mensaje: str, tipo: str = "success") -> None:
+    """Muestra feedback animado para una acción exitosa o fallida."""
+    filename = "status_error.json" if tipo == "error" else "status_success.json"
+    _render_lottie_centered(_load_lottie_local(filename), height=100)
+    st.caption(mensaje)
 
 
 def PageHeader(
@@ -133,4 +188,13 @@ def FilterBar(
     )
 
 
-__all__ = ["EmptyState", "FilterBar", "FilterBarActions", "MetricCard", "PageHeader"]
+__all__ = [
+    "EmptyState",
+    "FilterBar",
+    "FilterBarActions",
+    "MetricCard",
+    "PageHeader",
+    "render_empty_state",
+    "render_loader",
+    "render_status",
+]
