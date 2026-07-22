@@ -9,6 +9,7 @@ from collections.abc import Callable
 import streamlit as st
 
 from components import (
+    EmptyState,
     FilterBar,
     inject_clipboard_shortcut_guard,
     inject_custom_css,
@@ -48,7 +49,10 @@ def _configure_app() -> None:
 def _load_data_for_ui():
     """Carga datos compartidos; nunca escribe el DataFrame en session_state."""
     try:
-        return load_app_dataframe()
+        # El primer acceso puede consultar la fuente remota; las siguientes
+        # ejecuciones usan el caché compartido de Streamlit.
+        with st.spinner("Inicializando consola de inteligencia…"):
+            return load_app_dataframe()
     except Exception as exc:
         logger.exception("No se pudieron cargar los datos de la aplicación")
         st.error("No se pudieron cargar los datos. Verifica la conexión configurada.")
@@ -102,7 +106,10 @@ def _render_dashboard() -> None:
 
     df = _load_data_for_ui()
     if df is None or df.empty:
-        st.warning("No hay datos disponibles para el Dashboard Global.")
+        EmptyState(
+            "Aún no hay datos para mostrar",
+            "Carga o sincroniza registros y vuelve a consultar el Dashboard Global.",
+        )
         return
 
     filtered = apply_global_filters(
@@ -110,6 +117,13 @@ def _render_dashboard() -> None:
         entity=st.session_state.get("filtro_entidad", "Todas"),
         month=st.session_state.get("filtro_mes", "Todos"),
     )
+    if filtered.empty:
+        EmptyState(
+            "Los filtros no encontraron registros",
+            "Prueba con otro colegio o periodo desde los filtros globales.",
+            icon="\U0001f5d0\ufe0f",
+        )
+        return
     dashboard.render(filtered)
 
 

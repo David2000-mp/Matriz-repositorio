@@ -61,6 +61,23 @@ def MetricCard(
         )
 
 
+def EmptyState(
+    title: str,
+    message: str,
+    *,
+    icon: str = "\U0001f50d",
+) -> None:
+    """Muestra un estado vacío claro sin mezclarlo con la lógica de datos.
+
+    Las vistas deciden cuándo no existe información y este componente solo
+    comunica el resultado al usuario, de forma consistente y sin exponer
+    errores internos de Pandas.
+    """
+    with st.container(border=True):
+        st.subheader(f"{icon} {title}")
+        st.caption(message)
+
+
 @dataclass(frozen=True)
 class FilterBarActions:
     """Acciones solicitadas por la barra de filtros."""
@@ -116,4 +133,4 @@ def FilterBar(
     )
 
 
-__all__ = ["FilterBar", "FilterBarActions", "MetricCard", "PageHeader"]
+__all__ = ["EmptyState", "FilterBar", "FilterBarActions", "MetricCard", "PageHeader"]

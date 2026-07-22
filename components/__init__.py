@@ -26,7 +26,7 @@ from utils.theme_styles import (
 )
 
 from .custom_header import render_custom_header
-from .ui import FilterBar, FilterBarActions, MetricCard, PageHeader
+from .ui import EmptyState, FilterBar, FilterBarActions, MetricCard, PageHeader
 
 try:
     from .skeleton_loaders import show_kpi_skeleton, show_chart_skeleton
@@ -43,6 +43,7 @@ __all__ = [
     "configure_plotly_theme",
     "aplicar_estilo_personalizado",
     "render_custom_header",
+    "EmptyState",
     "FilterBar",
     "FilterBarActions",
     "MetricCard",

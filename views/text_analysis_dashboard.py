@@ -14,7 +14,7 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-from components import PLOTLY_CONFIG
+from components import EmptyState, PLOTLY_CONFIG
 from utils.chart_theme import renderizar_grafica_champileaks
 from utils.comment_processor import (
     add_sentiment_analysis,
@@ -541,7 +541,10 @@ def render_text_analysis_dashboard() -> None:
         df = data_provider.get_merged_data(force_reload=False)
 
     if df is None or df.empty:
-        st.warning("No hay datos disponibles para analizar textos.")
+        EmptyState(
+            "No hay textos disponibles",
+            "Sincroniza comentarios o selecciona otra fuente de datos para iniciar el análisis.",
+        )
         return
 
     if "fecha" in df.columns:
@@ -589,7 +592,11 @@ def render_text_analysis_dashboard() -> None:
         filtered = filtered[normalized_changes == cambio_sel]
 
     if filtered.empty:
-        st.info("No hay datos para los filtros seleccionados.")
+        EmptyState(
+            "Los filtros no encontraron textos",
+            "Ajusta entidad, plataforma, tema o cambios operacionales e intenta de nuevo.",
+            icon="\U0001f5d0\ufe0f",
+        )
         return
 
     if source_mode == "Base historica (Comentarios Consolidados)":

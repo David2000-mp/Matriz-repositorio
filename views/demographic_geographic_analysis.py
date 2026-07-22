@@ -10,7 +10,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
 
-from components import PLOTLY_CONFIG
+from components import EmptyState, PLOTLY_CONFIG
 from utils.chart_theme import renderizar_grafica_champileaks
 from utils.demographics_geo import (
     MEXICO_CENTER,
@@ -481,7 +481,10 @@ def render_demographic_geographic_analysis() -> None:
     df_demografica = data["base_demografica"]
 
     if df_demografica.empty:
-        st.warning("No se encontro informacion en la hoja Base_Demografica_Colegios.")
+        EmptyState(
+            "No hay información demográfica disponible",
+            "Verifica la hoja Base_Demografica_Colegios y vuelve a sincronizar los datos.",
+        )
         return
 
     filters = render_sidebar(df_maestra, df_demografica)
@@ -504,7 +507,11 @@ def render_demographic_geographic_analysis() -> None:
     )
 
     if df_network_scope.empty:
-        st.info("No hay datos para la plataforma/rango de fechas seleccionado.")
+        EmptyState(
+            "No hay datos en el rango seleccionado",
+            "Cambia la plataforma o amplía el periodo para consultar la red.",
+            icon="\U0001f5d0\ufe0f",
+        )
         return
 
     if df_selected.empty:

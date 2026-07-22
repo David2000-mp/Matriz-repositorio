@@ -20,7 +20,7 @@ except Exception:
     px = None
     go = None
 
-from components import MetricCard, PLOTLY_CONFIG
+from components import EmptyState, MetricCard, PLOTLY_CONFIG
 from utils.chart_theme import renderizar_grafica_champileaks
 from utils.data_provider import data_provider
 from utils.analytics import calculate_health_score
@@ -537,7 +537,10 @@ def render(df: pd.DataFrame | None = None) -> None:
     data = _apply_sidebar_filters(data)
 
     if data.empty:
-        st.warning("No hay datos disponibles para esta vista.")
+        EmptyState(
+            "Sin audiencias para los filtros actuales",
+            "Cambia el colegio o el periodo global para explorar otros registros.",
+        )
         return
 
     required_cols = {"entidad", "seguidores", "interacciones"}
@@ -565,7 +568,11 @@ def render(df: pd.DataFrame | None = None) -> None:
     unmapped_entities = sorted([name for name in unmapped_entities.unique().tolist() if name])
 
     if snapshot.empty or level_summary.empty:
-        st.warning("No hay datos suficientes para construir segmentacion o matriz de riesgo.")
+        EmptyState(
+            "No hay base suficiente para el análisis de riesgo",
+            "Se necesitan registros con seguidores e interacciones para construir la segmentación.",
+            icon="\U0001f6e1\ufe0f",
+        )
         return
 
     kpi_col1, kpi_col2, kpi_col3 = st.columns(3)
