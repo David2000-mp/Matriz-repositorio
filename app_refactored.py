@@ -1,25 +1,26 @@
-"""
-App refactorizado para CHAMPILEAKS.
-Provee enrutamiento limpio a las vistas y asegura inyección de estilos.
-"""
+"""Entry point y router nativo de CHAMPILEAKS."""
+
+from __future__ import annotations
+
+import logging
+import os
+from collections.abc import Callable
+
 import streamlit as st
-import pandas as pd
+
 from components import (
+    inject_clipboard_shortcut_guard,
     inject_custom_css,
     inject_layout_compact_css,
-    inject_clipboard_shortcut_guard,
-    scroll_to_top_on_nav_change,
-    render_custom_header,
 )
-from utils.helpers import load_image
-from utils.logger import set_production_mode, get_logger
+from utils.app_data import apply_global_filters, get_filter_options, load_app_dataframe
+from utils.logger import get_logger, set_production_mode
 
 logger = get_logger(__name__)
 
 
-def main():
-    # Configurar logging para producción si estamos en la nube
-    import os
+def _configure_app() -> None:
+    """Configura la página y conserva el sistema visual existente."""
     if os.getenv("STREAMLIT_SERVER_HEADLESS", "false").lower() == "true":
         set_production_mode()
 
@@ -28,556 +29,286 @@ def main():
         layout="wide",
         page_icon="Ⓜ️",
         initial_sidebar_state="expanded",
-        menu_items={
-            'Get Help': None,
-            'Report a bug': None,
-            'About': None
-        }
+        menu_items={"Get Help": None, "Report a bug": None, "About": None},
     )
-    
-    # Renderizar header personalizado (antes de cualquier contenido)
-    try:
-        render_custom_header()
-    except Exception as e:
-        import logging
-        logging.warning(f"No se pudo renderizar header personalizado: {e}")
-    
-    # Aplicar estilos CSS globales
+
+    # El logo nativo ocupa la cabecera reservada del sidebar y queda siempre
+    # por encima del menú generado por st.navigation.
+    st.logo("utils/logo_maristas_sidebar.png")
+
     try:
         inject_custom_css()
         inject_layout_compact_css(hide_streamlit_header=True)
         inject_clipboard_shortcut_guard()
-    except Exception as e:
-        try:
-            st.warning(f"No se pudo aplicar CSS personalizado: {e}")
-        except Exception:
-            # En entornos no interactivos, registrar en la consola
-            import logging
+    except Exception as exc:
+        logging.warning("No se pudo aplicar el CSS existente: %s", exc)
 
-            logging.warning(f"No se pudo mostrar warning de CSS: {e}")
 
-    # Sincronizar navegación desde la landing (permite botones que escriben `st.session_state['page']`)
-    if "page" in st.session_state:
-        st.session_state["page_selection"] = st.session_state.page
-        del st.session_state["page"]
+def _load_data_for_ui():
+    """Carga datos compartidos; nunca escribe el DataFrame en session_state."""
+    try:
+        return load_app_dataframe()
+    except Exception as exc:
+        logger.exception("No se pudieron cargar los datos de la aplicación")
+        st.error("No se pudieron cargar los datos. Verifica la conexión configurada.")
+        st.caption(str(exc))
+        return None
 
-    # Asegurar sidebar desplegado por defecto una vez por sesión.
-    # Evita forzarlo en cada rerun para no romper la preferencia manual del usuario.
-    if not st.session_state.get("_sidebar_default_expanded_applied", False):
-        st.html(
-            """
-            <script>
-            const ensureExpanded = () => {
-              const expandBtn = parent.document.querySelector('button[data-testid="stExpandSidebarButton"]');
-              if (expandBtn) {
-                expandBtn.click();
-              }
-            };
-            setTimeout(ensureExpanded, 30);
-            setTimeout(ensureExpanded, 180);
-            </script>
-            """,
-            unsafe_allow_javascript=True,
-        )
-        st.session_state["_sidebar_default_expanded_applied"] = True
 
-    st.markdown(
-        """
-        <style>
-        [data-testid="stSidebar"] [data-testid="stExpander"] summary p,
-        [data-testid="stSidebar"] [data-testid="stExpander"] summary span,
-        [data-testid="stSidebar"] [data-testid="stExpander"] summary svg,
-        [data-testid="stSidebar"] [data-testid="stRadio"] label p,
-        [data-testid="stSidebar"] [data-testid="stRadio"] label span,
-        [data-testid="stSidebar"] p,
-        [data-testid="stSidebar"] span {
-            color: #f5f7fa !important;
-            fill: #f5f7fa !important;
-        }
+def _render_sidebar_controls(df) -> None:
+    """Renderiza identidad, filtros globales y controles operativos."""
+    options = get_filter_options(df)
 
-        /* Evitar cambio a negro cuando el expander está retraído */
-        [data-testid="stSidebar"] [data-testid="stExpander"] summary,
-        [data-testid="stSidebar"] [data-testid="stExpander"] summary *,
-        [data-testid="stSidebar"] [data-testid="stExpander"] details:not([open]) summary,
-        [data-testid="stSidebar"] [data-testid="stExpander"] details:not([open]) summary * {
-            color: #f5f7fa !important;
-            fill: #f5f7fa !important;
-            font-weight: 500 !important;
-        }
-
-        /* Mantener el mismo peso cuando el expander está abierto */
-        [data-testid="stSidebar"] [data-testid="stExpander"] details[open] summary,
-        [data-testid="stSidebar"] [data-testid="stExpander"] details[open] summary * {
-            font-weight: 500 !important;
-        }
-
-        /* Mantener color estable en selectbox del sidebar (cerrado y desplegado) */
-        [data-testid="stSidebar"] [data-testid="stSelectbox"] [data-baseweb="select"],
-        [data-testid="stSidebar"] [data-testid="stSelectbox"] [data-baseweb="select"] *,
-        [data-testid="stSidebar"] [data-testid="stSelectbox"] div[role="combobox"],
-        [data-testid="stSidebar"] [data-testid="stSelectbox"] div[role="combobox"] *,
-        [data-testid="stSidebar"] [data-testid="stSelectbox"] input {
-            color: #212529 !important;
-            fill: #212529 !important;
-        }
-
-        /* Labels de filtros en sidebar: asegurar legibilidad sobre fondo azul */
-        [data-testid="stSidebar"] [data-testid="stSelectbox"] [data-testid="stWidgetLabel"] p,
-        [data-testid="stSidebar"] [data-testid="stSelectbox"] [data-testid="stWidgetLabel"] span,
-        [data-testid="stSidebar"] [data-testid="stSelectbox"] > label p,
-        [data-testid="stSidebar"] [data-testid="stSelectbox"] > label span {
-            color: #f5f7fa !important;
-            fill: #f5f7fa !important;
-        }
-
-        /* Opciones cuando se abre el dropdown: contraste estable (evita texto oscuro sobre fondo oscuro) */
-        [data-baseweb="popover"] [role="listbox"],
-        [data-baseweb="popover"] [role="option"] {
-            background-color: #ffffff !important;
-            color: #212529 !important;
-        }
-
-        [data-baseweb="popover"] [role="listbox"] *,
-        [data-baseweb="popover"] [role="option"] * {
-            color: #212529 !important;
-        }
-
-        [data-baseweb="popover"] [role="option"][aria-selected="true"] {
-            background-color: #e8f0ff !important;
-            color: #0f2f68 !important;
-        }
-
-        [data-baseweb="popover"] [role="option"]:hover {
-            background-color: #f2f6ff !important;
-            color: #0f2f68 !important;
-        }
-
-        [data-testid="stSidebar"] [data-testid="stSidebarUserContent"] {
-            padding-top: 0.35rem;
-            padding-bottom: 0.35rem;
-            gap: 0.25rem;
-        }
-
-        [data-testid="stSidebar"] [data-testid="stSidebarUserContent"] > div {
-            margin-bottom: 0.15rem;
-        }
-
-        [data-testid="stSidebar"] [data-testid="stExpander"] {
-            margin-top: 0.1rem;
-            margin-bottom: 0.15rem;
-        }
-
-        [data-testid="stSidebar"] [data-testid="stExpander"] details {
-            margin: 0 !important;
-            padding: 0 !important;
-        }
-
-        [data-testid="stSidebar"] [data-testid="stExpander"] summary {
-            padding-top: 0.2rem;
-            padding-bottom: 0.2rem;
-        }
-
-        [data-testid="stSidebar"] [data-testid="stSelectbox"],
-        [data-testid="stSidebar"] [data-testid="stButton"],
-        [data-testid="stSidebar"] [data-testid="stRadio"] {
-            margin-bottom: 0.15rem;
-        }
-
-        [data-testid="stSidebar"] {
-            padding-top: 0.35rem;
-            padding-bottom: 0.35rem;
-        }
-
-        [data-testid="stSidebarUserContent"] {
-            padding-top: 0rem !important;
-        }
-
-        [data-testid="stSidebarHeader"] {
-            padding: 0rem !important;
-            min-height: 0px !important;
-        }
-
-        [data-testid="stSidebar"] .element-container:has(.logo-marista) {
-            margin: 0 !important;
-            padding: 0 !important;
-        }
-
-        div[data-testid="stMarkdownContainer"]:has(.logo-marista) {
-            margin: 0 !important;
-            padding: 0 !important;
-        }
-
-        div[data-testid="stMarkdownContainer"]:has(.logo-marista) > * {
-            margin: 0 !important;
-            padding: 0 !important;
-        }
-
-        .logo-marista {
-            margin: 0 auto 0 auto !important;
-            padding: 0 !important;
-            display: block !important;
-            line-height: 0 !important;
-        }
-
-        div[data-testid="stMarkdownContainer"]:has(.logo-marista) p {
-            margin-top: 0 !important;
-            margin-bottom: 0 !important;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    # Sidebar: El ÚNICO lugar para filtrar
     with st.sidebar:
-        # Logo Marista
-        logo_b64 = load_image("logo_maristas.png")
-        if logo_b64:
-            st.markdown(f'<img src="data:image/png;base64,{logo_b64}" class="logo-marista" alt="Logo Marista">', unsafe_allow_html=True)
-        
-        st.title("CHAMPILEAKS")
+        st.divider()
+        st.subheader("Filtros globales")
 
-        st.subheader("Navegación")
-        # Navegación agrupada con sincronización global de estado.
-        navigation_groups = {
-            "metrics_analysis": [
-                "Inicio",
-                "Dashboard Global",
-                "Comparativas",
-                "Segmentación de Audiencias y Riesgo",
-                "Tipo de contenidos",
-                "Analisis de textos",
-                "Analisis Demografico y Geografico",
-                "Vista de Inteligencia Cruzada",
-                "Calc. Engagement",
-            ],
-            "data_management": [
-                "Registro Estadistico",
-                "Captura",
-                "Auditoría de Respuestas",
-            ],
-            "settings": [
-                "Configuración",
-            ],
-        }
+        entities = ["Todas", *options.entities]
+        months = ["Todos", *options.months]
 
-        # Compatibilidad con valores legacy (con emoji) para evitar navegación inválida.
-        legacy_display_to_canonical = {
-            "🏠 Inicio": "Inicio",
-            "📊 Dashboard Global": "Dashboard Global",
-            "📈 Comparativas": "Comparativas",
-            "🎯 Segmentación de Audiencias y Riesgo": "Segmentación de Audiencias y Riesgo",
-            "🆕 Tipo de contenidos": "Tipo de contenidos",
-            "🧠 Analisis de textos": "Analisis de textos",
-            "🗺️ Analisis Demografico y Geografico": "Analisis Demografico y Geografico",
-            "📐 Registro Estadistico": "Registro Estadistico",
-            "💡 Calc. Engagement": "Calc. Engagement",
-            "📝 Captura": "Captura",
-            "🔍 Auditoría de Respuestas": "Auditoría de Respuestas",
-            "⚙️ Configuración": "Configuración",
-        }
-
-        valid_canonical_options = {
-            option for options in navigation_groups.values() for option in options
-        }
-        label_to_canonical = {
-            option: option for option in valid_canonical_options
-        }
-        canonical_to_label = {
-            option: option for option in valid_canonical_options
-        }
-        canonical_to_group = {}
-        for group_name, group_options in navigation_groups.items():
-            for option in group_options:
-                canonical_to_group[option] = group_name
-
-        radio_keys = {
-            "metrics_analysis": "nav_radio_metrics_analysis",
-            "data_management": "nav_radio_data_management",
-            "settings": "nav_radio_settings",
-        }
-
-        current_selection = st.session_state.get("page_selection")
-        if current_selection in legacy_display_to_canonical:
-            current_selection = legacy_display_to_canonical[current_selection]
-        if current_selection not in valid_canonical_options:
-            current_selection = "Inicio"
-        st.session_state["page_selection"] = current_selection
-
-        def _sync_navigation(changed_radio_key: str):
-            if st.session_state.get("_nav_sync_in_progress", False):
-                return
-
-            st.session_state["_nav_sync_in_progress"] = True
-            try:
-                selected_label = st.session_state.get(changed_radio_key)
-                selected_canonical = label_to_canonical.get(selected_label)
-                if selected_canonical in valid_canonical_options:
-                    st.session_state["page_selection"] = selected_canonical
-
-                active_canonical = st.session_state.get("page_selection", "Inicio")
-                active_group = canonical_to_group.get(active_canonical, "metrics_analysis")
-
-                for group_name, state_key in radio_keys.items():
-                    if group_name == active_group:
-                        st.session_state[state_key] = canonical_to_label.get(active_canonical)
-                    else:
-                        st.session_state[state_key] = None
-            finally:
-                st.session_state["_nav_sync_in_progress"] = False
-
-        active_group = canonical_to_group.get(st.session_state["page_selection"], "metrics_analysis")
-        for group_name, state_key in radio_keys.items():
-            if group_name == active_group:
-                st.session_state[state_key] = canonical_to_label[st.session_state["page_selection"]]
-            elif state_key not in st.session_state:
-                st.session_state[state_key] = None
-
-        with st.expander("Métricas y Análisis", expanded=True):
-            st.radio(
-                "Métricas y Análisis",
-                navigation_groups["metrics_analysis"],
-                key=radio_keys["metrics_analysis"],
-                index=None,
-                label_visibility="collapsed",
-                on_change=_sync_navigation,
-                args=(radio_keys["metrics_analysis"],),
-            )
-
-        with st.expander("Gestión de Datos", expanded=False):
-            st.radio(
-                "Gestión de Datos",
-                navigation_groups["data_management"],
-                key=radio_keys["data_management"],
-                index=None,
-                label_visibility="collapsed",
-                on_change=_sync_navigation,
-                args=(radio_keys["data_management"],),
-            )
-
-        with st.expander("Ajustes", expanded=False):
-            st.radio(
-                "Ajustes",
-                navigation_groups["settings"],
-                key=radio_keys["settings"],
-                index=None,
-                label_visibility="collapsed",
-                on_change=_sync_navigation,
-                args=(radio_keys["settings"],),
-            )
-
-        selected = st.session_state["page_selection"]
-        st.session_state["page_selection"] = selected
-        scroll_to_top_on_nav_change("page_selection")
-
-        st.markdown("---")
-        st.subheader("Filtros Globales")
-
-        # Filtros globales (sin cargar datos aquí - lazy loading)
-        entidades = ["Todas"]  # Placeholder, se actualizará cuando se carguen datos
-        if "global_entities" in st.session_state:
-            entidades = ["Todas"] + st.session_state.global_entities
-
-        # Determinar el índice por defecto (siempre "Todas" si no hay filtro guardado)
-        filtro_actual = st.session_state.get("filtro_entidad", "Todas")
-        if filtro_actual in entidades:
-            index_default = entidades.index(filtro_actual)
-        else:
-            index_default = 0  # "Todas"
-            # Asegurar que el filtro esté inicializado en "Todas"
+        if st.session_state.get("filtro_entidad", "Todas") not in entities:
             st.session_state["filtro_entidad"] = "Todas"
-
-        entidad_sel = st.selectbox("Colegio", entidades, index=index_default, key="filtro_entidad")
-
-        # Meses disponibles (se actualizarán cuando se carguen datos)
-        meses = ["Todos"]
-        if "global_months" in st.session_state:
-            meses = ["Todos"] + st.session_state.global_months
-
-        # Determinar el índice por defecto para mes (siempre "Todos" si no hay filtro guardado)
-        filtro_mes_actual = st.session_state.get("filtro_mes", "Todos")
-        if filtro_mes_actual in meses:
-            index_mes_default = meses.index(filtro_mes_actual)
-        else:
-            index_mes_default = 0  # "Todos"
-            # Asegurar que el filtro esté inicializado en "Todos"
+        if st.session_state.get("filtro_mes", "Todos") not in months:
             st.session_state["filtro_mes"] = "Todos"
 
-        mes_sel = st.selectbox("Periodo", meses, index=index_mes_default, key="filtro_mes")
+        st.selectbox("Colegio", entities, key="filtro_entidad")
+        st.selectbox("Periodo", months, key="filtro_mes")
 
-        # Botón de Reset Filtros
-        if st.button("Reset Filtros", help="Limpia los filtros y devuelve a 'Todos los Colegios'"):
-            if "filtro_entidad" in st.session_state:
-                del st.session_state["filtro_entidad"]
-            if "filtro_mes" in st.session_state:
-                del st.session_state["filtro_mes"]
+        if st.button(
+            "Reset filtros",
+            help="Restablece colegio y periodo.",
+            use_container_width=True,
+        ):
+            st.session_state["filtro_entidad"] = "Todas"
+            st.session_state["filtro_mes"] = "Todos"
             st.rerun()
 
-        if st.button("Forzar recarga", help="Limpia caché y vuelve a cargar datos desde Google Sheets"):
+        if st.button(
+            "Forzar recarga",
+            help="Invalida el caché compartido y consulta nuevamente la fuente.",
+            use_container_width=True,
+        ):
             from utils.data_provider import data_provider
 
             data_provider.invalidate_cache()
-            st.session_state.force_data_refresh = True
-            st.toast("Recarga forzada activada", icon="🔄")
+            st.toast("Caché invalidado. Recargando datos…", icon="🔄")
             st.rerun()
 
         st.divider()
         st.caption("v2.1.0 • Maristas")
 
-    # --- Función de Carga Lazy ---
-    def load_data_lazy():
-        """Carga datos solo cuando se necesitan (lazy loading).
 
-        Usa `utils.data_provider` como fuente canónica para filtros y datos.
-        El data_provider incluye el importador de formularios con cálculo de interacciones.
-        """
-        refresh_data = st.session_state.get("force_data_refresh", False)
-        
-        if "app_data" not in st.session_state or refresh_data:
-            with st.spinner("Cargando datos desde Google Sheets..."):
-                try:
-                    # PRIORIDAD 1: Usar data_provider que tiene el importador de formulario
-                    from utils.data_provider import data_provider
-                    
-                    # Cargar datos fusionados con force_reload si se solicita refresh
-                    df_global = data_provider.get_merged_data(force_reload=refresh_data)
-                    
-                    if df_global is None or df_global.empty:
-                        st.warning("No se pudieron cargar datos. Verifica tu conexión a Google Sheets.")
-                        return None
-                    
-                    # Asegurar columnas estándar
-                    expected_columns = ['id_cuenta', 'entidad', 'plataforma', 'usuario_red', 'fecha', 'seguidores', 'engagement_rate', 'alcance', 'interacciones', 'likes_promedio']
-                    
-                    # Agregar columnas faltantes
-                    for col in expected_columns:
-                        if col not in df_global.columns:
-                            df_global[col] = ''
-                    
-                    # Usar id_cuenta como id
-                    if 'id_cuenta' in df_global.columns:
-                        df_global['id'] = df_global['id_cuenta'].astype(str)
-                    else:
-                        df_global['id'] = range(len(df_global))
-                    
-                    # Procesar fecha si no es datetime
-                    if 'fecha' in df_global.columns:
-                        df_global['fecha'] = pd.to_datetime(df_global['fecha'], errors='coerce')
+def _render_inicio() -> None:
+    """Landing intacta: conserva video, glassmorphism y estilos propios."""
+    from views import landing
 
-                    # Actualizar filtros globales disponibles
-                    try:
-                        if not df_global.empty and "entidad" in df_global.columns:
-                            st.session_state.global_entities = sorted([str(e) for e in df_global["entidad"].dropna().unique()])
-                        if not df_global.empty and "fecha" in df_global.columns:
-                            meses = sorted(df_global["fecha"].dt.strftime("%Y-%m").dropna().unique(), reverse=True)
-                            st.session_state.global_months = meses
-                    except Exception as e:
-                        logger.warning(f"No se pudieron actualizar filtros globales: {e}")
+    landing.render()
 
-                    st.session_state.app_data = {
-                        "cuentas": pd.DataFrame(),
-                        "metricas": pd.DataFrame(),
-                        "df_global": df_global
-                    }
-                    
-                    # Limpiar flag de refresh
-                    if "force_data_refresh" in st.session_state:
-                        st.session_state.force_data_refresh = False
-                    
-                    # Toast de éxito
-                    origin = st.session_state.get("data_origin", "unknown")
-                    if origin in {"sheets", "sheets_form"}:
-                        st.toast("🌐 Datos cargados desde Google Sheets", icon="✅")
-                    else:
-                        st.toast("💾 Datos cargados correctamente", icon="✅")
-                    
-                    return st.session_state.app_data
 
-                except Exception as e:
-                    st.error("❌ Error al cargar datos")
-                    st.exception(e)
-                    return None
+def _render_dashboard() -> None:
+    from views import dashboard
 
-        return st.session_state.app_data
+    df = _load_data_for_ui()
+    if df is None or df.empty:
+        st.warning("No hay datos disponibles para el Dashboard Global.")
+        return
 
-    # --- Función para aplicar filtros ---
-    def apply_filters(df_global):
-        """Aplica filtros globales al dataframe"""
-        if df_global is None or df_global.empty:
-            return df_global
+    filtered = apply_global_filters(
+        df,
+        entity=st.session_state.get("filtro_entidad", "Todas"),
+        month=st.session_state.get("filtro_mes", "Todos"),
+    )
+    dashboard.render(filtered)
 
-        df_filtered = df_global.copy()
 
-        # Filtro por mes (defensivo): usa el valor del sidebar almacenado en session_state.
-        mes_sel = st.session_state.get("filtro_mes", "Todos")
-        if mes_sel != "Todos" and "fecha" in df_filtered.columns:
-            fechas = pd.to_datetime(df_filtered["fecha"], errors="coerce")
-            df_filtered = df_filtered[fechas.dt.strftime("%Y-%m") == str(mes_sel)]
+def _render_comparativas() -> None:
+    from views import comparison
 
-        # Filtro por entidad
-        entidad_sel = st.session_state.get("filtro_entidad", "Todas")
-        if entidad_sel != "Todas" and entidad_sel in df_filtered["entidad"].values:
-            df_filtered = df_filtered[df_filtered["entidad"] == entidad_sel]
+    comparison.render_comparison_view()
 
-        return df_filtered
 
-    # Router con Lazy Loading
-    if selected == "Inicio":
-        from views import landing
-        landing.render()
-    elif selected == "Dashboard Global":
-        data = load_data_lazy()
-        if data:
-            df_filtered = apply_filters(data["df_global"])
-            from views import dashboard
-            dashboard.render(df_filtered)
-    elif selected == "Comparativas":
-        # Sprint 2 Week 3: Nueva vista de comparación lado a lado
-        from views import comparison
-        comparison.render_comparison_view()
-    elif selected == "Segmentación de Audiencias y Riesgo":
-        from views import audience_risk_view
+def _render_audiencias() -> None:
+    from views import audience_risk_view
 
-        audience_risk_view.render()
-    elif selected == "Tipo de contenidos":
-        from views import new_data_dashboard
+    audience_risk_view.render()
 
-        new_data_dashboard.render_new_data_dashboard()
-    elif selected == "Analisis de textos":
-        from views import text_analysis_dashboard
 
-        text_analysis_dashboard.render_text_analysis_dashboard()
-    elif selected == "Analisis Demografico y Geografico":
-        from views import demographic_geographic_analysis
+def _render_contenidos() -> None:
+    from views import new_data_dashboard
 
-        demographic_geographic_analysis.render_demographic_geographic_analysis()
-    elif selected == "Vista de Inteligencia Cruzada":
-        from views import cross_intelligence_view
+    new_data_dashboard.render_new_data_dashboard()
 
-        cross_intelligence_view.render_cross_intelligence_view()
-    elif selected == "Registro Estadistico":
-        from views import statistical_registry_dashboard
 
-        statistical_registry_dashboard.render_statistical_registry_dashboard()
-    elif selected == "Calc. Engagement":
-        # Calculadora de Engagement para Facebook y TikTok
-        from views import engagement_calculator_v2 as engagement_calculator
-        engagement_calculator.render()
-    elif selected == "Captura":
-        # Captura interna con validaciones y monitor mensual de pendientes.
-        from views import data_entry
+def _render_textos() -> None:
+    from views import text_analysis_dashboard
 
-        data_entry.render()
-    elif selected == "Auditoría de Respuestas":
-        from views import audit_view
+    text_analysis_dashboard.render_text_analysis_dashboard()
 
-        audit_view.render_audit_view()
-    elif selected == "Configuración":
-        from views import settings
-        settings.render()
-    else:
-        from views import landing
-        landing.render()
+
+def _render_demografia() -> None:
+    from views import demographic_geographic_analysis
+
+    demographic_geographic_analysis.render_demographic_geographic_analysis()
+
+
+def _render_cruzada() -> None:
+    from views import cross_intelligence_view
+
+    cross_intelligence_view.render_cross_intelligence_view()
+
+
+def _render_engagement() -> None:
+    from views import engagement_calculator_v2
+
+    engagement_calculator_v2.render()
+
+
+def _render_registro() -> None:
+    from views import statistical_registry_dashboard
+
+    statistical_registry_dashboard.render_statistical_registry_dashboard()
+
+
+def _render_captura() -> None:
+    from views import data_entry
+
+    data_entry.render()
+
+
+def _render_auditoria() -> None:
+    from views import audit_view
+
+    audit_view.render_audit_view()
+
+
+def _render_configuracion() -> None:
+    from views import settings
+
+    settings.render()
+
+
+def _page(
+    renderer: Callable[[], None],
+    *,
+    title: str,
+    icon: str,
+    url_path: str,
+    default: bool = False,
+) -> st.Page:
+    """Construye una página con URL estable y sin estado de navegación manual."""
+    return st.Page(
+        renderer,
+        title=title,
+        icon=icon,
+        url_path=url_path,
+        default=default,
+    )
+
+
+def _build_navigation():
+    pages = {
+        "Resumen": [
+            _page(
+                _render_inicio,
+                title="Inicio",
+                icon=":material/home:",
+                url_path="inicio",
+                default=True,
+            ),
+            _page(
+                _render_dashboard,
+                title="Dashboard Global",
+                icon=":material/dashboard:",
+                url_path="dashboard",
+            ),
+        ],
+        "Inteligencia": [
+            _page(
+                _render_audiencias,
+                title="Audiencias y riesgo",
+                icon=":material/groups:",
+                url_path="audiencias",
+            ),
+            _page(
+                _render_contenidos,
+                title="Tipo de contenidos",
+                icon=":material/article:",
+                url_path="contenidos",
+            ),
+            _page(
+                _render_textos,
+                title="Análisis de textos",
+                icon=":material/text_fields:",
+                url_path="textos",
+            ),
+            _page(
+                _render_demografia,
+                title="Demografía y geografía",
+                icon=":material/map:",
+                url_path="demografia",
+            ),
+            _page(
+                _render_cruzada,
+                title="Inteligencia cruzada",
+                icon=":material/hub:",
+                url_path="inteligencia-cruzada",
+            ),
+        ],
+        "Comparativas": [
+            _page(
+                _render_comparativas,
+                title="Comparativas",
+                icon=":material/compare_arrows:",
+                url_path="comparativas",
+            ),
+            _page(
+                _render_engagement,
+                title="Engagement",
+                icon=":material/monitoring:",
+                url_path="engagement",
+            ),
+        ],
+        "Datos": [
+            _page(
+                _render_registro,
+                title="Registro estadístico",
+                icon=":material/table_chart:",
+                url_path="registro",
+            ),
+            _page(
+                _render_captura,
+                title="Captura",
+                icon=":material/edit_note:",
+                url_path="captura",
+            ),
+            _page(
+                _render_auditoria,
+                title="Auditoría",
+                icon=":material/fact_check:",
+                url_path="auditoria",
+            ),
+        ],
+        "Sistema": [
+            _page(
+                _render_configuracion,
+                title="Configuración",
+                icon=":material/settings:",
+                url_path="configuracion",
+            ),
+        ],
+    }
+    return st.navigation(pages, position="sidebar", expanded=True)
+
+
+def main() -> None:
+    _configure_app()
+    current_page = _build_navigation()
+
+    # La caché es global; session_state conserva únicamente filtros escalares.
+    df = _load_data_for_ui()
+    _render_sidebar_controls(df)
+
+    current_page.run()
 
 
 if __name__ == "__main__":

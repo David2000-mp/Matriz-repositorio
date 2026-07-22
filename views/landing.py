@@ -103,8 +103,17 @@ def render(df=None):
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
-    /* Configuración de fuentes */
-    body, .stMarkdown, h1, h2, h3, h4, h5, h6, p, span {
+    /* Tipografía de la landing, aislada del sidebar y sus Material Symbols. */
+    section[data-testid="stMain"],
+    section[data-testid="stMain"] .stMarkdown,
+    section[data-testid="stMain"] h1,
+    section[data-testid="stMain"] h2,
+    section[data-testid="stMain"] h3,
+    section[data-testid="stMain"] h4,
+    section[data-testid="stMain"] h5,
+    section[data-testid="stMain"] h6,
+    section[data-testid="stMain"] p,
+    section[data-testid="stMain"] span:not([data-testid="stIconMaterial"]) {
         font-family: 'Inter', 'Segoe UI', -apple-system, sans-serif;
     }
 
@@ -154,12 +163,14 @@ def render(df=None):
         width: 100%;           /* Forzamos 50% para que sea pantalla dividida */
         height: 100vh;
         object-fit: cover;
-        z-index: -1;
+        z-index: 0;
+        pointer-events: none;
         margin-left: 0 !important;
     }
 
     .hero-overlay {
-        position: centered;
+        position: relative;
+        z-index: 2;
         width: 50%;           /* El texto también ocupa solo el 50% */
         height: 100vh;
         display: flex;
@@ -172,24 +183,70 @@ def render(df=None):
     }
 
     .glass-box {
-        position: centered;
-        background: rgba(255,255,255,0.18);
-        border-radius: 30px;
-        padding: 2.5rem 3.5rem;
-        box-shadow: 0 8px 32px 0 rgba(31,38,135,0.18);
-        backdrop-filter: blur(12px);
-        -webkit-backdrop-filter: blur(12px);
-        border: 1.5px solid rgba(255,255,255,0.28);
+        position: relative;
+        z-index: 3;
+        background: rgba(7, 27, 51, 0.4) !important;
+        backdrop-filter: blur(16px) saturate(120%) !important;
+        -webkit-backdrop-filter: blur(16px) saturate(120%) !important;
+        border: 1px solid rgba(255, 255, 255, 0.15) !important;
+        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5) !important;
+        border-radius: 20px !important;
+        width: fit-content !important;
+        max-width: calc(100vw - 2rem) !important;
+        padding: clamp(1.5rem, 3vw, 2.5rem) !important;
+        color: #FFFFFF !important;
+        text-align: center;
         display: flex;
         flex-direction: column;
-        align-items: flex-start;
+        align-items: center;
         animation: glassBoxEnter 0.8s ease-out 0.3s both,
                    glassBoxFloat 4s ease-in-out 1.1s infinite,
                    glassBoxGlow 5s ease-in-out 1.1s infinite;
         transition: transform 0.1s ease-out, box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         transform-style: preserve-3d;
-        position: relative;
         overflow: hidden;
+        cursor: grab;
+        touch-action: none;
+        user-select: none;
+    }
+
+    .glass-box.is-dragging {
+        animation: none !important;
+        cursor: grabbing;
+        box-shadow: 0 20px 52px rgba(0, 0, 0, 0.58),
+                    0 0 36px rgba(255, 184, 28, 0.36) !important;
+        border-color: rgba(255, 184, 28, 0.7) !important;
+    }
+
+    .glass-box h1,
+    .glass-box h2,
+    .glass-box h3,
+    .glass-box p,
+    .glass-box span {
+        color: #FFFFFF !important;
+        text-shadow: 0 2px 4px rgba(0,0,0,0.5) !important;
+    }
+
+    /* Jerarquía tipográfica de la consola de inteligencia. */
+    .glass-box .hero-title {
+        font-size: clamp(2rem, 4vw, 3.25rem) !important;
+        font-weight: 900 !important;
+        line-height: 1 !important;
+        letter-spacing: 0.16rem !important;
+        margin: 0 0 0.65rem !important;
+        white-space: nowrap !important;
+        text-shadow: 0 4px 10px rgba(0,0,0,0.6) !important;
+        text-transform: uppercase !important;
+    }
+
+    .glass-box .hero-subtitle {
+        font-size: clamp(0.9rem, 1.8vw, 1.15rem) !important;
+        font-weight: 400 !important;
+        line-height: 1.35 !important;
+        letter-spacing: 0.08rem !important;
+        opacity: 0.88 !important;
+        margin: 0 !important;
+        text-shadow: 0 2px 4px rgba(0,0,0,0.5) !important;
     }
     
     .glass-box::before {
@@ -251,10 +308,19 @@ def render(df=None):
         border: none !important;
     }
 
-    /* Fondo de la App Transparente */
-    .stApp {
+    /* La escena de video debe quedar visible bajo el contenido de la landing. */
+    .stApp,
+    [data-testid="stAppViewContainer"],
+    section[data-testid="stMain"],
+    section[data-testid="stMain"] > div,
+    [data-testid="stMainBlockContainer"] {
         background: transparent !important;
         background-color: transparent !important;
+    }
+
+    section[data-testid="stMain"] {
+        position: relative;
+        z-index: 1;
     }
 
     /* Eliminar Padding del Contenedor Principal */
@@ -289,7 +355,8 @@ def render(df=None):
             width: 100% !important;
         }
         .hero-title {
-            font-size: 3rem !important;
+            font-size: clamp(1.65rem, 9vw, 2.25rem) !important;
+            letter-spacing: 0.1rem !important;
         }
         /* Streamlit columns: fuerza 100% ancho y stack vertical */
         [data-testid="stHorizontalBlock"] {
@@ -358,14 +425,79 @@ def render(df=None):
         </video>
         <div class="hero-overlay">
             <div class="glass-box">
-                <p class="hero-title">CHAMPILEAKS</p>
+                <h1 class="hero-title">CHAMPILEAKS</h1>
                 <p class="hero-subtitle">Inteligencia Digital Marista</p>
             </div>
         </div>
         '''
         st.markdown(html_code, unsafe_allow_html=True)
     else:
-        st.markdown('<div class="hero-overlay"><div class="glass-box"><p class="hero-title">CHAMPILEAKS</p><p class="hero-subtitle">Inteligencia Digital Marista</p></div></div>', unsafe_allow_html=True)
+        st.markdown('<div class="hero-overlay"><div class="glass-box"><h1 class="hero-title">CHAMPILEAKS</h1><p class="hero-subtitle">Inteligencia Digital Marista</p></div></div>', unsafe_allow_html=True)
+
+    st.html("""
+    <script>
+    (() => {
+      const installDrag = () => {
+        const card = document.querySelector('.glass-box');
+        const overlay = document.querySelector('.hero-overlay');
+        if (!card || !overlay) {
+          window.setTimeout(installDrag, 100);
+          return;
+        }
+        if (card.dataset.champiDragReady === 'true') return;
+        card.dataset.champiDragReady = 'true';
+        card.title = 'Arrástrame para mover la consola · doble clic para centrar';
+
+        let dragging = false;
+        let offsetX = 0;
+        let offsetY = 0;
+        const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
+
+        const centre = () => {
+          card.style.position = '';
+          card.style.left = '';
+          card.style.top = '';
+          card.classList.remove('is-dragging');
+        };
+
+        card.addEventListener('pointerdown', (event) => {
+          if (event.button !== 0) return;
+          const cardRect = card.getBoundingClientRect();
+          const overlayRect = overlay.getBoundingClientRect();
+          card.style.position = 'absolute';
+          card.style.left = `${cardRect.left - overlayRect.left}px`;
+          card.style.top = `${cardRect.top - overlayRect.top}px`;
+          offsetX = event.clientX - cardRect.left;
+          offsetY = event.clientY - cardRect.top;
+          dragging = true;
+          card.classList.add('is-dragging');
+          card.setPointerCapture(event.pointerId);
+          event.preventDefault();
+        });
+
+        card.addEventListener('pointermove', (event) => {
+          if (!dragging) return;
+          const overlayRect = overlay.getBoundingClientRect();
+          const maxLeft = Math.max(0, overlayRect.width - card.offsetWidth);
+          const maxTop = Math.max(0, overlayRect.height - card.offsetHeight);
+          card.style.left = `${clamp(event.clientX - overlayRect.left - offsetX, 0, maxLeft)}px`;
+          card.style.top = `${clamp(event.clientY - overlayRect.top - offsetY, 0, maxTop)}px`;
+        });
+
+        const release = (event) => {
+          if (!dragging) return;
+          dragging = false;
+          card.classList.remove('is-dragging');
+          if (card.hasPointerCapture(event.pointerId)) card.releasePointerCapture(event.pointerId);
+        };
+        card.addEventListener('pointerup', release);
+        card.addEventListener('pointercancel', release);
+        card.addEventListener('dblclick', centre);
+      };
+      installDrag();
+    })();
+    </script>
+    """)
 
     if datos_validos and total_seguidores > 0:
         col1, col2, col3 = st.columns([1, 2, 1])

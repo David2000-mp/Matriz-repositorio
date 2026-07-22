@@ -288,6 +288,17 @@ class DataProvider:
 data_provider = DataProvider()
 
 
+@st.cache_data(ttl=300, show_spinner=False)
+def get_shared_merged_data() -> pd.DataFrame:
+    """Retorna el dataset fusionado desde un caché compartido por el servidor.
+
+    ``st.cache_data`` conserva una única entrada serializada para todas las
+    sesiones y entrega una copia segura a cada consumidor. La invalidación se
+    mantiene centralizada en ``DataProvider.invalidate_cache``.
+    """
+    return data_provider.get_merged_data(force_reload=False)
+
+
 # === Funciones públicas convenientes ===
 
 def get_data(force_reload: bool = False) -> Tuple[pd.DataFrame, pd.DataFrame]:

@@ -33,6 +33,8 @@ venv_*
 # Streamlit
 .streamlit/secrets.toml
 .streamlit/
+!.streamlit/
+!.streamlit/config.toml
 .streamlit_cache/
 
 # Environment Variables (IMPORTANTE - CREDENCIALES)

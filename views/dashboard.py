@@ -21,7 +21,7 @@ from utils import (
 from utils.data_provider import data_provider
 from utils.visualizations import plot_engagement_evolution, sanitize_chart_dataframe
 from utils.data_manager import load_configs
-from components import COLOR_MAP, inject_custom_css, configure_plotly_theme
+from components import inject_custom_css
 from utils.analytics import (
     calculate_growth_metrics,
     calculate_health_score,
@@ -41,7 +41,8 @@ from components.toast_notifications import (
 )
 
 # Importar configuración Plotly centralizada
-from components import PLOTLY_CONFIG, PLOTLY_LAYOUT_DEFAULTS, show_kpi_skeleton, show_chart_skeleton, COLOR_MAP
+from components import PLOTLY_CONFIG, show_kpi_skeleton, show_chart_skeleton, COLOR_MAP
+from utils.chart_theme import aplicar_tema_champileaks
 
 
 def get_traffic_light_indicator(metric, value):
@@ -897,12 +898,6 @@ def render(df=None):
                 fig_platform.update_layout(
                     xaxis_title="",
                     yaxis_title="Seguidores",
-                    font={"size": 10, "color": "#000000"},
-                    title_font={"color": "#000000"},
-                    margin={"l": 20, "r": 20, "t": 40, "b": 20},
-                    paper_bgcolor="white",
-                    plot_bgcolor="white",
-                    hoverlabel={"font": {"color": "#000000"}, "bgcolor": "#FFFFFF", "bordercolor": "#003696"},
                     xaxis={
                         "color": "#000000",
                         "gridcolor": "#E0E0E0",
@@ -919,7 +914,7 @@ def render(df=None):
 
                 # Limpiar skeleton y mostrar gráfico real
                 chart_placeholder.empty()
-                st.plotly_chart(fig_platform, config=PLOTLY_CONFIG, width='stretch')
+                st.plotly_chart(aplicar_tema_champileaks(fig_platform), config=PLOTLY_CONFIG, width='stretch')
                 
     except Exception as e:
         chart_placeholder.empty()
@@ -991,12 +986,6 @@ def render(df=None):
                         )
                         fig_area.update_layout(
                             autosize=True,
-                            paper_bgcolor="white",
-                            plot_bgcolor="white",
-                            font={"color": "#000000"},
-                            title_font={"color": "#000000"},
-                            legend={"font": {"color": "#000000"}},
-                            hoverlabel={"font": {"color": "#000000"}, "bgcolor": "#FFFFFF", "bordercolor": "#003696"},
                             xaxis={
                                 "color": "#000000",
                                 "gridcolor": "#E0E0E0",
@@ -1071,7 +1060,7 @@ def render(df=None):
 
                         evolution_placeholder.empty()  # Remover skeleton
                         st.plotly_chart(
-                            fig_area,
+                            aplicar_tema_champileaks(fig_area),
                             width='stretch',
                             config=PLOTLY_CONFIG,
                         )
@@ -1129,12 +1118,6 @@ def render(df=None):
                         fig_bar.update_traces(textposition="outside")
                         fig_bar.update_layout(
                             autosize=True,
-                            paper_bgcolor="white",
-                            plot_bgcolor="white",
-                            font={"color": "#000000"},
-                            title_font={"color": "#000000"},
-                            legend={"font": {"color": "#000000"}},
-                            hoverlabel={"font": {"color": "#000000"}, "bgcolor": "#FFFFFF", "bordercolor": "#003696"},
                             xaxis={
                                 "color": "#000000",
                                 "gridcolor": "#E0E0E0",
@@ -1150,7 +1133,7 @@ def render(df=None):
                         )
                         ranking_placeholder.empty()  # Remover skeleton
                         st.plotly_chart(
-                            fig_bar,
+                            aplicar_tema_champileaks(fig_bar),
                             width='stretch',
                             config=PLOTLY_CONFIG,
                         )
@@ -1227,12 +1210,6 @@ def render(df=None):
                             
                             fig_engagement.update_layout(
                                 autosize=True,
-                                paper_bgcolor='white',
-                                plot_bgcolor='white',
-                                font={'color': '#000000'},
-                                title_font={'color': '#000000'},
-                                legend={'font': {'color': '#000000'}},
-                                hoverlabel={'font': {'color': '#000000'}, 'bgcolor': '#FFFFFF', 'bordercolor': '#003696'},
                                 xaxis={
                                     'color': '#000000',
                                     'gridcolor': '#E0E0E0',
@@ -1249,7 +1226,7 @@ def render(df=None):
                             
                             engagement_placeholder.empty()
                             st.plotly_chart(
-                                fig_engagement,
+                                aplicar_tema_champileaks(fig_engagement),
                                 width='stretch',
                                 config=PLOTLY_CONFIG,
                             )
@@ -1325,10 +1302,6 @@ def render(df=None):
             yaxis_title="Crecimiento de Seguidores",
             legend_title="Plataforma Social",
             showlegend=show_platform_legend,
-            plot_bgcolor="rgba(0,0,0,0)",
-            paper_bgcolor="rgba(0,0,0,0)",
-            font=dict(size=12, color="#2c3e50"),
-            title_font=dict(size=20, color="#2c3e50", family="Arial Black"),
             title_x=0.5,
             title_y=0.95,
         )
@@ -1363,7 +1336,7 @@ def render(df=None):
         )
 
         st.plotly_chart(
-            fig_growth,
+            aplicar_tema_champileaks(fig_growth),
             width="stretch",
             config=PLOTLY_CONFIG,
         )
@@ -1402,10 +1375,6 @@ def render(df=None):
                 yaxis_title="Crecimiento porcentual (%)",
                 legend_title="Plataforma Social",
                 showlegend=show_platform_legend,
-                plot_bgcolor="rgba(0,0,0,0)",
-                paper_bgcolor="rgba(0,0,0,0)",
-                font=dict(size=12, color="#2c3e50"),
-                title_font=dict(size=20, color="#2c3e50", family="Arial Black"),
                 title_x=0.5,
                 title_y=0.95,
             )
@@ -1440,7 +1409,7 @@ def render(df=None):
             )
 
             st.plotly_chart(
-                fig_growth_pct,
+                aplicar_tema_champileaks(fig_growth_pct),
                 width="stretch",
                 config=PLOTLY_CONFIG,
             )
@@ -1593,11 +1562,6 @@ def render(df=None):
                 fig_health.update_traces(line=dict(color="#0056B3", width=3))  # Azul info WCAG AA
                 fig_health.update_layout(
                     autosize=True,
-                    font={"color": "#000000"},
-                    title_font={"color": "#000000"},
-                    paper_bgcolor="white",
-                    plot_bgcolor="white",
-                    hoverlabel={"font": {"color": "#000000"}, "bgcolor": "#FFFFFF", "bordercolor": "#003696"},
                     xaxis={
                         "color": "#000000",
                         "gridcolor": "#E0E0E0",
@@ -1613,7 +1577,7 @@ def render(df=None):
                     },
                 )
                 health_placeholder.empty()  # Remover skeleton
-                st.plotly_chart(fig_health, width='stretch', config=PLOTLY_CONFIG)
+                st.plotly_chart(aplicar_tema_champileaks(fig_health), width='stretch', config=PLOTLY_CONFIG)
     except Exception as e:
         health_placeholder.empty()
         logging.error(f"Error al generar gráfica de salud digital: {e}")
