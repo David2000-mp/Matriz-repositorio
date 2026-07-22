@@ -19,6 +19,7 @@ from streamlit_lottie import st_lottie
 _ANIMATIONS_DIR = Path(__file__).resolve().parents[1] / "assets" / "animations"
 
 
+@st.cache_data(show_spinner=False)
 def _load_lottie_local(filepath: str | Path) -> dict | None:
     """Carga una animación Lottie local sin interrumpir la aplicación.
 

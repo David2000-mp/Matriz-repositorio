@@ -7,7 +7,7 @@ import plotly.graph_objects as go
 import streamlit as st
 from plotly.subplots import make_subplots
 
-from components import EmptyState, PLOTLY_CONFIG
+from components import PLOTLY_CONFIG, render_empty_state
 from utils.chart_theme import aplicar_tema_champileaks
 from utils.cross_intelligence import (
     build_city_performance_drilldown,
@@ -404,9 +404,10 @@ def render_cross_intelligence_view() -> None:
 
     colegio, plataforma, month_key = _render_filters()
     if not month_key:
-        EmptyState(
-            "No hay periodos disponibles",
+        render_empty_state(
+            "**No hay periodos disponibles**  \n"
             "Sincroniza Base_Maestra_Colegios o Base_Demografica_Colegios para activar esta vista.",
+            tipo="geo",
         )
         return
 
@@ -434,10 +435,10 @@ def render_cross_intelligence_view() -> None:
         prev_month_key = monthly.get("prev_month_key", "")
 
     if maestra_current.empty and demo_current.empty:
-        EmptyState(
-            "No hay cruces para los filtros actuales",
+        render_empty_state(
+            "**No hay cruces para los filtros actuales**  \n"
             "Cambia el colegio, la plataforma o el periodo para consultar otra combinación.",
-            icon="\U0001f5d0\ufe0f",
+            tipo="geo",
         )
         return
 

@@ -10,7 +10,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import re
 
-from components import PLOTLY_CONFIG
+from components import PLOTLY_CONFIG, render_empty_state
 from utils.chart_theme import aplicar_tema_champileaks
 from utils.data_provider import data_provider
 
@@ -885,7 +885,10 @@ def render_new_data_dashboard() -> None:
 
     df = data_provider.get_merged_data(force_reload=False)
     if df is None or df.empty:
-        st.warning("No hay datos disponibles para esta vista.")
+        render_empty_state(
+            "**No hay contenidos disponibles**  \n"
+            "Sincroniza registros o cambia los filtros globales para consultar esta vista.",
+        )
         return
 
     required_for_view = ["fecha", "entidad", "plataforma"]
@@ -937,7 +940,10 @@ def render_new_data_dashboard() -> None:
         social_filtered = social_filtered[social_filtered["plataforma"] == plataforma_sel]
 
     if social_filtered.empty and maps_filtered.empty:
-        st.warning("No hay filas para los filtros seleccionados.")
+        render_empty_state(
+            "**Los filtros no encontraron contenidos**  \n"
+            "Prueba otra institución o plataforma para ampliar la consulta.",
+        )
         return
 
     has_social_data = not social_filtered.empty

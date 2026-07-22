@@ -15,7 +15,7 @@ try:
 except Exception:
     px = None
     go = None
-from components import PLOTLY_CONFIG
+from components import PLOTLY_CONFIG, render_status
 from utils.chart_theme import aplicar_tema_champileaks
 from utils.report_generator import generate_engagement_report_html
 from utils.rules_engine import calculate_engagement_engine
@@ -666,7 +666,7 @@ def render_step_1_basic_data():
     
     notice = st.session_state.pop("wizard_restore_notice", None) if "wizard_restore_notice" in st.session_state else None
     if notice:
-        st.success(notice)
+        render_status(notice, tipo="success")
 
     col1, col2 = st.columns(2)
     
@@ -746,11 +746,12 @@ def render_step_1_basic_data():
     if existing_draft and existing_draft.get("saved_at"):
         st.caption(f"🛟 Borrador disponible guardado el {existing_draft['saved_at'].replace('T', ' ')}")
 
+    draft_feedback: tuple[str, str] | None = None
     action_col1, action_col2, action_col3 = st.columns(3)
     with action_col1:
         if st.button("💾 Guardar borrador", width="stretch"):
             save_draft_snapshot(draft_payload, platform=platform_clean)
-            st.success("Borrador guardado localmente.")
+            draft_feedback = ("Borrador guardado localmente.", "success")
 
     with action_col2:
         if st.button("↩️ Recuperar borrador", width="stretch"):
@@ -765,9 +766,13 @@ def render_step_1_basic_data():
         if st.button("🗑️ Borrar borrador", width="stretch"):
             removed = clear_draft_snapshot(platform=platform_clean)
             if removed:
-                st.success("Borrador eliminado.")
+                draft_feedback = ("Borrador eliminado.", "success")
             else:
                 st.info("No había borrador guardado para esta plataforma.")
+
+    if draft_feedback is not None:
+        message, status_type = draft_feedback
+        render_status(message, tipo=status_type)
     
     if st.button("Continuar al Paso 2 →", width="stretch", type="primary"):
         save_draft_snapshot({**draft_payload, "wizard_step": 2}, platform=platform_clean)
@@ -1208,7 +1213,10 @@ def calculate_and_render_results():
     if platform == "tiktok":
         qualifying_posts = community_posts + [p for p in reach_posts if p not in community_posts]
         if not qualifying_posts:
-            st.error("⚠️ No hay datos para analizar. En TikTok necesitas interacciones o vistas.")
+            render_status(
+                "No hay datos para analizar. En TikTok necesitas interacciones o vistas.",
+                tipo="error",
+            )
             if st.button("← Volver al Paso 2"):
                 st.session_state["wizard_step"] = 2
                 st.rerun()
@@ -1225,7 +1233,10 @@ def calculate_and_render_results():
         analyzed_posts = captured_posts
         analysis_mode = "standard"
         if not community_posts:
-            st.error("⚠️ No hay datos para analizar. Por favor completa al menos algunos posts.")
+            render_status(
+                "No hay datos para analizar. Completa al menos algunas publicaciones.",
+                tipo="error",
+            )
             if st.button("← Volver al Paso 2"):
                 st.session_state["wizard_step"] = 2
                 st.rerun()

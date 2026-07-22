@@ -20,7 +20,7 @@ except Exception:
     px = None
     go = None
 
-from components import EmptyState, MetricCard, PLOTLY_CONFIG
+from components import MetricCard, PLOTLY_CONFIG, render_empty_state
 from utils.chart_theme import aplicar_tema_champileaks
 from utils.data_provider import data_provider
 from utils.analytics import calculate_health_score
@@ -537,8 +537,8 @@ def render(df: pd.DataFrame | None = None) -> None:
     data = _apply_sidebar_filters(data)
 
     if data.empty:
-        EmptyState(
-            "Sin audiencias para los filtros actuales",
+        render_empty_state(
+            "**Sin audiencias para los filtros actuales**  \n"
             "Cambia el colegio o el periodo global para explorar otros registros.",
         )
         return
@@ -568,10 +568,9 @@ def render(df: pd.DataFrame | None = None) -> None:
     unmapped_entities = sorted([name for name in unmapped_entities.unique().tolist() if name])
 
     if snapshot.empty or level_summary.empty:
-        EmptyState(
-            "No hay base suficiente para el análisis de riesgo",
+        render_empty_state(
+            "**No hay base suficiente para el análisis de riesgo**  \n"
             "Se necesitan registros con seguidores e interacciones para construir la segmentación.",
-            icon="\U0001f6e1\ufe0f",
         )
         return
 

@@ -9,11 +9,13 @@ from collections.abc import Callable
 import streamlit as st
 
 from components import (
-    EmptyState,
     FilterBar,
     inject_clipboard_shortcut_guard,
     inject_custom_css,
     inject_layout_compact_css,
+    render_empty_state,
+    render_loader,
+    render_status,
 )
 from utils.app_data import apply_global_filters, get_filter_options, load_app_dataframe
 from utils.logger import get_logger, set_production_mode
@@ -46,18 +48,31 @@ def _configure_app() -> None:
         logging.warning("No se pudo aplicar el CSS existente: %s", exc)
 
 
-def _load_data_for_ui():
+def _load_data_for_ui(*, show_loader: bool = True):
     """Carga datos compartidos; nunca escribe el DataFrame en session_state."""
+    loader_placeholder = st.empty() if show_loader else None
+    if loader_placeholder is not None:
+        with loader_placeholder.container():
+            render_loader("main")
+
     try:
         # El primer acceso puede consultar la fuente remota; las siguientes
         # ejecuciones usan el caché compartido de Streamlit.
-        with st.spinner("Inicializando consola de inteligencia…"):
-            return load_app_dataframe()
+        data = load_app_dataframe()
     except Exception as exc:
+        if loader_placeholder is not None:
+            loader_placeholder.empty()
         logger.exception("No se pudieron cargar los datos de la aplicación")
-        st.error("No se pudieron cargar los datos. Verifica la conexión configurada.")
+        render_status(
+            "No se pudieron cargar los datos. Verifica la conexión configurada.",
+            tipo="error",
+        )
         st.caption(str(exc))
         return None
+
+    if loader_placeholder is not None:
+        loader_placeholder.empty()
+    return data
 
 
 def _render_sidebar_controls(df) -> None:
@@ -104,10 +119,10 @@ def _render_inicio() -> None:
 def _render_dashboard() -> None:
     from views import dashboard
 
-    df = _load_data_for_ui()
+    df = _load_data_for_ui(show_loader=False)
     if df is None or df.empty:
-        EmptyState(
-            "Aún no hay datos para mostrar",
+        render_empty_state(
+            "**Aún no hay datos para mostrar**  \n"
             "Carga o sincroniza registros y vuelve a consultar el Dashboard Global.",
         )
         return
@@ -118,10 +133,9 @@ def _render_dashboard() -> None:
         month=st.session_state.get("filtro_mes", "Todos"),
     )
     if filtered.empty:
-        EmptyState(
-            "Los filtros no encontraron registros",
+        render_empty_state(
+            "**Los filtros no encontraron registros**  \n"
             "Prueba con otro colegio o periodo desde los filtros globales.",
-            icon="\U0001f5d0\ufe0f",
         )
         return
     dashboard.render(filtered)

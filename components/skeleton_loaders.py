@@ -4,6 +4,8 @@ Proporciona placeholders animados mientras se cargan datos/gráficos.
 """
 import streamlit as st
 
+from .ui import render_loader
+
 
 def show_kpi_skeleton(count=4):
     """
@@ -49,8 +51,10 @@ def show_chart_skeleton(height=400):
     Args:
         height: Altura del skeleton en píxeles
     """
+    render_loader("chart")
+    skeleton_height = max(int(height) - 120, 120)
     st.markdown(f"""
-        <div class="skeleton-chart" style="height: {height}px;">
+        <div class="skeleton-chart" style="height: {skeleton_height}px;">
             <div class="skeleton-title"></div>
             <div class="skeleton-bars">
                 <div class="skeleton-bar" style="height: 60%"></div>

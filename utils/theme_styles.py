@@ -255,6 +255,27 @@ def get_theme_css() -> str:
         padding: 1rem;
     }
 
+    section[data-testid="stMain"] [data-testid="stMetric"],
+    section[data-testid="stMain"] [data-testid="stPlotlyChart"],
+    section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"] {
+        transition:
+            transform 180ms ease,
+            box-shadow 180ms ease,
+            border-color 180ms ease;
+    }
+
+    section[data-testid="stMain"] [data-testid="stMetric"]:hover,
+    section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:hover {
+        border-color: rgba(22, 119, 255, 0.35);
+        box-shadow: 0 10px 28px rgba(0, 54, 150, 0.10);
+        transform: translateY(-2px);
+    }
+
+    section[data-testid="stMain"] [data-testid="stPlotlyChart"],
+    section[data-testid="stMain"] [data-testid="stAlert"] {
+        animation: champi-fade-up 240ms ease-out both;
+    }
+
     .stButton > button,
     .stDownloadButton > button {
         border-radius: 0.625rem;
@@ -274,6 +295,12 @@ def get_theme_css() -> str:
         transform: translateY(-1px);
     }
 
+    .stButton > button:active,
+    .stDownloadButton > button:active {
+        box-shadow: none;
+        transform: translateY(0) scale(0.98);
+    }
+
     [data-baseweb="tab-list"] {
         gap: 0.25rem;
         border-bottom: 1px solid var(--champi-border);
@@ -282,6 +309,21 @@ def get_theme_css() -> str:
     [data-baseweb="tab"][aria-selected="true"] {
         color: var(--champi-primary);
         border-bottom-color: var(--champi-accent);
+    }
+
+    [data-baseweb="tab"] {
+        transition: color 160ms ease, background-color 160ms ease;
+    }
+
+    @keyframes champi-fade-up {
+        from {
+            opacity: 0;
+            transform: translateY(6px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
     }
 
     @media (max-width: 767px) {
