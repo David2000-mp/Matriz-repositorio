@@ -21,7 +21,7 @@ from utils import (
 from utils.data_provider import data_provider
 from utils.visualizations import plot_engagement_evolution, sanitize_chart_dataframe
 from utils.data_manager import load_configs
-from components import inject_custom_css
+from components import inject_custom_css, render_live_indicator
 from utils.analytics import (
     calculate_growth_metrics,
     calculate_health_score,
@@ -206,7 +206,11 @@ def render(df=None):
     # Inyectar estilos globales desde components
     inject_custom_css()
 
-    st.title("Dashboard Global")
+    title_col, live_col = st.columns([8, 2], vertical_alignment="center")
+    with title_col:
+        st.title("Dashboard Global")
+    with live_col:
+        render_live_indicator("En vivo")
     # Cargar datos usando data provider si no se proporcionaron
     if df is None:
         # Progress bar con pasos (usa caché compartido; sin recarga forzada)

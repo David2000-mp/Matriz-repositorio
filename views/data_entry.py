@@ -7,6 +7,7 @@ import streamlit as st
 import pandas as pd
 from datetime import date
 import logging
+from components import ui
 from utils.data_provider import data_provider
 from utils.helpers import generate_social_url
 from utils.data_manager import (
@@ -496,6 +497,10 @@ def render(df=None):
                         if success:
                             toast_data_saved(f"{entidad} - {plataforma}")
                             toast_info(f"Alcance estimado: {alcance_final:,}", duration=2)
+                            ui.render_status(
+                                f"Datos guardados para {entidad} - {plataforma}",
+                                tipo="success",
+                            )
                             try:
                                 st.balloons()
                             except Exception:
@@ -515,10 +520,13 @@ def render(df=None):
                             })
 
                         else:
-                            st.error("❌ Error al guardar el registro. Intenta nuevamente. Si el problema persiste, verifica tu conexión a Google Sheets.")
+                            ui.render_status(
+                                "Error al guardar el registro. Intenta nuevamente. Si el problema persiste, verifica tu conexión a Google Sheets.",
+                                tipo="error",
+                            )
 
                     except Exception as e:
-                        st.error(f"⚠️ Error al guardar el registro: {e}")
+                        ui.render_status(f"Error al guardar el registro: {e}", tipo="error")
                         logging.error(f"Error al guardar registro: {e}", exc_info=True)
 
         # ========================================================================
@@ -708,6 +716,10 @@ def render(df=None):
                         if registros_guardados > 0:
                             status.update(label=f"✅ ¡Guardados {registros_guardados} registros exitosamente!")
                             toast_success(f"¡Captura anual completada! {registros_guardados} registros guardados")
+                            ui.render_status(
+                                f"Captura anual completada: {registros_guardados} registros guardados",
+                                tipo="success",
+                            )
 
                             # Mostrar resumen
                             st.info(f"📊 Resumen: {entidad_anual} - {año_captura}")
@@ -725,9 +737,16 @@ def render(df=None):
 
                         else:
                             status.update(label="❌ No se guardaron registros")
-                            st.warning("⚠️ No se encontraron datos para guardar. Asegúrate de ingresar al menos un valor de seguidores.")
+                            ui.render_status(
+                                "No se encontraron datos para guardar. Ingresa al menos un valor de seguidores.",
+                                tipo="error",
+                            )
 
                         if errores:
+                            ui.render_status(
+                                f"La captura terminó con {len(errores)} errores",
+                                tipo="error",
+                            )
                             st.error("❌ Errores encontrados:")
                             for error in errores:
                                 st.error(f"  • {error}")

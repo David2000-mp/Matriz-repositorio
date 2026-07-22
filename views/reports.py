@@ -4,6 +4,7 @@ Vista para la configuración y generación de reportes personalizados.
 
 import streamlit as st
 import pandas as pd
+from components import ui
 from utils.data_manager import load_data
 from utils.report_generator import ReportBuilder
 
@@ -50,29 +51,34 @@ def render_report_view(df_metricas, trend_figures):
 
     # Botón para generar el reporte
     if st.button("Generar PDF"):
-        with st.spinner("Generando reporte..."):
-            try:
-                # Crear instancia de ReportBuilder
-                report = ReportBuilder(df=metricas_filtradas, entity_name=entidad)
+        loader_placeholder = st.empty()
+        with loader_placeholder.container():
+            ui.render_loader(tipo="main")
+        try:
+            # Crear instancia de ReportBuilder
+            report = ReportBuilder(df=metricas_filtradas, entity_name=entidad)
 
-                # Agregar secciones seleccionadas
-                sections = []
-                if incluir_resumen:
-                    sections.append("resumen")
-                if incluir_kpis:
-                    sections.append("kpis")
-                if incluir_graficas:
-                    sections.append("graficas")
+            # Agregar secciones seleccionadas
+            sections = []
+            if incluir_resumen:
+                sections.append("resumen")
+            if incluir_kpis:
+                sections.append("kpis")
+            if incluir_graficas:
+                sections.append("graficas")
 
-                # Generar el archivo PDF
-                pdf_bytes = report.generate(sections=sections)
+            # Generar el archivo PDF
+            pdf_bytes = report.generate(sections=sections)
 
-                # Botón de descarga
-                st.download_button(
-                    label="Descargar Reporte",
-                    data=pdf_bytes,
-                    file_name=f"{entidad}_reporte.pdf",
-                    mime="application/pdf",
-                )
-            except Exception as e:
-                st.error(f"❌ Error al generar el reporte: {e}")
+            # Botón de descarga
+            st.download_button(
+                label="Descargar Reporte",
+                data=pdf_bytes,
+                file_name=f"{entidad}_reporte.pdf",
+                mime="application/pdf",
+            )
+            ui.render_status("Reporte generado correctamente", tipo="success")
+        except Exception as e:
+            ui.render_status(f"Error al generar el reporte: {e}", tipo="error")
+        finally:
+            loader_placeholder.empty()

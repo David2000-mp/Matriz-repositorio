@@ -7,6 +7,7 @@ import logging
 import pandas as pd
 import streamlit as st
 
+from components import ui
 from utils.sheets_connector import cargar_respuestas_forms
 
 
@@ -22,8 +23,8 @@ def render_audit_view(df_merged=None):
         df_forms = cargar_respuestas_forms()
 
         if df_forms.empty:
-            st.warning("No hay datos nuevos del formulario")
-            st.stop()
+            ui.render_empty_state("No hay datos nuevos del formulario", tipo="search")
+            return
 
         df_forms = df_forms.reset_index(drop=True)
 
@@ -75,5 +76,5 @@ def render_audit_view(df_merged=None):
             st.dataframe(errores[error_cols], width="stretch")
 
     except Exception as e:
-        st.error(f"Error cargando datos del formulario: {e}")
+        ui.render_status(f"Error cargando datos del formulario: {e}", tipo="error")
         logging.error(f"Error en auditoría de respuestas: {e}")

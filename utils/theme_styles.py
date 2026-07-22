@@ -315,6 +315,37 @@ def get_theme_css() -> str:
         transition: color 160ms ease, background-color 160ms ease;
     }
 
+    /* Animación suave (Fade & Slide Up) para páginas y pestañas */
+    @keyframes fade-slide-in {
+        0% { opacity: 0; transform: translateY(12px); }
+        100% { opacity: 1; transform: translateY(0); }
+    }
+
+    [data-testid="stMainBlock"],
+    [data-testid="stTabContent"],
+    .stTabs [role="tabpanel"] {
+        animation: fade-slide-in 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+    }
+
+    [data-testid="stTabs"] button {
+        transition: color 0.2s ease, border-color 0.2s ease;
+    }
+
+    /* Efecto hover genérico para tarjetas/métricas */
+    .metric-card-hover {
+        transition: all 0.3s ease;
+    }
+    .metric-card-hover:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+    }
+
+    /* El video fijo de la landing no debe heredar un contenedor transformado. */
+    [data-testid="stMainBlock"]:has(.hero-bg-video) {
+        animation: none;
+        transform: none;
+    }
+
     @keyframes champi-fade-up {
         from {
             opacity: 0;

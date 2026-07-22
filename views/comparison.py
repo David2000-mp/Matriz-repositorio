@@ -20,6 +20,7 @@ from typing import Dict, Optional, Tuple
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
+from components import ui
 from utils.app_state import get_app_state
 from components.toast_notifications import toast_info, toast_warning, toast_filter_applied
 from utils.logger import get_logger
@@ -141,8 +142,13 @@ def render_comparison_view():
 
     # Cargar datos desde data_provider (fuente canónica con caché compartido)
     from utils.data_provider import data_provider
-    with st.spinner("Cargando datos..."):
+    loader_placeholder = st.empty()
+    with loader_placeholder.container():
+        ui.render_loader(tipo="main")
+    try:
         df_full = data_provider.get_merged_data()
+    finally:
+        loader_placeholder.empty()
 
     if df_full is None or df_full.empty:
         st.warning("⚠️ No hay datos disponibles. Verifica la conexión a Google Sheets.")

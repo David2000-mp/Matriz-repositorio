@@ -9,6 +9,8 @@ import pandas as pd
 import os
 import logging
 
+from components import ui
+
 # Importaciones seguras
 import utils.data_manager as dm
 from utils import save_batch, COLEGIOS_MARISTAS
@@ -25,6 +27,12 @@ def render(df=None):
     """
     st.title("⚙️ CONFIGURACIÓN Y ADMINISTRACIÓN")
     st.caption("🛠️ Herramientas de Gestión y Personalización del Sistema")
+    pending_status = st.session_state.pop("_settings_lottie_status", None)
+    if pending_status:
+        ui.render_status(
+            pending_status["mensaje"],
+            tipo=pending_status.get("tipo", "success"),
+        )
     st.markdown("---")
 
     # Implementación de pestañas
@@ -121,7 +129,10 @@ def render(df=None):
             progress_bar.empty()
             status.empty()
             
-            st.success(f"🎉 ¡{len(datos):,} registros generados exitosamente!")
+            st.session_state["_settings_lottie_status"] = {
+                "mensaje": f"¡{len(datos):,} registros generados exitosamente!",
+                "tipo": "success",
+            }
             st.balloons()
             st.cache_data.clear()
             st.rerun()
@@ -145,10 +156,16 @@ def render(df=None):
                     success = reset_db()
                 
                 if success:
-                    st.success("✅ Base de datos reseteada exitosamente. Google Sheets y archivos CSV limpiados.")
+                    st.session_state["_settings_lottie_status"] = {
+                        "mensaje": "Base de datos reseteada exitosamente. Google Sheets y archivos CSV limpiados.",
+                        "tipo": "success",
+                    }
                     st.info("ℹ️ Los encabezados han sido preservados. Puedes comenzar a cargar datos nuevamente.")
                 else:
-                    st.error("❌ Error durante el reset. Verifica los logs.")
+                    st.session_state["_settings_lottie_status"] = {
+                        "mensaje": "Error durante el reset. Verifica los logs.",
+                        "tipo": "error",
+                    }
                 
                 # Recargar UI para reflejar cambios
                 st.rerun()
@@ -164,7 +181,10 @@ def render(df=None):
             import io
             from pathlib import Path
             
-            with st.spinner("Generando respaldo..."):
+            loader_placeholder = st.empty()
+            with loader_placeholder.container():
+                ui.render_loader(tipo="main")
+            try:
                 # Intentar cargar datos de Google Sheets
                 try:
                     cuentas_sheets, metricas_sheets = dm.load_data()
@@ -259,8 +279,12 @@ Google Sheets:
                     type="primary"
                 )
                 
-                st.success("✅ Respaldo generado exitosamente")
+                ui.render_status("Respaldo generado exitosamente", tipo="success")
                 st.balloons()
+            except Exception as e:
+                ui.render_status(f"Error al generar el respaldo: {e}", tipo="error")
+            finally:
+                loader_placeholder.empty()
 
         st.divider()
         st.subheader("📤 Cargar métricas por publicación (CSV)")
@@ -279,7 +303,7 @@ Google Sheets:
                 try:
                     df_posts = pd.read_csv(uploaded)
                 except Exception as e:
-                    st.error(f"Error leyendo CSV: {e}")
+                    ui.render_status(f"Error leyendo CSV: {e}", tipo="error")
                     df_posts = None
 
                 if df_posts is not None:
@@ -346,11 +370,14 @@ Google Sheets:
                                     # Convertir lista a DataFrame
                                     df_to_save = pd.DataFrame(datos_para_guardar)
                                     save_batch(df_to_save)
-                                    st.success(f"✅ {len(datos_para_guardar)} publicaciones guardadas correctamente.")
+                                    st.session_state["_settings_lottie_status"] = {
+                                        "mensaje": f"{len(datos_para_guardar)} publicaciones guardadas correctamente.",
+                                        "tipo": "success",
+                                    }
                                     st.cache_data.clear()
                                     st.rerun()
                                 except Exception as e:
-                                    st.error(f"Error guardando publicaciones: {e}")
+                                    ui.render_status(f"Error guardando publicaciones: {e}", tipo="error")
                             else:
                                 st.warning("No se encontraron publicaciones válidas para guardar.")
 
@@ -476,7 +503,8 @@ Google Sheets:
                             try:
                                 st.toast("✅ PDF generado", icon="Ⓜ️")
                             except Exception:
-                                st.success("✅ Reporte listo")
+                                pass
+                            ui.render_status("Reporte listo", tipo="success")
 
                             st.download_button(
                                 label="⬇️ Descargar PDF",
@@ -485,7 +513,7 @@ Google Sheets:
                                 mime="application/pdf",
                             )
                         except Exception as e:
-                            st.error(f"Error generando PDF: {e}")
+                            ui.render_status(f"Error generando PDF: {e}", tipo="error")
 
             with col_prev:
                 st.subheader("Vista Previa de Datos")
@@ -552,17 +580,23 @@ Google Sheets:
                                 redes_dict[plat.strip()] = user.strip()
 
                         if not redes_dict:
-                            st.error("Formato incorrecto. Usa: 'Plataforma:Usuario'")
+                            ui.render_status(
+                                "Formato incorrecto. Usa: 'Plataforma:Usuario'",
+                                tipo="error",
+                            )
                         else:
                             # Actualizar variable global en memoria para que se vea reflejado al instante
                             COLEGIOS_MARISTAS[new_name] = redes_dict
-                            st.success(f"✅ {new_name} agregada correctamente.")
+                            st.session_state["_settings_lottie_status"] = {
+                                "mensaje": f"{new_name} agregada correctamente.",
+                                "tipo": "success",
+                            }
                             st.rerun()  # Recargar la página para ver cambios
 
                     except Exception as e:
-                        st.error(f"Error de formato: {e}")
+                        ui.render_status(f"Error de formato: {e}", tipo="error")
                 else:
-                    st.error("Por favor completa todos los campos.")
+                    ui.render_status("Por favor completa todos los campos.", tipo="error")
 
         with st.expander("🗑️ Eliminar Institución del Catálogo"):
             st.warning(
@@ -614,9 +648,13 @@ Google Sheets:
                                     f"Error eliminando institución de Sheets: {e}"
                                 )
 
-                        st.success(
-                            f"✅ La institución '{institucion_a_eliminar}' ha sido eliminada correctamente."
-                        )
+                        st.session_state["_settings_lottie_status"] = {
+                            "mensaje": f"La institución '{institucion_a_eliminar}' ha sido eliminada correctamente.",
+                            "tipo": "success",
+                        }
                         st.rerun()
                     except Exception as e:
-                        st.error(f"❌ Error al eliminar la institución: {e}")
+                        ui.render_status(
+                            f"Error al eliminar la institución: {e}",
+                            tipo="error",
+                        )

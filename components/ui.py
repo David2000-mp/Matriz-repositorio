@@ -69,6 +69,25 @@ def render_status(mensaje: str, tipo: str = "success") -> None:
     st.caption(mensaje)
 
 
+def render_live_indicator(mensaje: str = "En vivo") -> None:
+    """Muestra un pulso compacto junto al estado activo del Dashboard."""
+    animation = _load_lottie_local("icon_pulse_live.json")
+    with st.container(
+        horizontal=True,
+        horizontal_alignment="right",
+        vertical_alignment="center",
+        gap="small",
+    ):
+        if animation is not None:
+            st_lottie(
+                animation,
+                height=36,
+                width=36,
+                key="dashboard-live-pulse",
+            )
+        st.caption(mensaje)
+
+
 def PageHeader(
     title: str,
     subtitle: str | None = None,
@@ -196,6 +215,7 @@ __all__ = [
     "MetricCard",
     "PageHeader",
     "render_empty_state",
+    "render_live_indicator",
     "render_loader",
     "render_status",
 ]
