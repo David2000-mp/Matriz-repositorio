@@ -329,13 +329,20 @@ La comparación demográfica repite el problema de “agregado ponderado” pres
 
 ### Pruebas existentes
 
-`tests/test_demographics_geo.py` contiene sólo tres pruebas:
+`tests/test_demographics_geo.py` contiene seis pruebas, incluyendo las
+regresiones de la Fase 1:
 
 1. distribución demográfica suma 100%;
 2. ciudad conocida/desconocida;
-3. exclusión del colegio seleccionado.
+3. exclusión del colegio seleccionado;
+4. fecha final inclusiva con horas;
+5. edades desconocidas agrupadas como `Otros`;
+6. coordenadas exactas y rechazo de negativos.
 
-No existen pruebas específicas para `utils/cross_intelligence.py` ni para `views/cross_intelligence_view.py`.
+`tests/test_cross_intelligence_reliability.py` agrega dos pruebas de los
+normalizadores de Inteligencia cruzada: rechazo de valores inválidos/negativos
+y límites completos del mes. Todavía no existen pruebas de las vistas ni de
+todos los cálculos de `utils/cross_intelligence.py`.
 
 ### Ejecución realizada
 
@@ -343,7 +350,9 @@ No existen pruebas específicas para `utils/cross_intelligence.py` ni para `view
 - Dependencias, archivos y lógica sintética: aprobados.
 - Wiring de navegación: falló porque el script busca el router anterior con `elif`, mientras la aplicación ya usa `st.navigation` y registra correctamente las páginas.
 - Google Sheets real: omitido porque el modo `--with-sheets` no se ejecutó.
-- Pytest enfocado: las tres pruebas no llegaron al cuerpo; el fixture global intentó escribir en `data/cuentas.csv` y `data/metricas.csv`.
+- Pytest enfocado con `--noconftest`: **8/8 pruebas aprobadas**. La ejecución
+  normal con el `conftest.py` completo se queda activa después de reportar
+  `100%`, por lo que se validó el conjunto puro sin cargar fixtures globales.
 - Inspección visual interactiva: no disponible porque no había una sesión de navegador conectable; el endpoint de salud local sí respondió.
 
 Además, el script QA exige `openpyxl >= 3.1.5`, mientras `requirements.txt` permite `openpyxl >= 3.1.0`. Un entorno puede cumplir requisitos y fallar el gate.
