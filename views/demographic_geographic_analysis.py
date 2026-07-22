@@ -69,12 +69,12 @@ def render_sidebar(df_maestra: pd.DataFrame, df_demografica: pd.DataFrame):
 
         colegio = st.selectbox(
             "Colegio",
-            options=colegios,
-            key="demogeo_colegio",
+            options=["Todos"] + colegios,
+            key="demogeo_v2_colegio",
         )
 
         plataformas_df = df_demografica
-        if "colegio" in plataformas_df.columns and colegio != "Sin datos":
+        if "colegio" in plataformas_df.columns and colegio not in {"Todos", "Sin datos"}:
             plataformas_df = plataformas_df[plataformas_df["colegio"].astype(str) == str(colegio)]
 
         plataformas = ["Todas"]
@@ -86,7 +86,7 @@ def render_sidebar(df_maestra: pd.DataFrame, df_demografica: pd.DataFrame):
         plataforma = st.selectbox(
             "Plataforma",
             options=plataformas,
-            key="demogeo_plataforma",
+            key="demogeo_v2_plataforma",
         )
 
         min_date, max_date = _default_date_range(df_demografica)
@@ -165,6 +165,54 @@ def _to_excel_bytes(df: pd.DataFrame) -> Tuple[Optional[bytes], Optional[str]]:
     return buffer.getvalue(), None
 
 
+def _build_city_impact_map(mapped: pd.DataFrame) -> go.Figure:
+    """Construye capas de mapa con colores explícitos por nivel de impacto."""
+    map_data = mapped.copy()
+    map_data["nivel_impacto"] = classify_city_impact(map_data["valor_total"])
+    max_value = max(float(map_data["valor_total"].max()), 1.0)
+    size_reference = 2.0 * max_value / (42.0**2)
+    fig = go.Figure()
+    for impact_level in CITY_IMPACT_ORDER:
+        level_data = map_data[map_data["nivel_impacto"] == impact_level]
+        if level_data.empty:
+            continue
+        fig.add_trace(
+            go.Scattermap(
+                lat=level_data["lat"],
+                lon=level_data["lon"],
+                text=level_data["ubicacion"],
+                customdata=level_data[
+                    ["valor_total", "participacion_pct", "nivel_impacto"]
+                ],
+                mode="markers",
+                name=impact_level,
+                marker={
+                    "size": level_data["valor_total"],
+                    "sizemode": "area",
+                    "sizeref": size_reference,
+                    "sizemin": 9,
+                    "color": CITY_IMPACT_COLORS[impact_level],
+                    "opacity": 0.9,
+                },
+                hovertemplate=(
+                    "<b>%{text}</b><br>Nivel: %{customdata[2]}"
+                    "<br>Valor: %{customdata[0]:,.0f}"
+                    "<br>Participación: %{customdata[1]:.2f}%<extra></extra>"
+                ),
+            )
+        )
+    fig.update_layout(
+        title="Mapa de ciudades por impacto",
+        map={
+            "style": "carto-positron",
+            "zoom": 4.4,
+            "center": MEXICO_CENTER,
+        },
+        legend_title_text="Nivel de impacto",
+    )
+    return fig
+
+
 def render_map_block(df_filtered: pd.DataFrame, colegio: str):
     """Bloque 2: mapa de ciudades y reporte tabular."""
     st.subheader("Bloque 2 - Geolocalizacion interactiva (Mexico)")
@@ -176,34 +224,7 @@ def render_map_block(df_filtered: pd.DataFrame, colegio: str):
         return
 
     if not mapped.empty:
-        map_data = mapped.copy()
-        map_data["nivel_impacto"] = classify_city_impact(map_data["valor_total"])
-        fig = px.scatter_mapbox(
-            map_data,
-            lat="lat",
-            lon="lon",
-            size="valor_total",
-            color="nivel_impacto",
-            color_discrete_map=CITY_IMPACT_COLORS,
-            category_orders={"nivel_impacto": CITY_IMPACT_ORDER},
-            hover_name="ubicacion",
-            hover_data={
-                "valor_total": ":,.0f",
-                "participacion_pct": ":.2f",
-                "nivel_impacto": True,
-                "lat": False,
-                "lon": False,
-            },
-            zoom=4.4,
-            center=MEXICO_CENTER,
-            mapbox_style="carto-positron",
-            title="Mapa de ciudades por impacto",
-            labels={
-                "nivel_impacto": "Nivel de impacto",
-                "valor_total": "Valor",
-                "participacion_pct": "Participacion (%)",
-            },
-        )
+        fig = _build_city_impact_map(mapped)
         st.plotly_chart(aplicar_tema_champileaks(fig), width="stretch", config=PLOTLY_CONFIG)
     else:
         st.warning("No hay ciudades con coordenadas disponibles en el diccionario interno.")

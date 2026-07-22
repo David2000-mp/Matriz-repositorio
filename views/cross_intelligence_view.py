@@ -48,6 +48,21 @@ def _metric_delta_text(current: float, previous: float, delta_abs: float, delta_
     return f"{delta_abs:+,.0f} ({delta_pct:+.1f}%)"
 
 
+_FILTER_DEFAULTS = {
+    "cross_v3_college": "Todos",
+    "cross_v3_platform": "Todas",
+    "cross_v3_period": HISTORICAL_KEY,
+    "cross_v3_metric": "interacciones",
+    "cross_v3_sex": "Todos",
+    "cross_v3_age": "Todos",
+}
+
+
+def _reset_filters_to_historical() -> None:
+    for key, value in _FILTER_DEFAULTS.items():
+        st.session_state[key] = value
+
+
 def _render_filters() -> tuple[str, str, str, str, str, str]:
     catalogs = get_filter_catalogs()
     month_keys = catalogs.get("month_keys", [])
@@ -55,31 +70,39 @@ def _render_filters() -> tuple[str, str, str, str, str, str]:
     if not month_keys:
         return "Todos", "Todas", "", "interacciones", "Todos", "Todos"
 
-    st.markdown("### Configura el análisis")
-    st.caption(
-        "Los filtros se aplican a todos los bloques de esta pestaña para mantener "
-        "una lectura consistente."
-    )
-    with st.container(border=True):
+    for key, value in _FILTER_DEFAULTS.items():
+        if key not in st.session_state:
+            st.session_state[key] = value
+
+    with st.expander("Personalizar análisis", expanded=False):
+        st.caption(
+            "La vista inicia con todo el histórico. Modifica sólo los campos que "
+            "necesites para analizar un periodo, colegio, plataforma o segmento."
+        )
+        st.button(
+            "Restablecer histórico completo",
+            on_click=_reset_filters_to_historical,
+            key="cross_v3_reset",
+        )
         first_row = st.columns(3)
         with first_row[0]:
             colegio = st.selectbox(
                 "Colegio",
                 options=["Todos"] + catalogs.get("colegios", []),
-                key="cross_college",
+                key="cross_v3_college",
             )
         with first_row[1]:
             plataforma = st.selectbox(
                 "Plataforma",
                 options=["Todas"] + catalogs.get("plataformas", []),
-                key="cross_platform",
+                key="cross_v3_platform",
             )
         with first_row[2]:
             month_key = st.selectbox(
                 "Periodo",
                 options=month_keys,
                 format_func=month_key_to_label,
-                key="cross_month_key",
+                key="cross_v3_period",
             )
 
         second_row = st.columns(3)
@@ -88,19 +111,19 @@ def _render_filters() -> tuple[str, str, str, str, str, str]:
                 "Métrica de rendimiento",
                 options=catalogs.get("metric_keys", ["interacciones"]),
                 format_func=metric_label,
-                key="cross_metric",
+                key="cross_v3_metric",
             )
         with second_row[1]:
             sexo = st.selectbox(
                 "Sexo",
                 options=["Todos"] + catalogs.get("sexos", []),
-                key="cross_sex",
+                key="cross_v3_sex",
             )
         with second_row[2]:
             edad = st.selectbox(
                 "Rango de edad",
                 options=["Todos"] + catalogs.get("edades", []),
-                key="cross_age",
+                key="cross_v3_age",
             )
 
     return colegio, plataforma, month_key, metric_key, sexo, edad
@@ -115,8 +138,13 @@ def _render_block_1(
     metric_key: str,
     sexo: str,
     edad: str,
+    historical_mode: bool,
 ) -> None:
-    st.subheader("Bloque 1 - Rendimiento y audiencia segmentada")
+    st.subheader("Resumen general")
+    st.caption(
+        "Una lectura rápida del rendimiento, la audiencia seleccionada y la ciudad "
+        "con mayor participación."
+    )
 
     selected_kpi = calculate_metric_delta(maestra_current, maestra_previous, metric_key)
     historical_total = calculate_metric_total(maestra_historical, metric_key)
@@ -129,28 +157,32 @@ def _render_block_1(
 
     with col1:
         with st.container(border=True):
-            st.markdown("**Métrica seleccionada**")
-            st.metric(
-                metric_label(metric_key),
-                _metric_value(selected_kpi.current),
-                delta=_metric_delta_text(
-                    selected_kpi.current,
-                    selected_kpi.previous,
-                    selected_kpi.delta_abs,
-                    selected_kpi.delta_pct,
-                ),
-            )
-            st.caption(f"Acumulado histórico: {_metric_value(historical_total)}")
-
-            if prev_month_key:
-                st.caption(f"Delta vs {month_key_to_label(prev_month_key)}")
+            st.markdown("**Rendimiento acumulado**" if historical_mode else "**Rendimiento del periodo**")
+            if historical_mode:
+                st.metric(metric_label(metric_key), _metric_value(historical_total))
+                st.caption("Suma de todos los periodos disponibles")
             else:
+                st.metric(
+                    metric_label(metric_key),
+                    _metric_value(selected_kpi.current),
+                    delta=_metric_delta_text(
+                        selected_kpi.current,
+                        selected_kpi.previous,
+                        selected_kpi.delta_abs,
+                        selected_kpi.delta_pct,
+                    ),
+                )
+            if not historical_mode and prev_month_key:
+                st.caption(f"Delta vs {month_key_to_label(prev_month_key)}")
+            elif not historical_mode:
                 st.caption("Delta: sin mes previo disponible")
 
     with col2:
         with st.container(border=True):
-            st.markdown("**Segmentación activa**")
-            segment_name = f"{sexo} | {edad}"
+            st.markdown("**Audiencia analizada**")
+            segment_name = (
+                "Audiencia total" if sexo == "Todos" and edad == "Todos" else f"{sexo} | {edad}"
+            )
             if segmented.empty:
                 st.warning("No hay cruce entre rendimiento y demografía para el segmento.")
             else:
@@ -162,7 +194,10 @@ def _render_block_1(
                     else 0.0
                 )
                 st.metric("Segmento", segment_name)
-                st.caption(f"Participación demográfica: {segment_share:.1f}%")
+                if segment_name == "Audiencia total":
+                    st.caption("Incluye todo el volumen demográfico disponible")
+                else:
+                    st.caption(f"Participación demográfica: {segment_share:.1f}%")
 
     with col3:
         with st.container(border=True):
@@ -184,7 +219,7 @@ def _render_block_2(
     colegio: str,
     plataforma: str,
 ) -> None:
-    st.subheader("Bloque 2 - Relación y evolución en el tiempo")
+    st.subheader("Relación y evolución en el tiempo")
     st.caption(
         "Este bloque separa tres preguntas: si audiencia y rendimiento se relacionan, "
         "cómo cambia un segmento y cómo evoluciona la métrica seleccionada."
@@ -399,7 +434,7 @@ def _render_block_3_drilldown(
     sexo: str,
     edad: str,
 ) -> None:
-    st.subheader("Bloque 3 - Desglose multidimensional")
+    st.subheader("Explora los datos")
     st.caption(
         "Explora el mismo corte por ciudad, colegio, composición de audiencia o "
         "plataforma. Todas las barras utilizan la identidad azul de CHAMPILEAKS."
@@ -537,47 +572,53 @@ def _render_block_3_drilldown(
             )
 
     with tab_cross:
-        segmented = build_segmented_performance(
-            maestra_current, demo_current, metric_key, sexo, edad
-        )
-        st.markdown(f"#### Rendimiento estimado de {sexo} | {edad}")
-        st.caption(
-            "Estimación = rendimiento observado × participación demográfica del "
-            "segmento en el mismo mes, colegio y plataforma."
-        )
-        if segmented.empty:
-            st.warning("No hay datos coincidentes para la segmentación seleccionada.")
+        if sexo == "Todos" and edad == "Todos":
+            st.info(
+                "Para activar este cruce, abre “Personalizar análisis” y selecciona "
+                "un sexo, un rango de edad o ambos."
+            )
         else:
-            fig_cross = go.Figure(
-                go.Bar(
-                    x=segmented["plataforma"],
-                    y=segmented["rendimiento_segmentado_estimado"],
-                    marker_color=AZUL_INTERACTIVO,
-                    name=f"{metric_label(metric_key)} estimadas",
-                    hovertemplate=(
-                        "Plataforma: %{x}<br>Rendimiento estimado: %{y:,.0f}"
-                        "<extra></extra>"
-                    ),
+            segmented = build_segmented_performance(
+                maestra_current, demo_current, metric_key, sexo, edad
+            )
+            st.markdown(f"#### Rendimiento estimado de {sexo} | {edad}")
+            st.caption(
+                "Estimación = rendimiento observado × participación demográfica del "
+                "segmento en el mismo mes, colegio y plataforma."
+            )
+            if segmented.empty:
+                st.warning("No hay datos coincidentes para la segmentación seleccionada.")
+            else:
+                fig_cross = go.Figure(
+                    go.Bar(
+                        x=segmented["plataforma"],
+                        y=segmented["rendimiento_segmentado_estimado"],
+                        marker_color=AZUL_INTERACTIVO,
+                        name=f"{metric_label(metric_key)} estimadas",
+                        hovertemplate=(
+                            "Plataforma: %{x}<br>Rendimiento estimado: %{y:,.0f}"
+                            "<extra></extra>"
+                        ),
+                    )
                 )
-            )
-            fig_cross.update_layout(
-                title=f"{metric_label(metric_key)} · {sexo} | {edad}",
-                xaxis_title="Plataforma",
-                yaxis_title="Rendimiento segmentado estimado",
-            )
-            fig_cross.update_yaxes(rangemode="tozero")
-            st.plotly_chart(
-                aplicar_tema_champileaks(fig_cross),
-                width="stretch",
-                config=PLOTLY_CONFIG,
-            )
-            st.dataframe(segmented, width="stretch", hide_index=True)
+                fig_cross.update_layout(
+                    title=f"{metric_label(metric_key)} · {sexo} | {edad}",
+                    xaxis_title="Plataforma",
+                    yaxis_title="Rendimiento segmentado estimado",
+                )
+                fig_cross.update_yaxes(rangemode="tozero")
+                st.plotly_chart(
+                    aplicar_tema_champileaks(fig_cross),
+                    width="stretch",
+                    config=PLOTLY_CONFIG,
+                )
+                st.dataframe(segmented, width="stretch", hide_index=True)
 
 
 def _render_block_4_strict_comparison(
     network_maestra, network_demo, colegio: str, metric_key: str
 ) -> None:
-    st.subheader("Bloque 4 - Cuenta vs Promedio de la Red (Regla Estricta)")
+    st.subheader("Compara el colegio con la red")
 
     if not colegio or colegio == "Todos":
         st.info("Selecciona un colegio especifico para habilitar la comparacion estricta contra la red.")
@@ -656,8 +697,11 @@ def _render_block_4_strict_comparison(
 
 
 def render_cross_intelligence_view() -> None:
-    st.title("Vista de Inteligencia Cruzada")
-    st.caption("Cruce entre rendimiento historico de contenido y perfil de audiencia")
+    st.title("Inteligencia cruzada")
+    st.caption(
+        "Entiende quién compone la audiencia y cómo se relaciona con el rendimiento "
+        "del contenido. La vista inicia con el histórico completo de toda la red."
+    )
 
     colegio, plataforma, month_key, metric_key, sexo, edad = _render_filters()
     if not month_key:
@@ -702,10 +746,14 @@ def render_cross_intelligence_view() -> None:
         if maestra_current.empty and not demo_current.empty:
             st.warning("Hay datos demograficos en el mes seleccionado, pero no hay datos de rendimiento para ese corte.")
 
-    st.markdown(f"**Periodo activo:** {month_key_to_label(month_key)}")
-    st.caption(
-        f"Métrica: {metric_label(metric_key)} · Plataforma: {plataforma} · "
-        f"Segmento: {sexo} | {edad}"
+    audience_label = (
+        "Audiencia total" if sexo == "Todos" and edad == "Todos" else f"{sexo} | {edad}"
+    )
+    school_label = "Toda la red" if colegio == "Todos" else colegio
+    platform_label = "Todas las plataformas" if plataforma == "Todas" else plataforma
+    st.info(
+        f"**Estás viendo:** {month_key_to_label(month_key)} · {school_label} · "
+        f"{platform_label} · {metric_label(metric_key)} · {audience_label}"
     )
 
     _render_block_1(
@@ -717,17 +765,7 @@ def render_cross_intelligence_view() -> None:
         metric_key,
         sexo,
         edad,
-    )
-    st.markdown("---")
-    _render_block_2(
-        maestra_historical,
-        demo_historical,
-        month_key,
-        metric_key,
-        sexo,
-        edad,
-        colegio,
-        plataforma,
+        historical_mode,
     )
     st.markdown("---")
     _render_block_3_drilldown(
@@ -739,7 +777,20 @@ def render_cross_intelligence_view() -> None:
         sexo,
         edad,
     )
+    if colegio != "Todos":
+        st.markdown("---")
+        _render_block_4_strict_comparison(
+            network_maestra, network_demo, colegio, metric_key
+        )
     st.markdown("---")
-    _render_block_4_strict_comparison(
-        network_maestra, network_demo, colegio, metric_key
-    )
+    with st.expander("Análisis avanzado: relación y evolución", expanded=False):
+        _render_block_2(
+            maestra_historical,
+            demo_historical,
+            month_key,
+            metric_key,
+            sexo,
+            edad,
+            colegio,
+            plataforma,
+        )

@@ -2,6 +2,7 @@
 
 import pandas as pd
 
+from views.demographic_geographic_analysis import _build_city_impact_map
 from utils.demographics_geo import (
     CITY_IMPACT_COLORS,
     apply_demographic_filters,
@@ -101,6 +102,12 @@ def test_date_filter_includes_records_with_time_on_end_date():
     assert result["valor"].tolist() == [1, 2]
 
 
+def test_all_schools_filter_keeps_the_complete_network():
+    result = apply_demographic_filters(_sample_df(), colegio="Todos")
+
+    assert set(result["colegio"]) == {"Colegio A", "Colegio B"}
+
+
 def test_unknown_ages_are_grouped_as_otros_without_losing_rows():
     df = pd.DataFrame(
         {
@@ -151,3 +158,20 @@ def test_city_impact_uses_red_blue_and_yellow_terciles():
         "Impacto medio": "#0756C9",
         "Impacto alto": "#FFB81C",
     }
+
+
+def test_city_map_renders_one_explicit_color_per_impact_level():
+    mapped = pd.DataFrame(
+        {
+            "ubicacion": ["Baja", "Media", "Alta"],
+            "valor_total": [10, 50, 100],
+            "participacion_pct": [6.25, 31.25, 62.5],
+            "lat": [19.0, 20.0, 21.0],
+            "lon": [-99.0, -100.0, -101.0],
+        }
+    )
+
+    figure = _build_city_impact_map(mapped)
+    trace_colors = {trace.name: trace.marker.color for trace in figure.data}
+
+    assert trace_colors == CITY_IMPACT_COLORS

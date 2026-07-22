@@ -432,7 +432,7 @@ def apply_demographic_filters(
             filtered["fecha_reporte"], errors="coerce", format="mixed"
         )
 
-    if colegio:
+    if colegio and colegio != "Todos":
         filtered = filtered[filtered["colegio"].astype(str) == str(colegio)]
 
     if plataforma and plataforma != "Todas":
