@@ -179,6 +179,24 @@ def get_theme_css() -> str:
         border-radius: 0.625rem;
         line-height: 1.25;
         text-decoration: none;
+        transform: translateX(0);
+        transition:
+            transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1),
+            background-color 180ms ease,
+            box-shadow 180ms ease;
+        will-change: transform;
+    }
+
+    section[data-testid="stSidebarNav"] a:not([aria-current="page"]):hover,
+    section[data-testid="stSidebar"] [data-testid="stPageLink"] a:not([aria-current="page"]):hover {
+        background: rgba(255, 255, 255, 0.09) !important;
+        box-shadow: 0 4px 14px rgba(0, 24, 64, 0.18);
+        transform: translateX(4px);
+    }
+
+    section[data-testid="stSidebarNav"] a:active,
+    section[data-testid="stSidebar"] [data-testid="stPageLink"] a:active {
+        transform: translateX(2px) scale(0.99);
     }
 
     section[data-testid="stSidebarNav"] a[aria-current="page"],
@@ -200,12 +218,20 @@ def get_theme_css() -> str:
         font-weight: normal !important;
         font-style: normal !important;
         font-size: 1.25rem !important;
+        transform: scale(1);
+        transform-origin: center;
+        transition: transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
         line-height: 1 !important;
         letter-spacing: normal !important;
         text-transform: none !important;
         white-space: nowrap !important;
         color: #FFFFFF !important;
         fill: #FFFFFF !important;
+    }
+
+    section[data-testid="stSidebarNav"] a:hover [data-testid="stIconMaterial"],
+    section[data-testid="stSidebar"] [data-testid="stPageLink"] a:hover [data-testid="stIconMaterial"] {
+        transform: scale(1.08);
     }
 
     section[data-testid="stSidebar"] svg,
