@@ -3,6 +3,11 @@
 import pandas as pd
 import pytest
 
+from views.cross_intelligence_view import (
+    COMPARE_METRICS_KEY,
+    _metric_selection_label,
+    _selected_metric_keys,
+)
 from utils.cross_intelligence import (
     build_city_performance_drilldown,
     build_cohort_series,
@@ -48,6 +53,16 @@ def test_metric_selector_never_adds_interactions_and_views():
     assert "volumen_total" not in ranking.columns
 
     assert calculate_metric_total(pd.DataFrame(), "interacciones") == 0
+
+
+def test_comparison_option_keeps_both_metrics_separate():
+    assert _selected_metric_keys(COMPARE_METRICS_KEY) == [
+        "interacciones",
+        "visualizaciones",
+    ]
+    assert _metric_selection_label(COMPARE_METRICS_KEY) == (
+        "Interacciones y visualizaciones"
+    )
 
 
 def test_city_impact_uses_only_the_selected_metric():
