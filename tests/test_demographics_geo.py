@@ -8,6 +8,7 @@ from utils.demographics_geo import (
     CITY_IMPACT_MARKER_SIZES,
     apply_demographic_filters,
     apply_performance_filters,
+    build_city_gender_estimate,
     build_city_report,
     build_city_metric_estimate,
     build_demography_base,
@@ -236,3 +237,29 @@ def test_city_metric_estimate_respects_each_school_before_aggregating():
     assert interactions.loc["Ciudad 2", "valor"] == 190
     assert views.loc["Ciudad 1", "valor"] == 190
     assert views.loc["Ciudad 2", "valor"] == 910
+
+
+def test_city_gender_estimate_uses_gender_total_per_school_and_platform():
+    demographic = pd.DataFrame(
+        [
+            ["Colegio A", "Instagram", "Ciudad", "", "Ciudad 1", 75],
+            ["Colegio A", "Instagram", "Ciudad", "", "Ciudad 2", 25],
+            ["Colegio A", "Instagram", "Demografia base", "Mujeres", "", 80],
+            ["Colegio A", "Instagram", "Demografia base", "Hombres", "", 20],
+        ],
+        columns=[
+            "colegio",
+            "plataforma",
+            "criterio",
+            "sexo",
+            "ubicacion",
+            "valor",
+        ],
+    )
+
+    result = build_city_gender_estimate(demographic, "Mujeres").set_index(
+        "ubicacion"
+    )
+
+    assert result.loc["Ciudad 1", "valor"] == 60
+    assert result.loc["Ciudad 2", "valor"] == 20

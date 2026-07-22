@@ -666,6 +666,67 @@ def build_city_metric_estimate(
     return result[columns].sort_values("valor", ascending=False).reset_index(drop=True)
 
 
+def build_city_gender_estimate(
+    df_demo: pd.DataFrame,
+    gender: str,
+) -> pd.DataFrame:
+    """Estima el volumen de un género por ciudad dentro de cada corte disponible."""
+    columns = ["criterio", "ubicacion", "valor"]
+    if df_demo is None or df_demo.empty or not str(gender).strip():
+        return pd.DataFrame(columns=columns)
+
+    local = _filter_nonnegative_values(df_demo)
+    criterion = (
+        local["criterio_norm"]
+        if "criterio_norm" in local.columns
+        else local["criterio"].apply(normalize_text)
+    )
+    city = local[criterion == "ciudad"].copy()
+    city = city[city["ubicacion"].astype(str).str.strip() != ""]
+    demographic = local[criterion == "demografia base"].copy()
+    demographic = demographic[
+        demographic["sexo"].astype(str).str.strip() == str(gender).strip()
+    ]
+    if city.empty or demographic.empty:
+        return pd.DataFrame(columns=columns)
+
+    scope_keys = [
+        key
+        for key in ["colegio", "plataforma"]
+        if key in city.columns and key in demographic.columns
+    ]
+    city_group_keys = scope_keys + ["ubicacion"]
+    city_agg = city.groupby(city_group_keys, as_index=False)["valor"].sum()
+
+    if scope_keys:
+        city_agg["scope_total"] = city_agg.groupby(scope_keys)["valor"].transform("sum")
+        city_agg["city_share"] = city_agg["valor"].div(
+            city_agg["scope_total"].replace(0, pd.NA)
+        ).fillna(0.0)
+        gender_agg = (
+            demographic.groupby(scope_keys, as_index=False)["valor"]
+            .sum()
+            .rename(columns={"valor": "gender_total"})
+        )
+        estimated = city_agg.merge(gender_agg, on=scope_keys, how="inner")
+        estimated["valor_estimado"] = estimated["city_share"] * estimated["gender_total"]
+    else:
+        city_total = float(city_agg["valor"].sum())
+        gender_total = float(demographic["valor"].sum())
+        if city_total <= 0:
+            return pd.DataFrame(columns=columns)
+        estimated = city_agg.copy()
+        estimated["valor_estimado"] = estimated["valor"] / city_total * gender_total
+
+    result = (
+        estimated.groupby("ubicacion", as_index=False)["valor_estimado"]
+        .sum()
+        .rename(columns={"valor_estimado": "valor"})
+    )
+    result.insert(0, "criterio", "Ciudad")
+    return result[columns].sort_values("valor", ascending=False).reset_index(drop=True)
+
+
 def build_network_comparison(df: pd.DataFrame, selected_school: str) -> pd.DataFrame:
     """
     Compara distribucion de colegio seleccionado vs promedio de red.

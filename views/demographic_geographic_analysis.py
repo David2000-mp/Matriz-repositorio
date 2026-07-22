@@ -21,11 +21,13 @@ from utils.demographics_geo import (
     AGE_ORDER,
     apply_demographic_filters,
     apply_performance_filters,
+    build_city_gender_estimate,
     build_city_metric_estimate,
     build_city_report,
     classify_city_impact,
     build_demography_base,
     build_network_comparison,
+    normalize_text,
 )
 
 
@@ -169,7 +171,7 @@ def _to_excel_bytes(df: pd.DataFrame) -> Tuple[Optional[bytes], Optional[str]]:
 
 
 def _build_city_impact_map(
-    mapped: pd.DataFrame, title: str = "Mapa de ciudades por impacto"
+    mapped: pd.DataFrame, title: str = "Mapa 1 · Impacto demográfico por ciudad"
 ) -> go.Figure:
     """Construye capas de mapa con colores explícitos por nivel de impacto."""
     map_data = mapped.copy()
@@ -219,6 +221,7 @@ def _render_metric_city_map(
     metric_key: str,
 ) -> None:
     metric_title = "Interacciones" if metric_key == "interacciones" else "Visualizaciones"
+    map_number = 2 if metric_key == "interacciones" else 3
     estimated = build_city_metric_estimate(df_demo, df_performance, metric_key)
     mapped, _ = build_city_report(estimated)
     if mapped.empty:
@@ -227,7 +230,81 @@ def _render_metric_city_map(
 
     fig = _build_city_impact_map(
         mapped,
-        title=f"Impacto estimado por {metric_title.lower()}",
+        title=f"Mapa {map_number} · Impacto estimado por {metric_title.lower()}",
+    )
+    st.plotly_chart(
+        aplicar_tema_champileaks(fig), width="stretch", config=PLOTLY_CONFIG
+    )
+
+
+def _render_social_network_city_map(df_demo: pd.DataFrame) -> None:
+    city_rows = df_demo[
+        df_demo["criterio"].apply(normalize_text) == "ciudad"
+    ].copy()
+    social_networks = sorted(
+        value
+        for value in city_rows.get("plataforma", pd.Series(dtype=str))
+        .dropna()
+        .astype(str)
+        .str.strip()
+        .unique()
+        if value
+    )
+    if not social_networks:
+        st.info("No hay redes sociales con ciudades disponibles para este corte.")
+        return
+
+    social_network = st.selectbox(
+        "Red social del mapa",
+        options=social_networks,
+        key="demogeo_social_network_map",
+    )
+    selected = city_rows[
+        city_rows["plataforma"].astype(str).str.strip() == social_network
+    ]
+    mapped, _ = build_city_report(selected)
+    if mapped.empty:
+        st.info(f"No hay ciudades mapeables para {social_network}.")
+        return
+    fig = _build_city_impact_map(
+        mapped,
+        title=f"Mapa 4 · Impacto por red social: {social_network}",
+    )
+    st.plotly_chart(
+        aplicar_tema_champileaks(fig), width="stretch", config=PLOTLY_CONFIG
+    )
+
+
+def _render_gender_city_map(df_demo: pd.DataFrame) -> None:
+    demographic_rows = df_demo[
+        df_demo["criterio"].apply(normalize_text) == "demografia base"
+    ].copy()
+    genders = sorted(
+        value
+        for value in demographic_rows.get("sexo", pd.Series(dtype=str))
+        .dropna()
+        .astype(str)
+        .str.strip()
+        .unique()
+        if value
+    )
+    if not genders:
+        st.info("No hay categorías de género disponibles para este corte.")
+        return
+
+    gender = st.selectbox(
+        "Género del mapa",
+        options=genders,
+        key="demogeo_gender_map",
+    )
+    estimated = build_city_gender_estimate(df_demo, gender)
+    mapped, _ = build_city_report(estimated)
+    if mapped.empty:
+        st.info(f"No hay datos suficientes para estimar la distribución de {gender}.")
+        return
+    fig = _build_city_impact_map(
+        mapped,
+        title=f"Mapa 5 · Impacto estimado por género: {gender}",
     )
     st.plotly_chart(
         aplicar_tema_champileaks(fig), width="stretch", config=PLOTLY_CONFIG
@@ -266,6 +343,17 @@ def render_map_block(
             _render_metric_city_map(df_filtered, df_performance, "interacciones")
         with col_views:
             _render_metric_city_map(df_filtered, df_performance, "visualizaciones")
+
+    st.markdown("#### Mapas de segmentación")
+    st.caption(
+        "Selecciona una red social o un género. El mapa de género es una estimación "
+        "basada en la composición demográfica de cada colegio y plataforma."
+    )
+    col_social, col_gender = st.columns(2)
+    with col_social:
+        _render_social_network_city_map(df_filtered)
+    with col_gender:
+        _render_gender_city_map(df_filtered)
 
     st.markdown("#### Reporte numerico por ciudad")
 
