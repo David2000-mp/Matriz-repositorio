@@ -41,7 +41,7 @@ from components.toast_notifications import (
 )
 
 # Importar configuración Plotly centralizada
-from components import PLOTLY_CONFIG, show_kpi_skeleton, show_chart_skeleton, COLOR_MAP
+from components import COLOR_MAP, MetricCard, PLOTLY_CONFIG, show_chart_skeleton, show_kpi_skeleton
 from utils.chart_theme import aplicar_tema_champileaks
 
 
@@ -647,19 +647,19 @@ def render(df=None):
 
         p1, p2, p3 = st.columns(3)
         with p1:
-            st.metric(
+            MetricCard(
                 "🏆 Plataforma líder",
                 str(leader_row['plataforma']),
                 f"ER {float(leader_row['engagement_promedio']):.2f}%"
             )
         with p2:
-            st.metric(
+            MetricCard(
                 "👀 Plataforma a vigilar",
                 str(watch_row['plataforma']),
                 f"ER {float(watch_row['engagement_promedio']):.2f}%"
             )
         with p3:
-            st.metric(
+            MetricCard(
                 "🎯 Prioridad inmediata",
                 priority_delta,
                 f"Salud {health_score:.0f}/100"
@@ -723,26 +723,26 @@ def render(df=None):
 
     col_cov1, col_cov2, col_cov3, col_cov4 = st.columns(4)
     with col_cov1:
-        st.metric(
+        MetricCard(
             label=f"Instituciones con Datos {get_traffic_light_indicator('coverage', coverage_percentage)}",
             value=f"{schools_with_data}/{total_schools}",
             delta=f"{coverage_percentage:.1f}%"
         )
     with col_cov2:
         fb_cov = platform_coverage.get('Facebook', 0)
-        st.metric(
+        MetricCard(
             label=f"Facebook {get_traffic_light_indicator('coverage', fb_cov)}",
             value=f"{fb_cov:.1f}%"
         )
     with col_cov3:
         ig_cov = platform_coverage.get('Instagram', 0)
-        st.metric(
+        MetricCard(
             label=f"Instagram {get_traffic_light_indicator('coverage', ig_cov)}",
             value=f"{ig_cov:.1f}%"
         )
     with col_cov4:
         tt_cov = platform_coverage.get('TikTok', 0)
-        st.metric(
+        MetricCard(
             label=f"TikTok {get_traffic_light_indicator('coverage', tt_cov)}",
             value=f"{tt_cov:.1f}%"
         )

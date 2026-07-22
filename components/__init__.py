@@ -2,7 +2,7 @@
 Paquete de componentes UI para CHAMPILYTICS.
 """
 
-from .styles import (
+from utils.theme_styles import (
     inject_custom_css,
     inject_layout_compact_css,
     inject_clipboard_shortcut_guard,
@@ -26,6 +26,7 @@ from .styles import (
 )
 
 from .custom_header import render_custom_header
+from .ui import FilterBar, FilterBarActions, MetricCard, PageHeader
 
 try:
     from .skeleton_loaders import show_kpi_skeleton, show_chart_skeleton
@@ -42,6 +43,10 @@ __all__ = [
     "configure_plotly_theme",
     "aplicar_estilo_personalizado",
     "render_custom_header",
+    "FilterBar",
+    "FilterBarActions",
+    "MetricCard",
+    "PageHeader",
     "show_kpi_skeleton",
     "show_chart_skeleton",
     "COLOR_PRIMARY",

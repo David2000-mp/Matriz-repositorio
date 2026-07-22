@@ -44,7 +44,7 @@ except Exception as e:
     tests_failed += 1
 
 try:
-    from components import styles
+    from utils import theme_styles
     print("✅ Estilos CSS OK")
     tests_passed += 1
 except Exception as e:

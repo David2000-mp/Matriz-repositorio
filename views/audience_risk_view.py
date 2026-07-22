@@ -20,7 +20,7 @@ except Exception:
     px = None
     go = None
 
-from components import PLOTLY_CONFIG
+from components import MetricCard, PLOTLY_CONFIG
 from utils.chart_theme import renderizar_grafica_champileaks
 from utils.data_provider import data_provider
 from utils.analytics import calculate_health_score
@@ -570,11 +570,11 @@ def render(df: pd.DataFrame | None = None) -> None:
 
     kpi_col1, kpi_col2, kpi_col3 = st.columns(3)
     with kpi_col1:
-        st.metric("Entidades analizadas", int(snapshot["entidad"].nunique()))
+        MetricCard("Entidades analizadas", int(snapshot["entidad"].nunique()))
     with kpi_col2:
-        st.metric("Seguidores totales", f"{int(snapshot['seguidores'].sum()):,}")
+        MetricCard("Seguidores totales", f"{int(snapshot['seguidores'].sum()):,}")
     with kpi_col3:
-        st.metric("Engagement ponderado red", f"{calcular_kpi_engagement_global(snapshot):.2f}%")
+        MetricCard("Engagement ponderado red", f"{calcular_kpi_engagement_global(snapshot):.2f}%")
 
     # Resumen ejecutivo para lectura rapida por usuarios no tecnicos.
     latest_month = None

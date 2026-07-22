@@ -3,9 +3,9 @@ Script de Verificación: Optimización Móvil CSS
 Verifica que todos los media queries y reglas móviles estén presentes
 """
 
-from utils.mobile_styles import get_mobile_css
+from utils.theme_styles import get_theme_css
 
-css = get_mobile_css()
+css = get_theme_css()
 
 print("=" * 80)
 print("📱 VERIFICACIÓN DE OPTIMIZACIÓN MÓVIL - CSS RESPONSIVE")

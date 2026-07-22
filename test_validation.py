@@ -19,7 +19,7 @@ imports_tests = [
     ('views.engagement_calculator_v2', 'from views import engagement_calculator_v2'),
     ('views.data_entry', 'from views import data_entry'),
     ('utils.report_generator', 'from utils import report_generator'),
-    ('components.styles', 'from components import styles'),
+    ('utils.theme_styles', 'from utils import theme_styles'),
 ]
 
 failed_imports = []
@@ -76,8 +76,8 @@ print("TEST 3: VALIDACIÓN DE ESTILOS CSS")
 print("-" * 60)
 
 try:
-    from components.styles import load_css
-    css_content = load_css()
+    from utils.theme_styles import get_theme_css
+    css_content = get_theme_css()
     if css_content and len(css_content) > 100:
         print(f"✅ load_css() retorna {len(css_content)} caracteres")
     else:

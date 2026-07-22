@@ -5,10 +5,10 @@ Ejecutar con: streamlit run demo_animaciones.py
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
-from utils.global_styles import get_global_institutional_css
+from utils.theme_styles import get_theme_css
 
 # Aplicar estilos globales
-st.markdown(get_global_institutional_css(), unsafe_allow_html=True)
+st.markdown(get_theme_css(), unsafe_allow_html=True)
 
 st.title("🎨 Demo de Animaciones de Hover")
 st.caption("Pasa el mouse sobre las cajas para ver las animaciones")

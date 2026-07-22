@@ -9,6 +9,7 @@ from collections.abc import Callable
 import streamlit as st
 
 from components import (
+    FilterBar,
     inject_clipboard_shortcut_guard,
     inject_custom_css,
     inject_layout_compact_css,
@@ -59,10 +60,20 @@ def _render_sidebar_controls(df) -> None:
     """Renderiza identidad, filtros globales y controles operativos."""
     options = get_filter_options(df)
 
-    with st.sidebar:
-        st.divider()
-        st.subheader("Filtros globales")
+    def reset_filters() -> None:
+        """Restablece filtros antes de que Streamlit instancie sus widgets."""
+        st.session_state["filtro_entidad"] = "Todas"
+        st.session_state["filtro_mes"] = "Todos"
+        st.toast("Filtros restablecidos", icon="✅")
 
+    def reload_data() -> None:
+        """Invalida el caché compartido desde el callback del botón."""
+        from utils.data_provider import data_provider
+
+        data_provider.invalidate_cache()
+        st.toast("Caché invalidado. Recargando datos…", icon="🔄")
+
+    with st.sidebar:
         entities = ["Todas", *options.entities]
         months = ["Todos", *options.months]
 
@@ -71,31 +82,12 @@ def _render_sidebar_controls(df) -> None:
         if st.session_state.get("filtro_mes", "Todos") not in months:
             st.session_state["filtro_mes"] = "Todos"
 
-        st.selectbox("Colegio", entities, key="filtro_entidad")
-        st.selectbox("Periodo", months, key="filtro_mes")
-
-        if st.button(
-            "Reset filtros",
-            help="Restablece colegio y periodo.",
-            use_container_width=True,
-        ):
-            st.session_state["filtro_entidad"] = "Todas"
-            st.session_state["filtro_mes"] = "Todos"
-            st.rerun()
-
-        if st.button(
-            "Forzar recarga",
-            help="Invalida el caché compartido y consulta nuevamente la fuente.",
-            use_container_width=True,
-        ):
-            from utils.data_provider import data_provider
-
-            data_provider.invalidate_cache()
-            st.toast("Caché invalidado. Recargando datos…", icon="🔄")
-            st.rerun()
-
-        st.divider()
-        st.caption("v2.1.0 • Maristas")
+        FilterBar(
+            entities=entities,
+            months=months,
+            on_reset=reset_filters,
+            on_reload=reload_data,
+        )
 
 
 def _render_inicio() -> None:

@@ -3,9 +3,9 @@ Script de verificación: Fuerza Bruta CSS para Streamlit Cloud
 Verifica que todos los selectores críticos estén presentes
 """
 
-from utils.global_styles import get_global_institutional_css
+from utils.theme_styles import get_theme_css
 
-css = get_global_institutional_css()
+css = get_theme_css()
 
 print("=" * 80)
 print("🛡️ VERIFICACIÓN DE FUERZA BRUTA CSS - STREAMLIT CLOUD")

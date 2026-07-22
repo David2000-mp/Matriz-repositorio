@@ -2,10 +2,10 @@
 Script para verificar que el CSS de selectboxes se genera correctamente
 """
 
-from utils.global_styles import get_global_institutional_css
+from utils.theme_styles import get_theme_css
 
 # Generar CSS
-css = get_global_institutional_css()
+css = get_theme_css()
 
 # Buscar reglas críticas
 print("=" * 80)
