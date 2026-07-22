@@ -12,7 +12,7 @@ import streamlit as st
 
 from components import PLOTLY_CONFIG, ui
 from utils.analytics_repository import load_analytics_bases
-from utils.chart_theme import aplicar_tema_champileaks
+from utils.chart_theme import ESCALA_IMPACTO_AMARILLA, aplicar_tema_champileaks
 from utils.demographics_geo import (
     MEXICO_CENTER,
     AGE_ORDER,
@@ -179,6 +179,7 @@ def render_map_block(df_filtered: pd.DataFrame, colegio: str):
             lon="lon",
             size="valor_total",
             color="valor_total",
+            color_continuous_scale=ESCALA_IMPACTO_AMARILLA,
             hover_name="ubicacion",
             hover_data={
                 "valor_total": ":,.0f",

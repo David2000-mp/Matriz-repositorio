@@ -10,7 +10,12 @@ import pandas as pd
 import streamlit as st
 
 from utils.analytics_repository import load_analytics_bases
-from utils.metric_catalog import INTERACTION_ALIASES, VISUALIZATION_ALIASES
+from utils.metric_catalog import (
+    INTERACTION_ALIASES,
+    METRIC_ALIASES,
+    VISUALIZATION_ALIASES,
+    metric_aliases,
+)
 
 
 MONTH_NAMES_ES = {
@@ -38,6 +43,15 @@ class MetricDelta:
     delta_pct: Optional[float]
 
 
+@dataclass(frozen=True)
+class CorrelationResult:
+    method: str
+    coefficient: Optional[float]
+    sample_size: int
+    interpretation: str
+    series: pd.DataFrame
+
+
 def _normalize_text(value: str) -> str:
     text = str(value or "").strip().lower()
     text = unicodedata.normalize("NFKD", text)
@@ -60,6 +74,40 @@ def _filter_nonnegative_values(df: pd.DataFrame) -> pd.DataFrame:
     local = df.copy()
     local["valor"] = pd.to_numeric(local["valor"], errors="coerce")
     return local[local["valor"].notna() & (local["valor"] >= 0)].copy()
+
+
+def _metric_rows(df: pd.DataFrame, metric_key: str) -> pd.DataFrame:
+    """Filtra una sola métrica canónica sin combinar escalas incompatibles."""
+    local = _filter_nonnegative_values(df)
+    if local.empty:
+        return local
+    if "metrica_norm" not in local.columns:
+        local["metrica_norm"] = local["metrica"].apply(_normalize_text)
+    return local[local["metrica_norm"].isin(metric_aliases(metric_key))].copy()
+
+
+def _demographic_base(df: pd.DataFrame) -> pd.DataFrame:
+    local = _filter_nonnegative_values(df)
+    if local.empty:
+        return local
+    if "criterio_norm" not in local.columns:
+        local["criterio_norm"] = local["criterio"].apply(_normalize_text)
+    local = local[local["criterio_norm"] == "demografia base"].copy()
+    return local[
+        (local["sexo"].astype(str).str.strip() != "")
+        & (local["edad"].astype(str).str.strip() != "")
+    ].copy()
+
+
+def _filter_segment(
+    df: pd.DataFrame, sexo: str = "Todos", edad: str = "Todos"
+) -> pd.DataFrame:
+    local = df.copy()
+    if sexo and sexo != "Todos":
+        local = local[local["sexo"].astype(str) == str(sexo)]
+    if edad and edad != "Todos":
+        local = local[local["edad"].astype(str) == str(edad)]
+    return local
 
 
 def _normalize_maestra(df: pd.DataFrame) -> pd.DataFrame:
@@ -186,7 +234,7 @@ def get_month_bounds(month_key: str) -> Tuple[Optional[pd.Timestamp], Optional[p
 
 @st.cache_data(ttl=300)
 def get_filter_catalogs() -> Dict[str, List[str]]:
-    """Obtiene opciones de filtros para colegio/plataforma/mes sobre ambas fuentes."""
+    """Obtiene dimensiones disponibles para los filtros analíticos."""
     maestra, demo = load_normalized_bases()
 
     colegios = sorted(
@@ -208,11 +256,34 @@ def get_filter_catalogs() -> Dict[str, List[str]]:
     )
     months = [HISTORICAL_KEY] + months
 
+    demo_base = _demographic_base(demo)
+    sexos = sorted(
+        value
+        for value in demo_base.get("sexo", pd.Series(dtype=str)).dropna().astype(str).str.strip().unique()
+        if value
+    )
+    edades = sorted(
+        (
+            value
+            for value in demo_base.get("edad", pd.Series(dtype=str)).dropna().astype(str).str.strip().unique()
+            if value
+        ),
+        key=lambda value: (
+            int(str(value).split("-", 1)[0])
+            if str(value).split("-", 1)[0].isdigit()
+            else 999,
+            str(value),
+        ),
+    )
+
     return {
         "colegios": colegios,
         "plataformas": plataformas,
         "month_keys": months,
         "month_labels": [month_key_to_label(m) for m in months],
+        "sexos": sexos,
+        "edades": edades,
+        "metric_keys": list(METRIC_ALIASES),
     }
 
 
@@ -320,6 +391,236 @@ def calculate_historical_totals(df_historical: pd.DataFrame) -> Dict[str, float]
         "interacciones_total": _metric_total(df_historical, INTERACTION_ALIASES),
         "visualizaciones_total": _metric_total(df_historical, VISUALIZATION_ALIASES),
     }
+
+
+@st.cache_data(ttl=300)
+def calculate_metric_delta(
+    df_current: pd.DataFrame,
+    df_previous: pd.DataFrame,
+    metric_key: str,
+) -> MetricDelta:
+    """Calcula el KPI de una sola métrica seleccionada."""
+    current_rows = _metric_rows(df_current, metric_key)
+    previous_rows = _metric_rows(df_previous, metric_key)
+    current = float(current_rows["valor"].sum()) if "valor" in current_rows else 0.0
+    previous = float(previous_rows["valor"].sum()) if "valor" in previous_rows else 0.0
+    delta_abs = current - previous
+    delta_pct = None if previous <= 0 else (delta_abs / previous) * 100.0
+    return MetricDelta(current, previous, delta_abs, delta_pct)
+
+
+@st.cache_data(ttl=300)
+def calculate_metric_total(df: pd.DataFrame, metric_key: str) -> float:
+    """Suma únicamente la métrica analítica seleccionada."""
+    rows = _metric_rows(df, metric_key)
+    return float(rows["valor"].sum()) if "valor" in rows else 0.0
+
+
+@st.cache_data(ttl=300)
+def build_segmented_performance(
+    df_maestra: pd.DataFrame,
+    df_demo: pd.DataFrame,
+    metric_key: str,
+    sexo: str = "Todos",
+    edad: str = "Todos",
+) -> pd.DataFrame:
+    """Estima rendimiento atribuible a un segmento por plataforma.
+
+    La estimación multiplica el rendimiento observado de cada
+    mes/colegio/plataforma por la participación del segmento en la base
+    demográfica equivalente. No se presenta como medición individual.
+    """
+    cols = [
+        "plataforma",
+        "metrica",
+        "rendimiento_total",
+        "volumen_segmento",
+        "volumen_demografico_total",
+        "participacion_segmento_pct",
+        "rendimiento_segmentado_estimado",
+    ]
+    performance = _metric_rows(df_maestra, metric_key)
+    demographic = _demographic_base(df_demo)
+    if performance.empty or demographic.empty:
+        return pd.DataFrame(columns=cols)
+
+    keys = ["month_key", "colegio", "plataforma"]
+    if any(key not in performance.columns or key not in demographic.columns for key in keys):
+        return pd.DataFrame(columns=cols)
+
+    totals = (
+        demographic.groupby(keys, as_index=False, dropna=False)["valor"]
+        .sum()
+        .rename(columns={"valor": "volumen_demografico_total"})
+    )
+    selected = _filter_segment(demographic, sexo, edad)
+    selected = (
+        selected.groupby(keys, as_index=False, dropna=False)["valor"]
+        .sum()
+        .rename(columns={"valor": "volumen_segmento"})
+    )
+    performance = (
+        performance.groupby(keys, as_index=False, dropna=False)["valor"]
+        .sum()
+        .rename(columns={"valor": "rendimiento_total"})
+    )
+
+    joined = totals.merge(selected, on=keys, how="left").merge(
+        performance, on=keys, how="inner"
+    )
+    if joined.empty:
+        return pd.DataFrame(columns=cols)
+
+    joined["volumen_segmento"] = joined["volumen_segmento"].fillna(0.0)
+    joined["participacion"] = joined["volumen_segmento"].div(
+        joined["volumen_demografico_total"].replace(0, pd.NA)
+    ).fillna(0.0)
+    joined["rendimiento_segmentado_estimado"] = (
+        joined["rendimiento_total"] * joined["participacion"]
+    )
+
+    result = (
+        joined.groupby("plataforma", as_index=False, dropna=False)
+        .agg(
+            rendimiento_total=("rendimiento_total", "sum"),
+            volumen_segmento=("volumen_segmento", "sum"),
+            volumen_demografico_total=("volumen_demografico_total", "sum"),
+            rendimiento_segmentado_estimado=("rendimiento_segmentado_estimado", "sum"),
+        )
+        .sort_values("rendimiento_segmentado_estimado", ascending=False)
+    )
+    result["participacion_segmento_pct"] = result["volumen_segmento"].div(
+        result["volumen_demografico_total"].replace(0, pd.NA)
+    ).fillna(0.0) * 100.0
+    result["metrica"] = str(metric_key)
+    return result[cols].reset_index(drop=True)
+
+
+def _correlation_interpretation(coefficient: Optional[float]) -> str:
+    if coefficient is None or pd.isna(coefficient):
+        return "Datos insuficientes o sin variación para calcular correlación."
+
+    magnitude = abs(float(coefficient))
+    if magnitude < 0.2:
+        strength = "muy débil"
+    elif magnitude < 0.4:
+        strength = "débil"
+    elif magnitude < 0.6:
+        strength = "moderada"
+    elif magnitude < 0.8:
+        strength = "fuerte"
+    else:
+        strength = "muy fuerte"
+
+    direction = "positiva" if coefficient > 0 else "negativa" if coefficient < 0 else "nula"
+    return f"Relación {direction} {strength}; correlación no implica causalidad."
+
+
+@st.cache_data(ttl=300)
+def calculate_demographic_performance_correlation(
+    df_maestra: pd.DataFrame,
+    df_demo: pd.DataFrame,
+    metric_key: str,
+    sexo: str = "Todos",
+    edad: str = "Todos",
+    method: str = "pearson",
+) -> CorrelationResult:
+    """Calcula correlación mensual entre volumen demográfico y rendimiento."""
+    method_key = str(method or "pearson").strip().lower()
+    if method_key not in {"pearson", "spearman"}:
+        raise ValueError("El método debe ser 'pearson' o 'spearman'.")
+
+    performance = _metric_rows(df_maestra, metric_key)
+    demographic = _filter_segment(_demographic_base(df_demo), sexo, edad)
+    empty_series = pd.DataFrame(
+        columns=["month_key", "month_date", "volumen_demografico", "rendimiento"]
+    )
+    if performance.empty or demographic.empty:
+        return CorrelationResult(
+            method_key, None, 0, _correlation_interpretation(None), empty_series
+        )
+
+    performance = (
+        performance.groupby("month_key", as_index=False)["valor"]
+        .sum()
+        .rename(columns={"valor": "rendimiento"})
+    )
+    demographic = (
+        demographic.groupby("month_key", as_index=False)["valor"]
+        .sum()
+        .rename(columns={"valor": "volumen_demografico"})
+    )
+    series = demographic.merge(performance, on="month_key", how="inner")
+    series = series.dropna(subset=["volumen_demografico", "rendimiento"])
+    series["month_date"] = pd.to_datetime(
+        series["month_key"].astype(str) + "-01", errors="coerce"
+    )
+    series = series[
+        ["month_key", "month_date", "volumen_demografico", "rendimiento"]
+    ].sort_values("month_key").reset_index(drop=True)
+
+    coefficient: Optional[float] = None
+    if (
+        len(series) >= 3
+        and series["volumen_demografico"].nunique() > 1
+        and series["rendimiento"].nunique() > 1
+    ):
+        left = series["volumen_demografico"]
+        right = series["rendimiento"]
+        if method_key == "spearman":
+            left = left.rank(method="average")
+            right = right.rank(method="average")
+        raw_coefficient = left.corr(right, method="pearson")
+        if pd.notna(raw_coefficient):
+            coefficient = float(raw_coefficient)
+
+    return CorrelationResult(
+        method=method_key,
+        coefficient=coefficient,
+        sample_size=len(series),
+        interpretation=_correlation_interpretation(coefficient),
+        series=series,
+    )
+
+
+@st.cache_data(ttl=300)
+def build_cohort_series(
+    df_demo: pd.DataFrame,
+    sexo: str = "Todos",
+    edad: str = "Todos",
+) -> pd.DataFrame:
+    """Sigue la participación mensual de un segmento demográfico estable."""
+    cols = [
+        "month_key",
+        "month_date",
+        "volumen_segmento",
+        "volumen_demografico_total",
+        "participacion_pct",
+    ]
+    demographic = _demographic_base(df_demo)
+    if demographic.empty:
+        return pd.DataFrame(columns=cols)
+
+    totals = (
+        demographic.groupby("month_key", as_index=False)["valor"]
+        .sum()
+        .rename(columns={"valor": "volumen_demografico_total"})
+    )
+    selected = _filter_segment(demographic, sexo, edad)
+    selected = (
+        selected.groupby("month_key", as_index=False)["valor"]
+        .sum()
+        .rename(columns={"valor": "volumen_segmento"})
+    )
+    series = totals.merge(selected, on="month_key", how="left")
+    series["volumen_segmento"] = series["volumen_segmento"].fillna(0.0)
+    series["participacion_pct"] = series["volumen_segmento"].div(
+        series["volumen_demografico_total"].replace(0, pd.NA)
+    ).fillna(0.0) * 100.0
+    series["month_date"] = pd.to_datetime(
+        series["month_key"].astype(str) + "-01", errors="coerce"
+    )
+    return series[cols].sort_values("month_key").reset_index(drop=True)
 
 
 @st.cache_data(ttl=300)
@@ -439,9 +740,13 @@ def build_demographic_time_share(df_demo: pd.DataFrame, top_n: int = 2) -> Tuple
 
 
 @st.cache_data(ttl=300)
-def build_city_performance_drilldown(df_maestra_month: pd.DataFrame, df_demo_month: pd.DataFrame) -> pd.DataFrame:
-    """Asigna rendimiento del mes por ciudad usando ponderacion por participacion demografica de ciudad."""
-    cols = ["ciudad", "city_pct", "interacciones_estimadas", "visualizaciones_estimadas", "volumen_estimado"]
+def build_city_performance_drilldown(
+    df_maestra_month: pd.DataFrame,
+    df_demo_month: pd.DataFrame,
+    metric_key: str = "interacciones",
+) -> pd.DataFrame:
+    """Distribuye una sola métrica por participación demográfica de ciudad."""
+    cols = ["ciudad", "city_pct", "metrica", "rendimiento_estimado"]
     if df_maestra_month is None or df_maestra_month.empty or df_demo_month is None or df_demo_month.empty:
         return pd.DataFrame(columns=cols)
 
@@ -457,43 +762,36 @@ def build_city_performance_drilldown(df_maestra_month: pd.DataFrame, df_demo_mon
         return pd.DataFrame(columns=cols)
 
     city_agg["city_pct"] = city_agg["valor"] / city_total
-    total_inter = _metric_total(df_maestra_month, INTERACTION_ALIASES)
-    total_vis = _metric_total(df_maestra_month, VISUALIZATION_ALIASES)
-
-    city_agg["interacciones_estimadas"] = city_agg["city_pct"] * total_inter
-    city_agg["visualizaciones_estimadas"] = city_agg["city_pct"] * total_vis
-    city_agg["volumen_estimado"] = city_agg["interacciones_estimadas"] + city_agg["visualizaciones_estimadas"]
-    city_agg = city_agg.drop(columns=["valor"]).sort_values("volumen_estimado", ascending=False).reset_index(drop=True)
-    return city_agg
+    metric_total = calculate_metric_total(df_maestra_month, metric_key)
+    city_agg["metrica"] = str(metric_key)
+    city_agg["rendimiento_estimado"] = city_agg["city_pct"] * metric_total
+    return (
+        city_agg.drop(columns=["valor"])
+        .sort_values("rendimiento_estimado", ascending=False)
+        .reset_index(drop=True)[cols]
+    )
 
 
 @st.cache_data(ttl=300)
-def build_school_ranking(df_maestra_month_network: pd.DataFrame) -> pd.DataFrame:
-    """Ranking de colegios por volumen aportado en el mes."""
-    cols = ["colegio", "interacciones", "visualizaciones", "volumen_total", "aporte_pct"]
+def build_school_ranking(
+    df_maestra_month_network: pd.DataFrame,
+    metric_key: str = "interacciones",
+) -> pd.DataFrame:
+    """Ranking de colegios para una sola métrica seleccionada."""
+    cols = ["colegio", "metrica", "rendimiento", "aporte_pct"]
     if df_maestra_month_network is None or df_maestra_month_network.empty:
         return pd.DataFrame(columns=cols)
 
-    local = _filter_nonnegative_values(df_maestra_month_network)
-    inter = (
-        local[local["metrica_norm"].isin(INTERACTION_ALIASES)]
-        .groupby("colegio", as_index=False)["valor"]
+    local = _metric_rows(df_maestra_month_network, metric_key)
+    rank = (
+        local.groupby("colegio", as_index=False)["valor"]
         .sum()
-        .rename(columns={"valor": "interacciones"})
+        .rename(columns={"valor": "rendimiento"})
     )
-    vis = (
-        local[local["metrica_norm"].isin(VISUALIZATION_ALIASES)]
-        .groupby("colegio", as_index=False)["valor"]
-        .sum()
-        .rename(columns={"valor": "visualizaciones"})
-    )
-
-    rank = pd.merge(inter, vis, on="colegio", how="outer").fillna(0.0)
-    rank["volumen_total"] = rank["interacciones"] + rank["visualizaciones"]
-    total = float(rank["volumen_total"].sum())
-    rank["aporte_pct"] = (rank["volumen_total"] / total * 100.0) if total > 0 else 0.0
-    rank = rank.sort_values("volumen_total", ascending=False).reset_index(drop=True)
-    return rank
+    total = float(rank["rendimiento"].sum())
+    rank["aporte_pct"] = (rank["rendimiento"] / total * 100.0) if total > 0 else 0.0
+    rank["metrica"] = str(metric_key)
+    return rank.sort_values("rendimiento", ascending=False).reset_index(drop=True)[cols]
 
 
 @st.cache_data(ttl=300)
@@ -518,46 +816,34 @@ def build_segment_distribution(df_demo_month: pd.DataFrame) -> pd.DataFrame:
 
 
 @st.cache_data(ttl=300)
-def build_performance_vs_network(df_maestra_scope: pd.DataFrame, selected_school: str) -> pd.DataFrame:
-    """Compara cuenta seleccionada vs promedio de red (excluyendo cuenta)."""
+def build_performance_vs_network(
+    df_maestra_scope: pd.DataFrame,
+    selected_school: str,
+    metric_key: str = "interacciones",
+) -> pd.DataFrame:
+    """Compara una métrica de la cuenta vs promedio de red."""
     cols = ["metrica", "cuenta", "red_promedio", "delta"]
     if df_maestra_scope is None or df_maestra_scope.empty or not selected_school or selected_school == "Todos":
         return pd.DataFrame(columns=cols)
 
-    local = _filter_nonnegative_values(df_maestra_scope)
+    local = _metric_rows(df_maestra_scope, metric_key)
     selected = local[local["colegio"].astype(str) == str(selected_school)].copy()
     network = local[local["colegio"].astype(str) != str(selected_school)].copy()
     if selected.empty or network.empty:
         return pd.DataFrame(columns=cols)
 
-    def _school_totals(df: pd.DataFrame, aliases: AbstractSet[str], out_name: str) -> pd.DataFrame:
-        part = df[df["metrica_norm"].isin(aliases)]
-        return part.groupby("colegio", as_index=False)["valor"].sum().rename(columns={"valor": out_name})
-
-    selected_inter = _school_totals(selected, INTERACTION_ALIASES, "total")
-    selected_vis = _school_totals(selected, VISUALIZATION_ALIASES, "total")
-    network_inter = _school_totals(network, INTERACTION_ALIASES, "total")
-    network_vis = _school_totals(network, VISUALIZATION_ALIASES, "total")
-
-    cuenta_inter = float(selected_inter["total"].sum())
-    cuenta_vis = float(selected_vis["total"].sum())
-    red_inter = float(network_inter["total"].mean()) if not network_inter.empty else 0.0
-    red_vis = float(network_vis["total"].mean()) if not network_vis.empty else 0.0
+    selected_total = float(selected["valor"].sum())
+    network_totals = network.groupby("colegio", as_index=False)["valor"].sum()
+    network_average = float(network_totals["valor"].mean()) if not network_totals.empty else 0.0
 
     result = pd.DataFrame(
         [
             {
-                "metrica": "Interacciones",
-                "cuenta": cuenta_inter,
-                "red_promedio": red_inter,
-                "delta": cuenta_inter - red_inter,
-            },
-            {
-                "metrica": "Visualizaciones",
-                "cuenta": cuenta_vis,
-                "red_promedio": red_vis,
-                "delta": cuenta_vis - red_vis,
-            },
+                "metrica": str(metric_key),
+                "cuenta": selected_total,
+                "red_promedio": network_average,
+                "delta": selected_total - network_average,
+            }
         ]
     )
     return result
