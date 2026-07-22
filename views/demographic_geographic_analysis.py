@@ -15,10 +15,13 @@ from utils.analytics_repository import load_analytics_bases
 from utils.chart_theme import aplicar_tema_champileaks
 from utils.demographics_geo import (
     CITY_IMPACT_COLORS,
+    CITY_IMPACT_MARKER_SIZES,
     CITY_IMPACT_ORDER,
     MEXICO_CENTER,
     AGE_ORDER,
     apply_demographic_filters,
+    apply_performance_filters,
+    build_city_metric_estimate,
     build_city_report,
     classify_city_impact,
     build_demography_base,
@@ -165,12 +168,12 @@ def _to_excel_bytes(df: pd.DataFrame) -> Tuple[Optional[bytes], Optional[str]]:
     return buffer.getvalue(), None
 
 
-def _build_city_impact_map(mapped: pd.DataFrame) -> go.Figure:
+def _build_city_impact_map(
+    mapped: pd.DataFrame, title: str = "Mapa de ciudades por impacto"
+) -> go.Figure:
     """Construye capas de mapa con colores explícitos por nivel de impacto."""
     map_data = mapped.copy()
     map_data["nivel_impacto"] = classify_city_impact(map_data["valor_total"])
-    max_value = max(float(map_data["valor_total"].max()), 1.0)
-    size_reference = 2.0 * max_value / (42.0**2)
     fig = go.Figure()
     for impact_level in CITY_IMPACT_ORDER:
         level_data = map_data[map_data["nivel_impacto"] == impact_level]
@@ -187,10 +190,7 @@ def _build_city_impact_map(mapped: pd.DataFrame) -> go.Figure:
                 mode="markers",
                 name=impact_level,
                 marker={
-                    "size": level_data["valor_total"],
-                    "sizemode": "area",
-                    "sizeref": size_reference,
-                    "sizemin": 9,
+                    "size": CITY_IMPACT_MARKER_SIZES[impact_level],
                     "color": CITY_IMPACT_COLORS[impact_level],
                     "opacity": 0.9,
                 },
@@ -202,7 +202,7 @@ def _build_city_impact_map(mapped: pd.DataFrame) -> go.Figure:
             )
         )
     fig.update_layout(
-        title="Mapa de ciudades por impacto",
+        title=title,
         map={
             "style": "carto-positron",
             "zoom": 4.4,
@@ -213,7 +213,32 @@ def _build_city_impact_map(mapped: pd.DataFrame) -> go.Figure:
     return fig
 
 
-def render_map_block(df_filtered: pd.DataFrame, colegio: str):
+def _render_metric_city_map(
+    df_demo: pd.DataFrame,
+    df_performance: pd.DataFrame,
+    metric_key: str,
+) -> None:
+    metric_title = "Interacciones" if metric_key == "interacciones" else "Visualizaciones"
+    estimated = build_city_metric_estimate(df_demo, df_performance, metric_key)
+    mapped, _ = build_city_report(estimated)
+    if mapped.empty:
+        st.info(f"No hay datos suficientes para estimar {metric_title.lower()} por ciudad.")
+        return
+
+    fig = _build_city_impact_map(
+        mapped,
+        title=f"Impacto estimado por {metric_title.lower()}",
+    )
+    st.plotly_chart(
+        aplicar_tema_champileaks(fig), width="stretch", config=PLOTLY_CONFIG
+    )
+
+
+def render_map_block(
+    df_filtered: pd.DataFrame,
+    colegio: str,
+    df_performance: Optional[pd.DataFrame] = None,
+):
     """Bloque 2: mapa de ciudades y reporte tabular."""
     st.subheader("Bloque 2 - Geolocalizacion interactiva (Mexico)")
 
@@ -228,6 +253,19 @@ def render_map_block(df_filtered: pd.DataFrame, colegio: str):
         st.plotly_chart(aplicar_tema_champileaks(fig), width="stretch", config=PLOTLY_CONFIG)
     else:
         st.warning("No hay ciudades con coordenadas disponibles en el diccionario interno.")
+
+    if df_performance is not None and not df_performance.empty:
+        st.markdown("#### Mapas de rendimiento estimado")
+        st.caption(
+            "Estimación: el rendimiento de cada colegio y plataforma se distribuye "
+            "entre sus ciudades según la participación demográfica observada. "
+            "Interacciones y visualizaciones se calculan por separado."
+        )
+        col_interactions, col_views = st.columns(2)
+        with col_interactions:
+            _render_metric_city_map(df_filtered, df_performance, "interacciones")
+        with col_views:
+            _render_metric_city_map(df_filtered, df_performance, "visualizaciones")
 
     st.markdown("#### Reporte numerico por ciudad")
 
@@ -366,6 +404,13 @@ def render_demographic_geographic_analysis() -> None:
         start_date=filters["start_date"],
         end_date=filters["end_date"],
     )
+    df_performance_network = apply_performance_filters(
+        df_maestra,
+        colegio="Todos",
+        plataforma=filters["plataforma"],
+        start_date=filters["start_date"],
+        end_date=filters["end_date"],
+    )
 
     if df_network_scope.empty:
         ui.render_empty_state(
@@ -418,11 +463,13 @@ def render_demographic_geographic_analysis() -> None:
 
         if mapa_mode == "General":
             df_map = df_network_scope
+            df_performance_map = df_performance_network
             mapa_label = "General_Red"
         else:
             if not colegios_mapa:
                 st.info("No hay colegios disponibles para vista por colegio con los filtros actuales.")
                 df_map = pd.DataFrame()
+                df_performance_map = pd.DataFrame()
                 mapa_label = "Sin_datos"
             else:
                 default_school_index = colegios_mapa.index(colegio) if colegio in colegios_mapa else 0
@@ -434,12 +481,15 @@ def render_demographic_geographic_analysis() -> None:
                     help="Selecciona un colegio especifico para ver solo sus ciudades en el mapa.",
                 )
                 df_map = df_network_scope[df_network_scope["colegio"].astype(str) == str(mapa_scope)].copy()
+                df_performance_map = df_performance_network[
+                    df_performance_network["colegio"].astype(str) == str(mapa_scope)
+                ].copy()
                 mapa_label = mapa_scope
 
         if df_map.empty:
             st.info("No hay datos de ciudad para la seleccion de mapa actual.")
         else:
-            render_map_block(df_map, mapa_label)
+            render_map_block(df_map, mapa_label, df_performance_map)
 
     with tab_comp:
         colegios_comp = []

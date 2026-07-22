@@ -5,8 +5,11 @@ import pandas as pd
 from views.demographic_geographic_analysis import _build_city_impact_map
 from utils.demographics_geo import (
     CITY_IMPACT_COLORS,
+    CITY_IMPACT_MARKER_SIZES,
     apply_demographic_filters,
+    apply_performance_filters,
     build_city_report,
+    build_city_metric_estimate,
     build_demography_base,
     build_network_comparison,
     classify_city_impact,
@@ -155,8 +158,8 @@ def test_city_impact_uses_red_blue_and_yellow_terciles():
     ]
     assert CITY_IMPACT_COLORS == {
         "Impacto bajo": "#D62828",
-        "Impacto medio": "#0756C9",
-        "Impacto alto": "#FFB81C",
+        "Impacto medio": "#FFB81C",
+        "Impacto alto": "#0756C9",
     }
 
 
@@ -173,5 +176,63 @@ def test_city_map_renders_one_explicit_color_per_impact_level():
 
     figure = _build_city_impact_map(mapped)
     trace_colors = {trace.name: trace.marker.color for trace in figure.data}
+    trace_sizes = {trace.name: trace.marker.size for trace in figure.data}
 
     assert trace_colors == CITY_IMPACT_COLORS
+    assert trace_sizes == CITY_IMPACT_MARKER_SIZES
+
+
+def test_performance_filter_uses_inclusive_end_date_and_all_schools():
+    performance = pd.DataFrame(
+        {
+            "fecha": [
+                "2026-07-31 23:59:59",
+                "2026-08-01 00:00:00",
+            ],
+            "colegio": ["Colegio A", "Colegio B"],
+            "plataforma": ["Instagram", "Instagram"],
+            "metrica": ["Interacciones", "Interacciones"],
+            "valor": [10, 20],
+        }
+    )
+
+    result = apply_performance_filters(
+        performance,
+        colegio="Todos",
+        end_date=pd.Timestamp("2026-07-31"),
+    )
+
+    assert result["valor"].tolist() == [10]
+
+
+def test_city_metric_estimate_respects_each_school_before_aggregating():
+    demographic = pd.DataFrame(
+        [
+            ["Colegio A", "Instagram", "Ciudad", "Ciudad 1", 90],
+            ["Colegio A", "Instagram", "Ciudad", "Ciudad 2", 10],
+            ["Colegio B", "Instagram", "Ciudad", "Ciudad 1", 10],
+            ["Colegio B", "Instagram", "Ciudad", "Ciudad 2", 90],
+        ],
+        columns=["colegio", "plataforma", "criterio", "ubicacion", "valor"],
+    )
+    performance = pd.DataFrame(
+        [
+            ["Colegio A", "Instagram", "Interacciones", 1000],
+            ["Colegio B", "Instagram", "Interacciones", 100],
+            ["Colegio A", "Instagram", "Visualizaciones", 100],
+            ["Colegio B", "Instagram", "Visualizaciones", 1000],
+        ],
+        columns=["colegio", "plataforma", "metrica", "valor"],
+    )
+
+    interactions = build_city_metric_estimate(
+        demographic, performance, "interacciones"
+    ).set_index("ubicacion")
+    views = build_city_metric_estimate(
+        demographic, performance, "visualizaciones"
+    ).set_index("ubicacion")
+
+    assert interactions.loc["Ciudad 1", "valor"] == 910
+    assert interactions.loc["Ciudad 2", "valor"] == 190
+    assert views.loc["Ciudad 1", "valor"] == 190
+    assert views.loc["Ciudad 2", "valor"] == 910

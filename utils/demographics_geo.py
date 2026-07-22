@@ -7,13 +7,20 @@ from typing import Optional, Tuple
 
 import pandas as pd
 
+from utils.metric_catalog import metric_aliases
+
 
 MEXICO_CENTER = {"lat": 23.6345, "lon": -102.5528}
 CITY_IMPACT_ORDER = ["Impacto bajo", "Impacto medio", "Impacto alto"]
 CITY_IMPACT_COLORS = {
     "Impacto bajo": "#D62828",
-    "Impacto medio": "#0756C9",
-    "Impacto alto": "#FFB81C",
+    "Impacto medio": "#FFB81C",
+    "Impacto alto": "#0756C9",
+}
+CITY_IMPACT_MARKER_SIZES = {
+    "Impacto bajo": 7,
+    "Impacto medio": 11,
+    "Impacto alto": 20,
 }
 
 # Coordenadas aproximadas para principales ciudades y localidades de Mexico.
@@ -451,6 +458,36 @@ def apply_demographic_filters(
     return filtered
 
 
+def apply_performance_filters(
+    df: pd.DataFrame,
+    colegio: Optional[str] = None,
+    plataforma: Optional[str] = None,
+    start_date: Optional[pd.Timestamp] = None,
+    end_date: Optional[pd.Timestamp] = None,
+) -> pd.DataFrame:
+    """Aplica al rendimiento el mismo corte usado por la vista geográfica."""
+    if df is None or df.empty:
+        return pd.DataFrame(columns=df.columns if df is not None else None)
+
+    filtered = _filter_nonnegative_values(df)
+    if "fecha" in filtered.columns:
+        filtered["fecha"] = pd.to_datetime(
+            filtered["fecha"], errors="coerce", format="mixed"
+        )
+
+    if colegio and colegio != "Todos":
+        filtered = filtered[filtered["colegio"].astype(str) == str(colegio)]
+    if plataforma and plataforma != "Todas":
+        filtered = filtered[filtered["plataforma"].astype(str) == str(plataforma)]
+    if start_date is not None:
+        start = pd.to_datetime(start_date).normalize()
+        filtered = filtered[filtered["fecha"] >= start]
+    if end_date is not None:
+        end_exclusive = pd.to_datetime(end_date).normalize() + pd.Timedelta(days=1)
+        filtered = filtered[filtered["fecha"] < end_exclusive]
+    return filtered
+
+
 def build_demography_base(df: pd.DataFrame) -> pd.DataFrame:
     """Construye agregacion de Demografia base por edad y sexo."""
     if df is None or df.empty:
@@ -551,6 +588,82 @@ def classify_city_impact(values: pd.Series) -> pd.Series:
     labels.loc[percentiles <= 1 / 3] = "Impacto bajo"
     labels.loc[percentiles > 2 / 3] = "Impacto alto"
     return labels
+
+
+def build_city_metric_estimate(
+    df_demo: pd.DataFrame,
+    df_performance: pd.DataFrame,
+    metric_key: str,
+) -> pd.DataFrame:
+    """Estima una métrica por ciudad respetando colegio y plataforma.
+
+    Cada total de rendimiento se distribuye entre las ciudades de su mismo
+    colegio/plataforma según el peso demográfico observado, y después se agrega
+    por ciudad. Nunca mezcla interacciones con visualizaciones.
+    """
+    columns = ["criterio", "ubicacion", "valor"]
+    if (
+        df_demo is None
+        or df_demo.empty
+        or df_performance is None
+        or df_performance.empty
+    ):
+        return pd.DataFrame(columns=columns)
+
+    city = _filter_nonnegative_values(df_demo)
+    criterion = (
+        city["criterio_norm"]
+        if "criterio_norm" in city.columns
+        else city["criterio"].apply(normalize_text)
+    )
+    city = city[criterion == "ciudad"].copy()
+    city = city[city["ubicacion"].astype(str).str.strip() != ""]
+
+    performance = _filter_nonnegative_values(df_performance)
+    metric_names = (
+        performance["metrica_norm"]
+        if "metrica_norm" in performance.columns
+        else performance["metrica"].apply(normalize_text)
+    )
+    performance = performance[metric_names.isin(metric_aliases(metric_key))].copy()
+    if city.empty or performance.empty:
+        return pd.DataFrame(columns=columns)
+
+    scope_keys = [
+        key
+        for key in ["colegio", "plataforma"]
+        if key in city.columns and key in performance.columns
+    ]
+    city_group_keys = scope_keys + ["ubicacion"]
+    city_agg = city.groupby(city_group_keys, as_index=False)["valor"].sum()
+
+    if scope_keys:
+        city_agg["scope_total"] = city_agg.groupby(scope_keys)["valor"].transform("sum")
+        city_agg["city_share"] = city_agg["valor"].div(
+            city_agg["scope_total"].replace(0, pd.NA)
+        ).fillna(0.0)
+        performance_agg = (
+            performance.groupby(scope_keys, as_index=False)["valor"]
+            .sum()
+            .rename(columns={"valor": "metric_total"})
+        )
+        estimated = city_agg.merge(performance_agg, on=scope_keys, how="inner")
+        estimated["valor_estimado"] = estimated["city_share"] * estimated["metric_total"]
+    else:
+        city_total = float(city_agg["valor"].sum())
+        metric_total = float(performance["valor"].sum())
+        if city_total <= 0:
+            return pd.DataFrame(columns=columns)
+        estimated = city_agg.copy()
+        estimated["valor_estimado"] = estimated["valor"] / city_total * metric_total
+
+    result = (
+        estimated.groupby("ubicacion", as_index=False)["valor_estimado"]
+        .sum()
+        .rename(columns={"valor_estimado": "valor"})
+    )
+    result.insert(0, "criterio", "Ciudad")
+    return result[columns].sort_values("valor", ascending=False).reset_index(drop=True)
 
 
 def build_network_comparison(df: pd.DataFrame, selected_school: str) -> pd.DataFrame:
