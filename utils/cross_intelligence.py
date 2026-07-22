@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import unicodedata
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Tuple
+from typing import AbstractSet, Dict, List, Optional, Tuple
 
 import pandas as pd
 import streamlit as st
 
-from utils.data_loader import load_base_demografica_colegios, load_base_maestra_colegios
+from utils.analytics_repository import load_analytics_bases
+from utils.metric_catalog import INTERACTION_ALIASES, VISUALIZATION_ALIASES
 
 
 MONTH_NAMES_ES = {
@@ -28,10 +29,6 @@ MONTH_NAMES_ES = {
 }
 
 HISTORICAL_KEY = "__historico_completo__"
-
-INTERACTION_ALIASES = {"interacciones", "interaccion"}
-VISUALIZATION_ALIASES = {"visualizaciones", "visualizacion", "views", "vistas"}
-
 
 @dataclass(frozen=True)
 class MetricDelta:
@@ -134,9 +131,10 @@ def _normalize_demografica(df: pd.DataFrame) -> pd.DataFrame:
 
 @st.cache_data(ttl=300)
 def load_normalized_bases() -> Tuple[pd.DataFrame, pd.DataFrame]:
-    """Carga y normaliza ambas bases con parseo de fechas cacheado."""
-    maestra = _normalize_maestra(load_base_maestra_colegios())
-    demografica = _normalize_demografica(load_base_demografica_colegios())
+    """Enriquece el snapshot compartido para los cálculos cruzados."""
+    base_maestra, base_demografica = load_analytics_bases()
+    maestra = _normalize_maestra(base_maestra)
+    demografica = _normalize_demografica(base_demografica)
     return maestra, demografica
 
 
@@ -287,7 +285,7 @@ def get_historical_slice(colegio: str, plataforma: str) -> Dict[str, pd.DataFram
     }
 
 
-def _metric_total(df_maestra: pd.DataFrame, aliases: set[str]) -> float:
+def _metric_total(df_maestra: pd.DataFrame, aliases: AbstractSet[str]) -> float:
     if df_maestra is None or df_maestra.empty:
         return 0.0
 
@@ -532,7 +530,7 @@ def build_performance_vs_network(df_maestra_scope: pd.DataFrame, selected_school
     if selected.empty or network.empty:
         return pd.DataFrame(columns=cols)
 
-    def _school_totals(df: pd.DataFrame, aliases: set[str], out_name: str) -> pd.DataFrame:
+    def _school_totals(df: pd.DataFrame, aliases: AbstractSet[str], out_name: str) -> pd.DataFrame:
         part = df[df["metrica_norm"].isin(aliases)]
         return part.groupby("colegio", as_index=False)["valor"].sum().rename(columns={"valor": out_name})
 

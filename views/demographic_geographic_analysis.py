@@ -11,6 +11,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from components import PLOTLY_CONFIG, ui
+from utils.analytics_repository import load_analytics_bases
 from utils.chart_theme import aplicar_tema_champileaks
 from utils.demographics_geo import (
     MEXICO_CENTER,
@@ -19,139 +20,16 @@ from utils.demographics_geo import (
     build_city_report,
     build_demography_base,
     build_network_comparison,
-    normalize_text,
 )
 
 
-# Salvaguarda en vista para ciudades reportadas frecuentemente sin coordenadas.
-CITY_COORDS_RECOVERY = {
-    # Estado de Mexico y CDMX
-    "Toluca de Lerdo": (19.2925, -99.6569),
-    "Nezahualcóyotl": (19.4081, -99.0186),
-    "Ecatepec de Morelos": (19.6097, -99.0600),
-    "Metepec": (19.2511, -99.6047),
-    "Chimalhuacán": (19.4375, -98.9542),
-    "Naucalpan de Juárez": (19.4753, -99.2378),
-    "Tlalnepantla de Baz": (19.5400, -99.1900),
-    "Cuautitlán Izcalli": (19.6439, -99.2161),
-    "Atizapán de Zaragoza": (19.5558, -99.2492),
-    "San Miguel Zinacantepec": (19.2908, -99.7389),
-    "San Andrés Ocotlán": (19.1869, -99.5801),
-    "San Mateo Atenco": (19.2673, -99.5327),
-
-    # Resto del pais
-    "Puebla de Zaragoza": (19.0453, -98.1975),
-    "Zapopan": (20.7203, -103.3919),
-    "Uruapan": (19.3967, -102.0392),
-    "Ciudad Juárez": (31.7450, -106.4850),
-    "Oaxaca de Juárez": (17.0678, -96.7200),
-    "Santiago de Querétaro": (20.5888, -100.3899),
-    "León de los Aldama": (21.1220, -101.6805),
-    "San Luis Potosí": (22.1565, -100.9855),
-    "Victoria de Durango": (24.0277, -104.6532),
-    "San Francisco de Campeche": (19.8301, -90.5349),
-    "San Cristóbal de las Casas": (16.7370, -92.6375),
-    "Potoichán": (17.4470, -98.6650),
-    "Las Margaritas": (16.3158, -91.9817),
-    "Comonfort": (20.7189, -100.7606),
-    "Apaseo el Grande": (20.5469, -100.6867),
-    "Cortazar": (20.4828, -100.9611),
-    "Santa Cruz de Juventino Rosas": (20.6433, -100.9942),
-    "Juventino Rosas": (20.6433, -100.9942),
-    "Monasterio de Yuste": (40.1142, -5.7389),
-}
-
-
 def load_data() -> Dict[str, pd.DataFrame]:
-    """Carga ambas hojas necesarias para la vista."""
-    base_maestra = _load_sheet_base_maestra()
-    base_demografica = _load_sheet_base_demografica()
+    """Obtiene el snapshot compartido del repositorio analítico."""
+    base_maestra, base_demografica = load_analytics_bases()
     return {
-        "base_maestra": base_maestra,
-        "base_demografica": base_demografica,
+        "base_maestra": base_maestra.copy(),
+        "base_demografica": base_demografica.copy(),
     }
-
-
-@st.cache_data(ttl=300)
-def _load_sheet_base_maestra() -> pd.DataFrame:
-    """Carga Base_Maestra_Colegios directo desde Google Sheets."""
-    from utils.sheets_connector import get_sheets_connection
-
-    expected = ["fecha", "colegio", "plataforma", "metrica", "valor"]
-    aliases = {
-        "métrica": "metrica",
-    }
-
-    ss = get_sheets_connection()
-    if not ss:
-        return pd.DataFrame(columns=expected)
-
-    try:
-        ws = ss.worksheet("Base_Maestra_Colegios")
-        records = ws.get_all_records()
-    except Exception:
-        return pd.DataFrame(columns=expected)
-
-    if not records:
-        return pd.DataFrame(columns=expected)
-
-    df = pd.DataFrame(records).fillna("")
-    df.columns = [aliases.get(str(c).strip().lower(), str(c).strip().lower()) for c in df.columns]
-
-    for col in expected:
-        if col not in df.columns:
-            df[col] = ""
-
-    df = df[expected].copy()
-    df["fecha"] = pd.to_datetime(df["fecha"], errors="coerce")
-    df["valor"] = pd.to_numeric(df["valor"], errors="coerce").fillna(0)
-    return df
-
-
-@st.cache_data(ttl=300)
-def _load_sheet_base_demografica() -> pd.DataFrame:
-    """Carga Base_Demografica_Colegios directo desde Google Sheets."""
-    from utils.sheets_connector import get_sheets_connection
-
-    expected = [
-        "fecha_reporte",
-        "colegio",
-        "plataforma",
-        "criterio",
-        "sexo",
-        "edad",
-        "ubicacion",
-        "valor",
-    ]
-    aliases = {
-        "fecha de reporte": "fecha_reporte",
-        "ubicación": "ubicacion",
-    }
-
-    ss = get_sheets_connection()
-    if not ss:
-        return pd.DataFrame(columns=expected)
-
-    try:
-        ws = ss.worksheet("Base_Demografica_Colegios")
-        records = ws.get_all_records()
-    except Exception:
-        return pd.DataFrame(columns=expected)
-
-    if not records:
-        return pd.DataFrame(columns=expected)
-
-    df = pd.DataFrame(records).fillna("")
-    df.columns = [aliases.get(str(c).strip().lower(), str(c).strip().lower()) for c in df.columns]
-
-    for col in expected:
-        if col not in df.columns:
-            df[col] = ""
-
-    df = df[expected].copy()
-    df["fecha_reporte"] = pd.to_datetime(df["fecha_reporte"], errors="coerce")
-    df["valor"] = pd.to_numeric(df["valor"], errors="coerce").fillna(0)
-    return df
 
 
 def _default_date_range(df: pd.DataFrame):
@@ -289,57 +167,6 @@ def render_map_block(df_filtered: pd.DataFrame, colegio: str):
     st.subheader("Bloque 2 - Geolocalizacion interactiva (Mexico)")
 
     mapped, unmapped = build_city_report(df_filtered)
-    city_source = df_filtered.copy()
-    city_source["criterio_norm"] = city_source["criterio"].apply(normalize_text)
-    city_source = city_source[city_source["criterio_norm"] == "ciudad"]
-    city_source = city_source[city_source["ubicacion"].astype(str).str.strip() != ""]
-
-    city_totals = pd.DataFrame(columns=["ubicacion", "valor_total", "participacion_pct"])
-    if not city_source.empty:
-        city_totals = (
-            city_source.groupby("ubicacion", as_index=False)["valor"]
-            .sum()
-            .rename(columns={"valor": "valor_total"})
-            .sort_values("valor_total", ascending=False)
-        )
-        total_val = float(city_totals["valor_total"].sum())
-        city_totals["participacion_pct"] = (city_totals["valor_total"] / total_val * 100.0) if total_val else 0.0
-
-    # Recupera ciudades conocidas cuando llegan en unmapped por inconsistencias de parsing.
-    if not unmapped.empty:
-        recovery_norm = {normalize_text(name): coords for name, coords in CITY_COORDS_RECOVERY.items()}
-        unmapped["_recovery_key"] = unmapped["ubicacion"].astype(str).apply(normalize_text)
-        recover_mask = unmapped["_recovery_key"].isin(recovery_norm.keys())
-        if recover_mask.any():
-            recovered = unmapped.loc[recover_mask].copy()
-            recovered["lat"] = recovered["_recovery_key"].map(
-                lambda key: recovery_norm[key][0]
-            )
-            recovered["lon"] = recovered["_recovery_key"].map(
-                lambda key: recovery_norm[key][1]
-            )
-            recovered = recovered.drop(columns=["_recovery_key"], errors="ignore")
-            mapped = pd.concat([mapped, recovered], ignore_index=True)
-            unmapped = unmapped.loc[~recover_mask].copy()
-        unmapped = unmapped.drop(columns=["_recovery_key"], errors="ignore")
-
-    # Refuerzo: si una ciudad conocida existe en datos crudos y no quedó en mapped, se inyecta.
-    if not city_totals.empty:
-        recovery_norm = {normalize_text(name): coords for name, coords in CITY_COORDS_RECOVERY.items()}
-        city_totals["_recovery_key"] = city_totals["ubicacion"].astype(str).apply(normalize_text)
-        known_rows = city_totals[city_totals["_recovery_key"].isin(recovery_norm.keys())].copy()
-        mapped_keys = set(mapped["ubicacion"].astype(str).apply(normalize_text).tolist()) if not mapped.empty else set()
-        missing_known = known_rows[~known_rows["_recovery_key"].isin(mapped_keys)].copy()
-        if not missing_known.empty:
-            missing_known["lat"] = missing_known["_recovery_key"].map(lambda key: recovery_norm[key][0])
-            missing_known["lon"] = missing_known["_recovery_key"].map(lambda key: recovery_norm[key][1])
-            missing_known = missing_known[["ubicacion", "valor_total", "participacion_pct", "lat", "lon"]]
-            mapped = pd.concat([mapped, missing_known], ignore_index=True)
-
-        if not unmapped.empty:
-            known_norm_keys = set(recovery_norm.keys())
-            unmapped_norm = unmapped["ubicacion"].astype(str).apply(normalize_text)
-            unmapped = unmapped.loc[~unmapped_norm.isin(known_norm_keys)].copy()
 
     if mapped.empty and unmapped.empty:
         st.info("No hay datos de criterio Ciudad para los filtros seleccionados.")

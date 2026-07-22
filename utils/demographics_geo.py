@@ -368,13 +368,19 @@ def normalize_text(value: str) -> str:
     return " ".join(value.split())
 
 
+CITY_COORDS = {
+    **MEXICO_CITY_COORDS,
+    **{normalize_text(name): coords for name, coords in RAW_CITY_COORDS.items()},
+}
+
+
 def _resolve_city_coords(city_norm: str):
     """Resuelve coordenadas exactas tras normalizar variantes controladas."""
     if not city_norm:
         return pd.NA, pd.NA
 
-    if city_norm in MEXICO_CITY_COORDS:
-        return MEXICO_CITY_COORDS[city_norm]
+    if city_norm in CITY_COORDS:
+        return CITY_COORDS[city_norm]
 
     candidates = [city_norm]
 
@@ -393,8 +399,8 @@ def _resolve_city_coords(city_norm: str):
             candidates.append(cleaned)
 
     for cand in candidates:
-        if cand in MEXICO_CITY_COORDS:
-            return MEXICO_CITY_COORDS[cand]
+        if cand in CITY_COORDS:
+            return CITY_COORDS[cand]
 
     return pd.NA, pd.NA
 
@@ -498,21 +504,15 @@ def build_city_report(df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame]:
     city["participacion_pct"] = (city["valor_total"] / total * 100.0) if total else 0.0
 
     city["city_norm"] = city["ubicacion"].apply(normalize_text)
-    city["raw_key"] = city["ubicacion"].astype(str).str.strip()
-
-    def _resolve_row_coords(row):
-        raw_coords = RAW_CITY_COORDS.get(row["raw_key"])
-        if raw_coords is not None:
-            return raw_coords
-        return _resolve_city_coords(row["city_norm"])
-
-    city[["lat", "lon"]] = city.apply(lambda row: pd.Series(_resolve_row_coords(row)), axis=1)
+    city[["lat", "lon"]] = city["city_norm"].apply(
+        lambda city_name: pd.Series(_resolve_city_coords(city_name))
+    )
 
     mapped = city.dropna(subset=["lat", "lon"]).copy()
     unmapped = city[city["lat"].isna() | city["lon"].isna()].copy()
 
-    mapped = mapped.drop(columns=["city_norm", "raw_key"]).reset_index(drop=True)
-    unmapped = unmapped.drop(columns=["city_norm", "raw_key"]).reset_index(drop=True)
+    mapped = mapped.drop(columns=["city_norm"]).reset_index(drop=True)
+    unmapped = unmapped.drop(columns=["city_norm"]).reset_index(drop=True)
     return mapped, unmapped
 
 
