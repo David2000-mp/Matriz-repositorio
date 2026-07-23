@@ -11,7 +11,8 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from components import PLOTLY_CONFIG, ui
-from components.analysis_delivery import render_exact_download, render_quality_panel
+from components.analysis_delivery import render_quality_panel
+from components.chart_downloads import render_plotly_with_exact_download
 from utils.analytics_repository import load_analytics_bases
 from utils.chart_theme import aplicar_tema_champileaks
 from utils.demographics_geo import (
@@ -151,11 +152,13 @@ def render_demography_block(df_filtered: pd.DataFrame):
         hovermode="x unified",
     )
 
-    st.plotly_chart(aplicar_tema_champileaks(fig), width="stretch", config=PLOTLY_CONFIG)
-    render_exact_download(
+    render_plotly_with_exact_download(
+        aplicar_tema_champileaks(fig),
         demo,
         "demografia_estructura_audiencia",
         key="download_demogeo_audience_structure",
+        width="stretch",
+        config=PLOTLY_CONFIG,
     )
 
 
@@ -248,13 +251,13 @@ def _render_metric_city_map(
         mapped,
         title=f"Mapa {map_number} · Impacto estimado por {metric_title.lower()}",
     )
-    st.plotly_chart(
-        aplicar_tema_champileaks(fig), width="stretch", config=PLOTLY_CONFIG
-    )
-    render_exact_download(
+    render_plotly_with_exact_download(
+        aplicar_tema_champileaks(fig),
         _city_impact_chart_data(mapped),
         f"mapa_{metric_key}_por_ciudad",
         key=f"download_demogeo_map_{metric_key}",
+        width="stretch",
+        config=PLOTLY_CONFIG,
     )
 
 
@@ -291,13 +294,13 @@ def _render_social_network_city_map(df_demo: pd.DataFrame) -> None:
         mapped,
         title=f"Mapa 4 · Impacto por red social: {social_network}",
     )
-    st.plotly_chart(
-        aplicar_tema_champileaks(fig), width="stretch", config=PLOTLY_CONFIG
-    )
-    render_exact_download(
+    render_plotly_with_exact_download(
+        aplicar_tema_champileaks(fig),
         _city_impact_chart_data(mapped),
         f"mapa_red_social_{social_network}",
         key="download_demogeo_map_social_network",
+        width="stretch",
+        config=PLOTLY_CONFIG,
     )
 
 
@@ -332,13 +335,13 @@ def _render_gender_city_map(df_demo: pd.DataFrame) -> None:
         mapped,
         title=f"Mapa 5 · Impacto estimado por género: {gender}",
     )
-    st.plotly_chart(
-        aplicar_tema_champileaks(fig), width="stretch", config=PLOTLY_CONFIG
-    )
-    render_exact_download(
+    render_plotly_with_exact_download(
+        aplicar_tema_champileaks(fig),
         _city_impact_chart_data(mapped),
         f"mapa_genero_{gender}",
         key="download_demogeo_map_gender",
+        width="stretch",
+        config=PLOTLY_CONFIG,
     )
 
 
@@ -358,11 +361,13 @@ def render_map_block(
 
     if not mapped.empty:
         fig = _build_city_impact_map(mapped)
-        st.plotly_chart(aplicar_tema_champileaks(fig), width="stretch", config=PLOTLY_CONFIG)
-        render_exact_download(
+        render_plotly_with_exact_download(
+            aplicar_tema_champileaks(fig),
             _city_impact_chart_data(mapped),
             f"mapa_impacto_demografico_{colegio}",
             key="download_demogeo_map_demographic",
+            width="stretch",
+            config=PLOTLY_CONFIG,
         )
     else:
         st.warning("No hay ciudades con coordenadas disponibles en el diccionario interno.")
@@ -474,11 +479,13 @@ def render_comparison_block(df_for_network: pd.DataFrame, colegio: str):
         yaxis_title="Distribucion (%)",
     )
     fig.update_xaxes(tickangle=-35)
-    st.plotly_chart(aplicar_tema_champileaks(fig), width="stretch", config=PLOTLY_CONFIG)
-    render_exact_download(
+    render_plotly_with_exact_download(
+        aplicar_tema_champileaks(fig),
         comp,
         f"comparacion_demografica_{colegio}",
         key="download_demogeo_network_comparison",
+        width="stretch",
+        config=PLOTLY_CONFIG,
     )
 
     table = comp[["edad", "sexo", "colegio_pct", "red_pct", "delta_pp"]].copy()

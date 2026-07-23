@@ -17,6 +17,7 @@ from components import (
     render_loader,
     render_status,
 )
+from components.chart_downloads import install_global_chart_csv_downloads
 from utils.app_data import apply_global_filters, get_filter_options, load_app_dataframe
 from utils.logger import get_logger, set_production_mode
 
@@ -35,6 +36,7 @@ def _configure_app() -> None:
         initial_sidebar_state="expanded",
         menu_items={"Get Help": None, "Report a bug": None, "About": None},
     )
+    install_global_chart_csv_downloads()
 
     # El logo nativo ocupa la cabecera reservada del sidebar y queda siempre
     # por encima del menú generado por st.navigation.

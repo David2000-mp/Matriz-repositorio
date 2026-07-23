@@ -8,7 +8,8 @@ import streamlit as st
 from plotly.subplots import make_subplots
 
 from components import PLOTLY_CONFIG, ui
-from components.analysis_delivery import render_exact_download, render_quality_panel
+from components.analysis_delivery import render_quality_panel
+from components.chart_downloads import render_plotly_with_exact_download
 from utils.chart_theme import (
     AZUL_INSTITUCIONAL,
     AZUL_INTERACTIVO,
@@ -362,15 +363,13 @@ def _render_block_2(
                     )
                     fig_correlation.update_xaxes(rangemode="tozero")
                     fig_correlation.update_yaxes(rangemode="tozero")
-                    st.plotly_chart(
+                    render_plotly_with_exact_download(
                         aplicar_tema_champileaks(fig_correlation),
-                        width="stretch",
-                        config=PLOTLY_CONFIG,
-                    )
-                    render_exact_download(
                         result.series,
                         f"correlacion_{selected_metric}_{method}",
                         key=f"download_cross_correlation_{selected_metric}",
+                        width="stretch",
+                        config=PLOTLY_CONFIG,
                     )
 
     with tab_cohort:
@@ -413,15 +412,13 @@ def _render_block_2(
                     yaxis_title="Participación del segmento (%)",
                 )
                 fig_cohort.update_yaxes(range=[0, 100], rangemode="tozero")
-                st.plotly_chart(
+                render_plotly_with_exact_download(
                     aplicar_tema_champileaks(fig_cohort),
-                    width="stretch",
-                    config=PLOTLY_CONFIG,
-                )
-                render_exact_download(
                     cohort,
                     f"cohorte_{sexo}_{edad}",
                     key="download_cross_cohort",
+                    width="stretch",
+                    config=PLOTLY_CONFIG,
                 )
                 with st.expander("Ver datos mensuales"):
                     st.dataframe(cohort, width="stretch", hide_index=True)
@@ -505,15 +502,13 @@ def _render_block_2(
                     rangemode="tozero",
                     secondary_y=True,
                 )
-            st.plotly_chart(
+            render_plotly_with_exact_download(
                 aplicar_tema_champileaks(fig_trend),
-                width="stretch",
-                config=PLOTLY_CONFIG,
-            )
-            render_exact_download(
                 performance[["month_key", "month_date", *trend_metrics]],
                 f"tendencia_{'_'.join(trend_metrics)}",
                 key="download_cross_trend",
+                width="stretch",
+                config=PLOTLY_CONFIG,
             )
 
 
@@ -588,11 +583,13 @@ def _render_block_3_drilldown(
                 barmode="group",
             )
             fig_city.update_xaxes(rangemode="tozero")
-            st.plotly_chart(aplicar_tema_champileaks(fig_city), width="stretch", config=PLOTLY_CONFIG)
-            render_exact_download(
+            render_plotly_with_exact_download(
+                aplicar_tema_champileaks(fig_city),
                 pd.concat(city_chart_parts, ignore_index=True),
                 f"desglose_ciudades_{'_'.join(metric_keys)}",
                 key="download_cross_city_drilldown",
+                width="stretch",
+                config=PLOTLY_CONFIG,
             )
 
             table_city = pd.concat(table_parts, ignore_index=True)
@@ -656,11 +653,13 @@ def _render_block_3_drilldown(
                 barmode="group",
             )
             fig_school.update_xaxes(rangemode="tozero")
-            st.plotly_chart(aplicar_tema_champileaks(fig_school), width="stretch", config=PLOTLY_CONFIG)
-            render_exact_download(
+            render_plotly_with_exact_download(
+                aplicar_tema_champileaks(fig_school),
                 pd.concat(school_chart_parts, ignore_index=True),
                 f"ranking_colegios_{'_'.join(_selected_metric_keys(metric_key))}",
                 key="download_cross_school_ranking",
+                width="stretch",
+                config=PLOTLY_CONFIG,
             )
             st.dataframe(
                 pd.concat(school_table_parts, ignore_index=True),
@@ -701,11 +700,13 @@ def _render_block_3_drilldown(
                 xaxis_title="Rango de edad",
             )
             fig_segment.update_yaxes(rangemode="tozero")
-            st.plotly_chart(aplicar_tema_champileaks(fig_segment), width="stretch", config=PLOTLY_CONFIG)
-            render_exact_download(
+            render_plotly_with_exact_download(
+                aplicar_tema_champileaks(fig_segment),
                 segment_dist,
                 "distribucion_audiencia",
                 key="download_cross_audience_distribution",
+                width="stretch",
+                config=PLOTLY_CONFIG,
             )
             st.dataframe(
                 segment_dist.rename(
@@ -771,15 +772,13 @@ def _render_block_3_drilldown(
                     barmode="group",
                 )
                 fig_cross.update_yaxes(rangemode="tozero")
-                st.plotly_chart(
+                render_plotly_with_exact_download(
                     aplicar_tema_champileaks(fig_cross),
-                    width="stretch",
-                    config=PLOTLY_CONFIG,
-                )
-                render_exact_download(
                     pd.concat(segmented_table_parts, ignore_index=True),
                     f"cruce_segmento_{sexo}_{edad}",
                     key="download_cross_segment",
+                    width="stretch",
+                    config=PLOTLY_CONFIG,
                 )
                 st.dataframe(
                     pd.concat(segmented_table_parts, ignore_index=True),
@@ -841,11 +840,13 @@ def _render_block_4_strict_comparison(
                 barmode="group",
             )
             fig_perf.update_yaxes(rangemode="tozero")
-            st.plotly_chart(aplicar_tema_champileaks(fig_perf), width="stretch", config=PLOTLY_CONFIG)
-            render_exact_download(
+            render_plotly_with_exact_download(
+                aplicar_tema_champileaks(fig_perf),
                 perf_comp,
                 f"cuenta_vs_red_rendimiento_{colegio}",
                 key="download_cross_performance_network",
+                width="stretch",
+                config=PLOTLY_CONFIG,
             )
             st.dataframe(perf_comp, width="stretch", hide_index=True)
 
@@ -879,11 +880,13 @@ def _render_block_4_strict_comparison(
             )
             fig_demo.update_xaxes(tickangle=-35)
             fig_demo.update_yaxes(rangemode="tozero")
-            st.plotly_chart(aplicar_tema_champileaks(fig_demo), width="stretch", config=PLOTLY_CONFIG)
-            render_exact_download(
+            render_plotly_with_exact_download(
+                aplicar_tema_champileaks(fig_demo),
                 plot_demo,
                 f"cuenta_vs_red_demografia_{colegio}",
                 key="download_cross_demographic_network",
+                width="stretch",
+                config=PLOTLY_CONFIG,
             )
             st.dataframe(demo_comp, width="stretch", hide_index=True)
 
