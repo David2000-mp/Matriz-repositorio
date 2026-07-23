@@ -11,6 +11,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from components import PLOTLY_CONFIG, ui
+from components.analysis_delivery import render_exact_download, render_quality_panel
 from utils.analytics_repository import load_analytics_bases
 from utils.chart_theme import aplicar_tema_champileaks
 from utils.demographics_geo import (
@@ -151,6 +152,11 @@ def render_demography_block(df_filtered: pd.DataFrame):
     )
 
     st.plotly_chart(aplicar_tema_champileaks(fig), width="stretch", config=PLOTLY_CONFIG)
+    render_exact_download(
+        demo,
+        "demografia_estructura_audiencia",
+        key="download_demogeo_audience_structure",
+    )
 
 
 def _to_excel_bytes(df: pd.DataFrame) -> Tuple[Optional[bytes], Optional[str]]:
@@ -170,12 +176,22 @@ def _to_excel_bytes(df: pd.DataFrame) -> Tuple[Optional[bytes], Optional[str]]:
     return buffer.getvalue(), None
 
 
+def _city_impact_chart_data(mapped: pd.DataFrame) -> pd.DataFrame:
+    """Materializa exactamente las columnas visuales usadas por cualquier mapa."""
+    chart_data = mapped.copy()
+    chart_data["nivel_impacto"] = classify_city_impact(chart_data["valor_total"])
+    chart_data["color"] = chart_data["nivel_impacto"].map(CITY_IMPACT_COLORS)
+    chart_data["tamano_marcador"] = chart_data["nivel_impacto"].map(
+        CITY_IMPACT_MARKER_SIZES
+    )
+    return chart_data
+
+
 def _build_city_impact_map(
     mapped: pd.DataFrame, title: str = "Mapa 1 · Impacto demográfico por ciudad"
 ) -> go.Figure:
     """Construye capas de mapa con colores explícitos por nivel de impacto."""
-    map_data = mapped.copy()
-    map_data["nivel_impacto"] = classify_city_impact(map_data["valor_total"])
+    map_data = _city_impact_chart_data(mapped)
     fig = go.Figure()
     for impact_level in CITY_IMPACT_ORDER:
         level_data = map_data[map_data["nivel_impacto"] == impact_level]
@@ -235,6 +251,11 @@ def _render_metric_city_map(
     st.plotly_chart(
         aplicar_tema_champileaks(fig), width="stretch", config=PLOTLY_CONFIG
     )
+    render_exact_download(
+        _city_impact_chart_data(mapped),
+        f"mapa_{metric_key}_por_ciudad",
+        key=f"download_demogeo_map_{metric_key}",
+    )
 
 
 def _render_social_network_city_map(df_demo: pd.DataFrame) -> None:
@@ -273,6 +294,11 @@ def _render_social_network_city_map(df_demo: pd.DataFrame) -> None:
     st.plotly_chart(
         aplicar_tema_champileaks(fig), width="stretch", config=PLOTLY_CONFIG
     )
+    render_exact_download(
+        _city_impact_chart_data(mapped),
+        f"mapa_red_social_{social_network}",
+        key="download_demogeo_map_social_network",
+    )
 
 
 def _render_gender_city_map(df_demo: pd.DataFrame) -> None:
@@ -309,6 +335,11 @@ def _render_gender_city_map(df_demo: pd.DataFrame) -> None:
     st.plotly_chart(
         aplicar_tema_champileaks(fig), width="stretch", config=PLOTLY_CONFIG
     )
+    render_exact_download(
+        _city_impact_chart_data(mapped),
+        f"mapa_genero_{gender}",
+        key="download_demogeo_map_gender",
+    )
 
 
 def render_map_block(
@@ -328,6 +359,11 @@ def render_map_block(
     if not mapped.empty:
         fig = _build_city_impact_map(mapped)
         st.plotly_chart(aplicar_tema_champileaks(fig), width="stretch", config=PLOTLY_CONFIG)
+        render_exact_download(
+            _city_impact_chart_data(mapped),
+            f"mapa_impacto_demografico_{colegio}",
+            key="download_demogeo_map_demographic",
+        )
     else:
         st.warning("No hay ciudades con coordenadas disponibles en el diccionario interno.")
 
@@ -439,6 +475,11 @@ def render_comparison_block(df_for_network: pd.DataFrame, colegio: str):
     )
     fig.update_xaxes(tickangle=-35)
     st.plotly_chart(aplicar_tema_champileaks(fig), width="stretch", config=PLOTLY_CONFIG)
+    render_exact_download(
+        comp,
+        f"comparacion_demografica_{colegio}",
+        key="download_demogeo_network_comparison",
+    )
 
     table = comp[["edad", "sexo", "colegio_pct", "red_pct", "delta_pp"]].copy()
     table = table.sort_values("delta_pp", key=lambda s: s.abs(), ascending=False)
@@ -519,6 +560,38 @@ def render_demographic_geographic_analysis() -> None:
     with top_right:
         total_valor = pd.to_numeric(metrics_df["valor"], errors="coerce").fillna(0).sum()
         st.metric("Valor total", f"{total_valor:,.0f}")
+
+    render_quality_panel(
+        {
+            "Demografía · corte activo": df_selected,
+            "Demografía · red": df_network_scope,
+            "Rendimiento · red": df_performance_network,
+        },
+        {
+            "Demografía · corte activo": [
+                "fecha_reporte",
+                "colegio",
+                "plataforma",
+                "criterio",
+                "valor",
+            ],
+            "Demografía · red": [
+                "fecha_reporte",
+                "colegio",
+                "plataforma",
+                "criterio",
+                "valor",
+            ],
+            "Rendimiento · red": [
+                "fecha",
+                "colegio",
+                "plataforma",
+                "metrica",
+                "valor",
+            ],
+        },
+        panel_key="demografia_geografia",
+    )
 
     tab_demo, tab_geo, tab_comp = st.tabs(
         [

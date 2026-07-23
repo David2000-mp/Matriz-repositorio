@@ -8,6 +8,7 @@ import streamlit as st
 from plotly.subplots import make_subplots
 
 from components import PLOTLY_CONFIG, ui
+from components.analysis_delivery import render_exact_download, render_quality_panel
 from utils.chart_theme import (
     AZUL_INSTITUCIONAL,
     AZUL_INTERACTIVO,
@@ -366,6 +367,11 @@ def _render_block_2(
                         width="stretch",
                         config=PLOTLY_CONFIG,
                     )
+                    render_exact_download(
+                        result.series,
+                        f"correlacion_{selected_metric}_{method}",
+                        key=f"download_cross_correlation_{selected_metric}",
+                    )
 
     with tab_cohort:
         if sexo == "Todos" and edad == "Todos":
@@ -411,6 +417,11 @@ def _render_block_2(
                     aplicar_tema_champileaks(fig_cohort),
                     width="stretch",
                     config=PLOTLY_CONFIG,
+                )
+                render_exact_download(
+                    cohort,
+                    f"cohorte_{sexo}_{edad}",
+                    key="download_cross_cohort",
                 )
                 with st.expander("Ver datos mensuales"):
                     st.dataframe(cohort, width="stretch", hide_index=True)
@@ -499,6 +510,11 @@ def _render_block_2(
                 width="stretch",
                 config=PLOTLY_CONFIG,
             )
+            render_exact_download(
+                performance[["month_key", "month_date", *trend_metrics]],
+                f"tendencia_{'_'.join(trend_metrics)}",
+                key="download_cross_trend",
+            )
 
 
 def _render_block_3_drilldown(
@@ -543,6 +559,7 @@ def _render_block_3_drilldown(
             )
             fig_city = go.Figure()
             table_parts = []
+            city_chart_parts = []
             for selected_metric, city_rank in city_rankings:
                 show = city_rank.head(12).iloc[::-1]
                 fig_city.add_trace(
@@ -561,6 +578,9 @@ def _render_block_3_drilldown(
                 table_part = city_rank.copy()
                 table_part["Métrica"] = metric_label(selected_metric)
                 table_parts.append(table_part)
+                chart_part = show.copy()
+                chart_part["Métrica"] = metric_label(selected_metric)
+                city_chart_parts.append(chart_part)
             fig_city.update_layout(
                 title=f"Impacto estimado por ciudad · {_metric_selection_label(metric_key)}",
                 xaxis_title="Rendimiento estimado",
@@ -569,6 +589,11 @@ def _render_block_3_drilldown(
             )
             fig_city.update_xaxes(rangemode="tozero")
             st.plotly_chart(aplicar_tema_champileaks(fig_city), width="stretch", config=PLOTLY_CONFIG)
+            render_exact_download(
+                pd.concat(city_chart_parts, ignore_index=True),
+                f"desglose_ciudades_{'_'.join(metric_keys)}",
+                key="download_cross_city_drilldown",
+            )
 
             table_city = pd.concat(table_parts, ignore_index=True)
             table_city["city_pct"] = table_city["city_pct"] * 100.0
@@ -605,6 +630,7 @@ def _render_block_3_drilldown(
             st.caption("Compara el valor observado del colegio con el resto de la red.")
             fig_school = go.Figure()
             school_table_parts = []
+            school_chart_parts = []
             for selected_metric, school_rank in school_rankings:
                 show = school_rank.head(12).iloc[::-1]
                 fig_school.add_trace(
@@ -620,6 +646,9 @@ def _render_block_3_drilldown(
                 table_part = school_rank.copy()
                 table_part["Métrica"] = metric_label(selected_metric)
                 school_table_parts.append(table_part)
+                chart_part = show.copy()
+                chart_part["Métrica"] = metric_label(selected_metric)
+                school_chart_parts.append(chart_part)
             fig_school.update_layout(
                 title=f"Ranking de colegios · {_metric_selection_label(metric_key)}",
                 xaxis_title="Valor observado",
@@ -628,6 +657,11 @@ def _render_block_3_drilldown(
             )
             fig_school.update_xaxes(rangemode="tozero")
             st.plotly_chart(aplicar_tema_champileaks(fig_school), width="stretch", config=PLOTLY_CONFIG)
+            render_exact_download(
+                pd.concat(school_chart_parts, ignore_index=True),
+                f"ranking_colegios_{'_'.join(_selected_metric_keys(metric_key))}",
+                key="download_cross_school_ranking",
+            )
             st.dataframe(
                 pd.concat(school_table_parts, ignore_index=True),
                 width="stretch",
@@ -668,6 +702,11 @@ def _render_block_3_drilldown(
             )
             fig_segment.update_yaxes(rangemode="tozero")
             st.plotly_chart(aplicar_tema_champileaks(fig_segment), width="stretch", config=PLOTLY_CONFIG)
+            render_exact_download(
+                segment_dist,
+                "distribucion_audiencia",
+                key="download_cross_audience_distribution",
+            )
             st.dataframe(
                 segment_dist.rename(
                     columns={"edad": "Edad", "sexo": "Sexo", "pct": "Participación (%)"}
@@ -737,6 +776,11 @@ def _render_block_3_drilldown(
                     width="stretch",
                     config=PLOTLY_CONFIG,
                 )
+                render_exact_download(
+                    pd.concat(segmented_table_parts, ignore_index=True),
+                    f"cruce_segmento_{sexo}_{edad}",
+                    key="download_cross_segment",
+                )
                 st.dataframe(
                     pd.concat(segmented_table_parts, ignore_index=True),
                     width="stretch",
@@ -798,6 +842,11 @@ def _render_block_4_strict_comparison(
             )
             fig_perf.update_yaxes(rangemode="tozero")
             st.plotly_chart(aplicar_tema_champileaks(fig_perf), width="stretch", config=PLOTLY_CONFIG)
+            render_exact_download(
+                perf_comp,
+                f"cuenta_vs_red_rendimiento_{colegio}",
+                key="download_cross_performance_network",
+            )
             st.dataframe(perf_comp, width="stretch", hide_index=True)
 
     with col_right:
@@ -831,6 +880,11 @@ def _render_block_4_strict_comparison(
             fig_demo.update_xaxes(tickangle=-35)
             fig_demo.update_yaxes(rangemode="tozero")
             st.plotly_chart(aplicar_tema_champileaks(fig_demo), width="stretch", config=PLOTLY_CONFIG)
+            render_exact_download(
+                plot_demo,
+                f"cuenta_vs_red_demografia_{colegio}",
+                key="download_cross_demographic_network",
+            )
             st.dataframe(demo_comp, width="stretch", hide_index=True)
 
 
@@ -892,6 +946,47 @@ def render_cross_intelligence_view() -> None:
     st.info(
         f"**Estás viendo:** {month_key_to_label(month_key)} · {school_label} · "
         f"{platform_label} · {_metric_selection_label(metric_key)} · {audience_label}"
+    )
+
+    quality_sources = {
+        "Rendimiento · corte activo": maestra_current,
+        "Demografía · corte activo": demo_current,
+        "Rendimiento · histórico": maestra_historical,
+        "Demografía · histórico": demo_historical,
+    }
+    render_quality_panel(
+        quality_sources,
+        {
+            "Rendimiento · corte activo": [
+                "fecha",
+                "colegio",
+                "plataforma",
+                "metrica",
+                "valor",
+            ],
+            "Demografía · corte activo": [
+                "fecha_reporte",
+                "colegio",
+                "plataforma",
+                "criterio",
+                "valor",
+            ],
+            "Rendimiento · histórico": [
+                "fecha",
+                "colegio",
+                "plataforma",
+                "metrica",
+                "valor",
+            ],
+            "Demografía · histórico": [
+                "fecha_reporte",
+                "colegio",
+                "plataforma",
+                "criterio",
+                "valor",
+            ],
+        },
+        panel_key="inteligencia_cruzada",
     )
 
     _render_block_1(
