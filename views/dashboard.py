@@ -45,6 +45,124 @@ from components import COLOR_MAP, MetricCard, PLOTLY_CONFIG, show_chart_skeleton
 from utils.chart_theme import aplicar_tema_champileaks
 
 
+GOOGLE_PLATFORM_ALIASES = {
+    "google",
+    "google maps",
+    "google map",
+    "googlemaps",
+    "google business profile",
+    "google my business",
+    "maps",
+    "gbp",
+}
+
+
+def _normalize_platform_name(value: object) -> str:
+    """Normaliza un nombre de plataforma para comparaciones de negocio."""
+    if value is None or pd.isna(value):
+        return ""
+    return " ".join(str(value).strip().lower().replace("_", " ").split())
+
+
+def _is_google_platform(value: object) -> bool:
+    """Identifica las variantes usadas para Google/Google Maps."""
+    normalized = _normalize_platform_name(value)
+    if not normalized:
+        return False
+    return (
+        normalized in GOOGLE_PLATFORM_ALIASES
+        or normalized.replace(" ", "") in GOOGLE_PLATFORM_ALIASES
+    )
+
+
+def _split_social_and_google(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Separa Google de las redes sociales antes de calcular comparativas."""
+    if df is None or df.empty or "plataforma" not in df.columns:
+        empty = pd.DataFrame(columns=df.columns if df is not None else [])
+        return (df.copy() if df is not None else empty.copy()), empty
+
+    google_mask = df["plataforma"].map(_is_google_platform)
+    return df.loc[~google_mask].copy(), df.loc[google_mask].copy()
+
+
+def _build_google_latest_snapshot(google_df: pd.DataFrame) -> pd.DataFrame:
+    """Devuelve la observación más reciente de Google por institución."""
+    if google_df is None or google_df.empty:
+        return pd.DataFrame(columns=google_df.columns if google_df is not None else [])
+
+    latest = google_df.copy()
+    if "fecha" in latest.columns:
+        latest["fecha"] = pd.to_datetime(latest["fecha"], errors="coerce")
+        latest = latest.sort_values("fecha")
+
+    subset = ["entidad"] if "entidad" in latest.columns else None
+    if subset:
+        latest = latest.drop_duplicates(subset=subset, keep="last")
+
+    return latest.reset_index(drop=True)
+
+
+def _render_google_section(google_df: pd.DataFrame) -> None:
+    """Renderiza Google al final, sin rankings ni benchmarks sociales."""
+    if google_df is None or google_df.empty:
+        return
+
+    st.markdown("---")
+    st.subheader("Google")
+    st.caption(
+        "Google no es una red social: sus datos se muestran por separado y no "
+        "participan en rankings, benchmarks ni indicadores de salud de redes sociales."
+    )
+
+    latest = _build_google_latest_snapshot(google_df)
+    ratings = pd.Series(dtype="float64")
+    if "calificacion_redes" in latest.columns:
+        ratings = pd.to_numeric(latest["calificacion_redes"], errors="coerce")
+        ratings = ratings[ratings > 0]
+
+    institution_count = (
+        latest["entidad"].dropna().astype(str).str.strip().replace("", pd.NA).dropna().nunique()
+        if "entidad" in latest.columns
+        else 0
+    )
+    latest_date = pd.NaT
+    if "fecha" in google_df.columns:
+        latest_date = pd.to_datetime(google_df["fecha"], errors="coerce").max()
+
+    metric_cols = st.columns(4)
+    with metric_cols[0]:
+        rating_label = f"{ratings.mean():.2f}" if not ratings.empty else "Sin dato"
+        st.metric("Calificación promedio", rating_label)
+    with metric_cols[1]:
+        st.metric("Instituciones con Google", f"{institution_count:,}")
+    with metric_cols[2]:
+        st.metric("Registros históricos", f"{len(google_df):,}")
+    with metric_cols[3]:
+        latest_label = latest_date.strftime("%b %Y") if pd.notna(latest_date) else "Sin fecha"
+        st.metric("Última actualización", latest_label)
+
+    detail_columns = [
+        column
+        for column in ("entidad", "fecha", "calificacion_redes", "comentarios_consolidados")
+        if column in latest.columns
+    ]
+    if detail_columns:
+        detail = latest[detail_columns].copy()
+        detail = detail.rename(
+            columns={
+                "entidad": "Institución",
+                "fecha": "Última actualización",
+                "calificacion_redes": "Calificación",
+                "comentarios_consolidados": "Comentarios",
+            }
+        )
+        if "Institución" in detail.columns:
+            detail = detail.sort_values("Institución")
+
+        st.markdown("#### Detalle de Google por institución")
+        st.dataframe(detail, width="stretch", hide_index=True)
+
+
 def get_traffic_light_indicator(metric, value):
     """
     Retorna indicador visual de confiabilidad basado en umbrales por métrica.
@@ -306,7 +424,19 @@ def render(df=None):
         if _col in df_full.columns:
             df_full[_col] = pd.to_numeric(df_full[_col], errors="coerce").fillna(0)
 
-    # Dashboard anclado a histórico completo.
+    # Google no es una red social. Se separa antes de cualquier KPI, benchmark,
+    # ranking o indicador de salud y se presenta en un apartado propio al final.
+    df_full, google_df_full = _split_social_and_google(df_full)
+
+    if df_full.empty and not google_df_full.empty:
+        st.info(
+            "No hay registros de redes sociales para los filtros actuales. "
+            "Los datos de Google se muestran en su apartado independiente."
+        )
+        _render_google_section(google_df_full)
+        return
+
+    # Dashboard social anclado a histórico completo.
     df_m_month = df_full.copy()
 
     # ========================================================================
@@ -1533,4 +1663,6 @@ def render(df=None):
                 duplicados.sort_values(['entidad', 'plataforma', 'fecha'])
                 [['fecha', 'entidad', 'plataforma', 'seguidores']]
             )
+
+    _render_google_section(google_df_full)
 
