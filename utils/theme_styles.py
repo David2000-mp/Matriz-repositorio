@@ -66,6 +66,7 @@ PLOTLY_CONFIG = {
     "displayModeBar": True,
     "displaylogo": False,
     "responsive": True,
+    "scrollZoom": False,
     "modeBarButtonsToRemove": ["lasso2d", "select2d"],
     "toImageButtonOptions": {"format": "png", "scale": 2},
 }
@@ -124,21 +125,50 @@ def get_theme_css() -> str:
     }
 
     [data-testid="stSidebarHeader"] {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+        gap: 0.5rem !important;
         padding-top: 1rem !important;
         padding-bottom: 1rem !important;
         min-height: 76px !important;
     }
 
-    [data-testid="stSidebarHeader"] div,
-    [data-testid="stLogo"] {
+    [data-testid="stSidebarHeader"]
+        > div:not([data-testid="stSidebarCollapseButton"]) {
+        flex: 1 1 auto !important;
+        min-width: 0 !important;
         height: auto !important;
-        width: 100% !important;
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
     }
 
+    [data-testid="stSidebarCollapseButton"] {
+        position: relative !important;
+        z-index: 2 !important;
+        flex: 0 0 2.75rem !important;
+        width: 2.75rem !important;
+        min-width: 2.75rem !important;
+        height: 2.75rem !important;
+        margin-left: auto !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+    }
+
+    [data-testid="stSidebarCollapseButton"] button {
+        width: 2.75rem !important;
+        min-width: 2.75rem !important;
+        height: 2.75rem !important;
+        padding: 0 !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+    }
+
     [data-testid="stLogo"] img,
+    [data-testid="stSidebarLogo"],
     [data-testid="stSidebarHeader"] img {
         /* Activo recortado sin margen transparente: se muestra completo. */
         height: 48px !important;
@@ -383,10 +413,411 @@ def get_theme_css() -> str:
         }
     }
 
+    /*
+     * Capa responsive compartida. Las vistas usan columnas, tablas y grÃ¡ficas
+     * nativas; estas reglas conservan su comportamiento sin exigir que cada
+     * pantalla implemente una versiÃ³n mÃ³vil independiente.
+     */
+    @media (max-width: 1024px) {
+        section[data-testid="stMain"] [data-testid="stMainBlockContainer"] {
+            max-width: 100% !important;
+            padding-left: 1.5rem !important;
+            padding-right: 1.5rem !important;
+        }
+
+        section[data-testid="stMain"] :is(
+            [data-testid="stPlotlyChart"],
+            [data-testid="stDataFrame"],
+            [data-testid="stDataEditor"],
+            [data-testid="stIFrame"]
+        ) {
+            width: 100% !important;
+            max-width: 100% !important;
+            min-width: 0 !important;
+        }
+
+        section[data-testid="stMain"] [data-testid="stIFrame"] iframe {
+            width: 100% !important;
+            max-width: 100% !important;
+        }
+
+        section[data-testid="stMain"] [data-testid="stMarkdownContainer"]:has(table) {
+            max-width: 100%;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        section[data-testid="stMain"] [data-testid="stMarkdownContainer"] table {
+            width: 100%;
+            min-width: max-content;
+        }
+    }
+
     @media (max-width: 767px) {
-        section[data-testid="stSidebar"] { max-width: 88vw; }
-        section[data-testid="stMain"] [data-testid="stHorizontalBlock"] {
+        html {
+            -webkit-text-size-adjust: 100%;
+            -webkit-tap-highlight-color: rgba(0, 54, 150, 0.2) !important;
+        }
+
+        [data-testid="stAppViewContainer"],
+        section[data-testid="stMain"] {
+            width: 100%;
+            max-width: 100%;
+            overflow-x: clip;
+        }
+
+        section[data-testid="stMain"] [data-testid="stMainBlockContainer"] {
+            box-sizing: border-box !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            margin-top: 0 !important;
+            padding-top: calc(3.75rem + env(safe-area-inset-top)) !important;
+            padding-left: 1rem !important;
+            padding-right: 1rem !important;
+            padding-bottom: calc(1.5rem + env(safe-area-inset-bottom)) !important;
+        }
+
+        section[data-testid="stMain"] [data-testid="stMainBlockContainer"]:has(
+            .hero-bg-video
+        ) {
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+
+        section[data-testid="stMain"] :is(
+            [data-testid="stVerticalBlock"],
+            [data-testid="stVerticalBlockBorderWrapper"],
+            [data-testid="stElementContainer"],
+            [data-testid="stLayoutWrapper"],
+            [data-testid="stMarkdownContainer"]
+        ) {
+            box-sizing: border-box !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            min-width: 0 !important;
+        }
+
+        /*
+         * st.columns genera stHorizontalBlock > stColumn. Forzar una sola
+         * columna evita tarjetas o controles demasiado estrechos.
+         */
+        section[data-testid="stMain"] [data-testid="stHorizontalBlock"]:has(
+            > [data-testid="stColumn"]
+        ) {
+            flex-direction: column !important;
+            flex-wrap: nowrap !important;
+            align-items: stretch !important;
+            gap: 0.75rem !important;
+            width: 100% !important;
+        }
+
+        section[data-testid="stMain"] [data-testid="stHorizontalBlock"]
+            > [data-testid="stColumn"] {
+            width: 100% !important;
+            max-width: 100% !important;
+            min-width: 0 !important;
+            flex: 1 1 100% !important;
+        }
+
+        /*
+         * La captura anual construye una matriz de 12 meses con etiquetas
+         * colapsadas. En mÃ³vil ocultamos su cabecera duplicada y recuperamos
+         * la etiqueta completa junto a cada campo para que el apilado conserve
+         * el contexto de mes y plataforma.
+         */
+        section[data-testid="stMain"] [data-testid="stHorizontalBlock"]:has(
+            > [data-testid="stColumn"]:nth-child(7)
+        ):not(:has([data-testid="stNumberInput"])) {
+            display: none !important;
+        }
+
+        section[data-testid="stMain"] [data-testid="stHorizontalBlock"]:has(
+            > [data-testid="stColumn"]:nth-child(7)
+        ) [data-testid="stNumberInput"] :is(label, [data-testid="stWidgetLabel"]) {
+            position: static !important;
+            display: flex !important;
+            visibility: visible !important;
+            width: auto !important;
+            height: auto !important;
+            margin: 0 0 0.25rem !important;
+            clip: auto !important;
+            white-space: normal !important;
+        }
+
+        section[data-testid="stMain"] :is(h1, h2, h3, p, label, span) {
+            overflow-wrap: anywhere;
+        }
+
+        section[data-testid="stMain"] [data-testid="stHeadingWithActionElements"],
+        section[data-testid="stMain"] [data-testid="stHeadingWithActionElements"] > div {
+            width: 100% !important;
+            justify-content: center !important;
+            text-align: center !important;
+        }
+
+        section[data-testid="stMain"] h1 {
+            font-size: clamp(1.75rem, 8vw, 2.4rem) !important;
+            line-height: 1.15 !important;
+            width: 100% !important;
+            margin-left: auto !important;
+            margin-right: auto !important;
+            text-align: center !important;
+        }
+
+        section[data-testid="stMain"] h2 {
+            font-size: clamp(1.5rem, 6.5vw, 2rem) !important;
+            line-height: 1.2 !important;
+            width: 100% !important;
+            margin-left: auto !important;
+            margin-right: auto !important;
+            text-align: center !important;
+        }
+
+        section[data-testid="stMain"] h3 {
+            font-size: clamp(1.2rem, 5.5vw, 1.6rem) !important;
+            line-height: 1.25 !important;
+            width: 100% !important;
+            margin-left: auto !important;
+            margin-right: auto !important;
+            text-align: center !important;
+        }
+
+        section[data-testid="stMain"] :is(
+            [data-testid="stCaptionContainer"],
+            [data-testid="stMetric"],
+            [data-testid="stMetricLabel"],
+            [data-testid="stMetricValue"],
+            [data-testid="stMetricDelta"],
+            .kpi-card
+        ) {
+            text-align: center !important;
+        }
+
+        section[data-testid="stMain"] :is(
+            [data-testid="stMetricLabel"],
+            [data-testid="stMetricDelta"]
+        ) {
+            justify-content: center !important;
+        }
+
+        section[data-testid="stMain"] :is(img, video, canvas, svg) {
+            max-width: 100%;
+        }
+
+        /*
+         * 16px evita el zoom automÃ¡tico de iOS; 44px es el objetivo tÃ¡ctil
+         * mÃ­nimo para acciones y controles frecuentes.
+         */
+        section[data-testid="stMain"] :is(input, textarea, [role="combobox"]) {
+            min-width: 0 !important;
+            max-width: 100% !important;
+            font-size: 16px !important;
+        }
+
+        section[data-testid="stMain"] :is(
+            .stButton > button,
+            .stDownloadButton > button,
+            [data-testid="stLinkButton"] a,
+            [data-testid="stFormSubmitButton"] button,
+            [data-testid="stPopover"] button,
+            [data-baseweb="tab"],
+            [data-baseweb="select"] > div,
+            [data-testid="stExpander"] summary
+        ) {
+            min-height: 44px !important;
+            touch-action: manipulation;
+        }
+
+        section[data-testid="stMain"] [data-baseweb="tab-list"] {
+            display: flex !important;
+            flex-wrap: nowrap !important;
+            justify-content: flex-start !important;
+            max-width: 100% !important;
+            overflow-x: auto !important;
+            overflow-y: hidden !important;
+            overscroll-behavior-inline: contain;
+            scroll-snap-type: inline proximity;
+            -webkit-overflow-scrolling: touch !important;
+            scrollbar-width: thin;
+        }
+
+        section[data-testid="stMain"] [data-baseweb="tab"] {
+            flex: 0 0 auto !important;
+            min-width: max-content !important;
+            padding-left: 0.875rem !important;
+            padding-right: 0.875rem !important;
+            white-space: nowrap !important;
+            scroll-snap-align: start;
+        }
+
+        section[data-testid="stMain"] :is(
+            [data-testid="stDataFrame"],
+            [data-testid="stDataEditor"],
+            [data-testid="stFileUploader"],
+            [data-testid="stIFrame"]
+        ) {
+            width: 100% !important;
+            max-width: 100% !important;
+            min-width: 0 !important;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch !important;
+        }
+
+        section[data-testid="stMain"] [data-testid="stPlotlyChart"] {
+            width: 100% !important;
+            max-width: 100% !important;
+            min-width: 0 !important;
+            overflow: hidden !important;
+        }
+
+        section[data-testid="stMain"] [data-testid="stPlotlyChart"] :is(
+            .js-plotly-plot,
+            .plot-container,
+            .svg-container
+        ) {
+            width: 100% !important;
+            max-width: 100% !important;
+        }
+
+        section[data-testid="stMain"] [data-testid="stPlotlyChart"] .modebar {
+            display: flex !important;
             flex-wrap: wrap;
+            justify-content: flex-end;
+            max-width: 100%;
+        }
+
+        section[data-testid="stMain"] [data-testid="stPlotlyChart"] .modebar-btn {
+            min-width: 36px;
+            min-height: 36px;
+        }
+
+        section[data-testid="stMain"] [data-testid="stMarkdownContainer"]:has(table) {
+            width: 100%;
+            max-width: 100%;
+            overflow-x: auto !important;
+            overscroll-behavior-inline: contain;
+            -webkit-overflow-scrolling: touch !important;
+        }
+
+        section[data-testid="stMain"] [data-testid="stMarkdownContainer"] table {
+            display: table !important;
+            width: max-content !important;
+            min-width: 100% !important;
+            font-size: 0.9rem !important;
+        }
+
+        section[data-testid="stMain"] [data-testid="stMarkdownContainer"] :is(th, td) {
+            padding: 0.5rem !important;
+            overflow-wrap: normal;
+        }
+
+        section[data-testid="stMain"] :is(
+            [data-testid="stMetricValue"],
+            .kpi-value
+        ) {
+            font-size: clamp(1.35rem, 7vw, 2rem) !important;
+            line-height: 1.15 !important;
+            overflow-wrap: anywhere;
+        }
+
+        section[data-testid="stSidebar"] {
+            z-index: 100002 !important;
+            height: 100dvh !important;
+            max-height: 100dvh !important;
+            background: #003696 !important;
+            box-shadow: none !important;
+            padding-bottom: env(safe-area-inset-bottom) !important;
+        }
+
+        section[data-testid="stSidebarNav"] a,
+        section[data-testid="stSidebar"] [data-testid="stPageLink"] a {
+            min-height: 44px !important;
+        }
+
+        section[data-testid="stSidebar"] [data-testid="stSidebarContent"] {
+            height: 100% !important;
+            background: #003696 !important;
+            overflow-x: hidden;
+            overscroll-behavior: contain;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        [role="dialog"] {
+            width: calc(100vw - 2rem) !important;
+            max-width: calc(100vw - 2rem) !important;
+            max-height: calc(100dvh - 2rem) !important;
+            overflow: auto;
+        }
+
+        /* El viewport mÃ³vil cambia al mostrar/ocultar la barra del navegador. */
+        .hero-bg-video,
+        .hero-overlay {
+            width: 100% !important;
+            height: 100svh !important;
+            min-height: 100svh !important;
+        }
+
+        .glass-box {
+            max-width: calc(100vw - 2rem) !important;
+            touch-action: pan-y !important;
+            cursor: default !important;
+            animation: none !important;
+            transform: none !important;
+        }
+    }
+
+    @media (max-width: 480px) {
+        section[data-testid="stMain"] [data-testid="stMainBlockContainer"] {
+            padding-left: 0.75rem !important;
+            padding-right: 0.75rem !important;
+        }
+
+        section[data-testid="stMain"] h1 {
+            font-size: 1.75rem !important;
+        }
+
+        section[data-testid="stMain"] h2 {
+            font-size: 1.5rem !important;
+        }
+
+        section[data-testid="stMain"] :is(
+            .stButton > button,
+            .stDownloadButton > button,
+            [data-testid="stLinkButton"] a,
+            [data-testid="stFormSubmitButton"] button
+        ) {
+            width: 100% !important;
+        }
+
+        section[data-testid="stMain"] [data-baseweb="tab"] {
+            font-size: 0.875rem !important;
+        }
+    }
+
+    @media (max-width: 767px) and (orientation: landscape) {
+        .hero-bg-video,
+        .hero-overlay {
+            min-height: 100svh !important;
+        }
+    }
+
+    @media (hover: none) and (pointer: coarse) {
+        section[data-testid="stMain"] :is(
+            .stButton > button,
+            .stDownloadButton > button,
+            [data-testid="stLinkButton"] a,
+            [data-testid="stFormSubmitButton"] button
+        ),
+        section[data-testid="stSidebarNav"] a,
+        section[data-testid="stSidebar"] [data-testid="stPageLink"] a {
+            min-height: 48px !important;
+        }
+
+        section[data-testid="stMain"] [data-testid="stMetric"]:hover,
+        section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:hover,
+        section[data-testid="stSidebarNav"] a:hover,
+        section[data-testid="stSidebar"] [data-testid="stPageLink"] a:hover {
+            transform: none !important;
         }
     }
 
@@ -408,8 +839,57 @@ def inject_custom_css() -> None:
 
 def inject_layout_compact_css(hide_streamlit_header: bool = False) -> None:
     header_css = """
-        header[data-testid="stHeader"] { display: none !important; }
-        div[data-testid="stToolbar"], div[data-testid="stDecoration"] { display: none; }
+        /*
+         * El botón que restaura el sidebar vive dentro del header nativo.
+         * Reducimos la cabecera a una capa transparente, pero no la quitamos
+         * del DOM: ocultarla con display:none también hacía inaccesible el
+         * botón en escritorio y móvil.
+         */
+        header[data-testid="stHeader"] {
+            display: block !important;
+            height: 0 !important;
+            min-height: 0 !important;
+            padding: 0 !important;
+            background: transparent !important;
+            box-shadow: none !important;
+            overflow: visible !important;
+            pointer-events: none !important;
+            z-index: 100000 !important;
+        }
+        /*
+         * stExpandSidebarButton es descendiente de stToolbar en Streamlit.
+         * La barra debe seguir renderizada aunque sus acciones se oculten.
+         */
+        header[data-testid="stHeader"] div[data-testid="stToolbar"] {
+            display: flex !important;
+            height: 0 !important;
+            min-height: 0 !important;
+            background: transparent !important;
+            overflow: visible !important;
+            pointer-events: none !important;
+        }
+        header[data-testid="stHeader"] button:not([data-testid="stExpandSidebarButton"]),
+        header[data-testid="stHeader"] [data-testid="stStatusWidget"],
+        header[data-testid="stHeader"] [data-testid="stMainMenu"],
+        div[data-testid="stDecoration"] {
+            display: none !important;
+        }
+        header[data-testid="stHeader"] div[data-testid="stSidebarCollapsedControl"],
+        header[data-testid="stHeader"] button[data-testid="stExpandSidebarButton"] {
+            display: flex !important;
+            visibility: visible !important;
+            pointer-events: auto !important;
+        }
+        header[data-testid="stHeader"] button[data-testid="stExpandSidebarButton"] {
+            position: fixed !important;
+            top: calc(env(safe-area-inset-top) + .5rem) !important;
+            left: calc(env(safe-area-inset-left) + .5rem) !important;
+            width: 2.75rem !important;
+            min-width: 2.75rem !important;
+            height: 2.75rem !important;
+            padding: 0 !important;
+            z-index: 100001 !important;
+        }
     """ if hide_streamlit_header else """
         header[data-testid="stHeader"] {
             background: linear-gradient(135deg, #002566, #001840);
@@ -429,6 +909,24 @@ def inject_layout_compact_css(hide_streamlit_header: bool = False) -> None:
             background: rgba(255,255,255,.18);
             border: 1px solid rgba(255,255,255,.5);
             border-radius: .5rem;
+        }}
+        button[data-testid="stExpandSidebarButton"]:focus-visible,
+        div[data-testid="stSidebarCollapseButton"] button:focus-visible {{
+            outline: 3px solid #FFB81C;
+            outline-offset: 2px;
+        }}
+        @media (max-width: 767px) {{
+            .main .block-container {{
+                padding-top: calc(3.75rem + env(safe-area-inset-top)) !important;
+            }}
+            button[data-testid="stExpandSidebarButton"],
+            div[data-testid="stSidebarCollapseButton"] button {{
+                width: 2.75rem !important;
+                min-width: 2.75rem !important;
+                height: 2.75rem !important;
+                min-height: 2.75rem !important;
+                touch-action: manipulation;
+            }}
         }}
         </style>
         """,
