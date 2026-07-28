@@ -26,6 +26,7 @@ load_dotenv()
 logger = get_logger(__name__)
 
 CONSOLIDATED_COMMENTS_SHEET = "Comentarios Consolidados"
+VIRAL_VIDEOS_SHEET = "Videos Virales"
 CONSOLIDATED_COMMENTS_CANONICAL = {
     "institucion": "institucion",
     "fecha_carga": "fecha_carga",
@@ -492,6 +493,32 @@ def _canonical_form_column_groups(columns: List[str]) -> Dict[str, List[str]]:
         "publicacion_destacada": {
             "publicacion destacada",
         },
+        "publicacion_mas_interacciones": {
+            "publicacion con mas interacciones",
+            "publicacion con mas interacciones ",
+        },
+        "se_considera_viral_280": {
+            "se considera viral ( + 280 interacciones )",
+            "se considera viral (+ 280 interacciones)",
+            "se considera viral 280 interacciones",
+        },
+        "media_interaccion": {
+            "media de interaccion",
+            "media de interacciones",
+        },
+        "calificacion_redes": {
+            "calificacion en redes",
+        },
+        "tipo_contenido_mas_viral": {
+            "que tipo de contenido fue el mas viral",
+        },
+        "novedoso_video_viral": {
+            "que es lo mas novedoso del video viral",
+        },
+        "calificacion_contenido": {
+            "del 1 al 10 que calificacion le pones al contenido de la pagina",
+            "del 1 al 10, que calificacion le pones al contenido de la pagina",
+        },
         "comentarios": {
             "comentarios contextuales",
             '"comentarios contextuales"',
@@ -503,9 +530,14 @@ def _canonical_form_column_groups(columns: List[str]) -> Dict[str, List[str]]:
     grouped: Dict[str, List[str]] = {key: [] for key in alias_map}
 
     for col in columns:
-        normalized = _normalize_header_label(col)
+        normalized = re.sub(r"[^a-z0-9]+", " ", _normalize_header_label(col))
+        normalized = re.sub(r"\s+", " ", normalized).strip()
         for canonical, aliases in alias_map.items():
-            if normalized in aliases:
+            normalized_aliases = {
+                re.sub(r"\s+", " ", re.sub(r"[^a-z0-9]+", " ", _normalize_header_label(alias))).strip()
+                for alias in aliases
+            }
+            if normalized in normalized_aliases:
                 grouped[canonical].append(col)
                 break
 
@@ -726,6 +758,21 @@ def cargar_respuestas_forms() -> pd.DataFrame:
         return pd.DataFrame()
 
 
+@st.cache_data(ttl=300)
+def load_form_responses() -> pd.DataFrame:
+    """Entrega un snapshot cacheado del formulario mensual ya normalizado."""
+    return cargar_respuestas_forms().copy()
+
+
+@st.cache_data(ttl=300)
+def load_base_demografica_colegios() -> pd.DataFrame:
+    """Entrega la Base Demográfica mediante el repositorio analítico central."""
+    from utils.analytics_repository import load_analytics_bases
+
+    _, demografica = load_analytics_bases()
+    return demografica.copy()
+
+
 def _institution_name_to_code(name: str) -> str:
     normalized_name = _normalize_header_label(name).replace(" ", "")
     for code, canonical_name in INSTITUTION_CATALOG.items():
@@ -746,20 +793,31 @@ def _canonicalize_consolidated_comments_columns(df: pd.DataFrame) -> pd.DataFram
     return df.rename(columns=rename_map)
 
 
+def _empty_official_comments_frame() -> pd.DataFrame:
+    """Construye el contrato vacío común de las hojas textuales oficiales."""
+    return pd.DataFrame(
+        columns=[
+            *CONSOLIDATED_COMMENTS_CANONICAL.values(),
+            "institucion_nombre",
+            "institucion_codigo",
+        ]
+    )
+
+
 @st.cache_data(ttl=3600)
-def load_consolidated_comments() -> pd.DataFrame:
-    """Carga base histórica desde 'Comentarios Consolidados' con esquema canónico y deduplicación."""
+def load_official_comments_sheet(sheet_name: str) -> pd.DataFrame:
+    """Carga una hoja oficial de comentarios con contrato canónico compartido."""
     try:
         ss = get_sheets_connection()
         if not ss:
-            logger.error("No se pudo conectar a Google Sheets para Comentarios Consolidados")
-            return pd.DataFrame(columns=list(CONSOLIDATED_COMMENTS_CANONICAL.values()))
+            logger.error("No se pudo conectar a Google Sheets para %s", sheet_name)
+            return _empty_official_comments_frame()
 
-        ws = ss.worksheet(CONSOLIDATED_COMMENTS_SHEET)
+        ws = ss.worksheet(sheet_name)
         raw_data = ws.get()
         if not raw_data or len(raw_data) < 2:
-            logger.info("La hoja 'Comentarios Consolidados' no tiene registros")
-            return pd.DataFrame(columns=list(CONSOLIDATED_COMMENTS_CANONICAL.values()))
+            logger.info("La hoja '%s' no tiene registros", sheet_name)
+            return _empty_official_comments_frame()
 
         headers = _unique_headers(raw_data[0])
         rows = raw_data[1:]
@@ -781,11 +839,12 @@ def load_consolidated_comments() -> pd.DataFrame:
         missing = [col for col in required_cols if col not in df.columns]
         if missing:
             logger.error(
-                "Faltan columnas requeridas en 'Comentarios Consolidados': %s. Disponibles: %s",
+                "Faltan columnas requeridas en '%s': %s. Disponibles: %s",
+                sheet_name,
                 missing,
                 list(df.columns),
             )
-            return pd.DataFrame(columns=required_cols)
+            return _empty_official_comments_frame()
 
         df = df[required_cols].copy()
         df = df.dropna(how="all")
@@ -812,7 +871,8 @@ def load_consolidated_comments() -> pd.DataFrame:
 
         df = df[(df["comentario"] != "") & df["fecha_carga"].notna()]
         logger.info(
-            "Comentarios Consolidados: %s filas leidas, %s duplicados removidos, %s filas validas",
+            "%s: %s filas leidas, %s duplicados removidos, %s filas validas",
+            sheet_name,
             before_dedup,
             before_dedup - after_dedup,
             len(df),
@@ -820,8 +880,18 @@ def load_consolidated_comments() -> pd.DataFrame:
 
         return df.reset_index(drop=True)
     except Exception as e:
-        logger.error(f"Error cargando Comentarios Consolidados: {e}")
-        return pd.DataFrame(columns=list(CONSOLIDATED_COMMENTS_CANONICAL.values()))
+        logger.error("Error cargando %s: %s", sheet_name, e)
+        return _empty_official_comments_frame()
+
+
+def load_consolidated_comments() -> pd.DataFrame:
+    """Carga la hoja histórica ``Comentarios Consolidados``."""
+    return load_official_comments_sheet(CONSOLIDATED_COMMENTS_SHEET).copy()
+
+
+def load_viral_videos_comments() -> pd.DataFrame:
+    """Carga la hoja histórica ``Videos Virales`` con el mismo contrato."""
+    return load_official_comments_sheet(VIRAL_VIDEOS_SHEET).copy()
 
 
 # Función de testing (comentada para uso en desarrollo)

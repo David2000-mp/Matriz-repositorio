@@ -179,6 +179,12 @@ def _render_cruzada() -> None:
     cross_intelligence_view.render_cross_intelligence_view()
 
 
+def _render_satelite() -> None:
+    from views import satellite_dashboard
+
+    satellite_dashboard.render()
+
+
 def _render_engagement() -> None:
     from views import engagement_calculator_v2
 
@@ -274,6 +280,12 @@ def _build_navigation():
                 title="Inteligencia cruzada",
                 icon=":material/hub:",
                 url_path="inteligencia-cruzada",
+            ),
+            _page(
+                _render_satelite,
+                title="Módulo Satélite",
+                icon=":material/satellite_alt:",
+                url_path="satelite",
             ),
         ],
         "Comparativas": [
