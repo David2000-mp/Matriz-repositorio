@@ -248,6 +248,9 @@ def _display_percentage(value: object) -> str:
 
 def _render_strategic_form(context: OfficialContext) -> None:
     """Presenta métricas del formulario sin mezclar sus filas con el satélite."""
+    if context.colegio_nombre_canonico is None:
+        st.info("Selecciona una institución específica para visualizar su Ficha Estratégica Mensual.")
+        return
     with st.expander("Ficha Estratégica Oficial", expanded=False):
         ficha = context.ficha_estrategica
         if not ficha:
@@ -290,6 +293,10 @@ def _render_official_context(context: OfficialContext) -> None:
 
     _render_strategic_form(context)
 
+    st.markdown("#### Termómetro Textual")
+    st.caption(
+        "Análisis basado en fecha de carga oficial; podría incluir interacciones tardías de meses anteriores."
+    )
     text_columns = st.columns(2)
     top_words = context.text.top_words
     if top_words.empty:
@@ -310,6 +317,16 @@ def _render_official_context(context: OfficialContext) -> None:
             hide_index=True,
             width="stretch",
             key="sat_tabla_sentimiento_oficial",
+        )
+
+    with st.expander("Calidad de Datos y Deduplicación", expanded=False):
+        quality_columns = st.columns(4)
+        quality_columns[0].metric("Registros en fuentes", context.text.total_fuente)
+        quality_columns[1].metric("Comentarios unidos (corte)", context.text.total_original)
+        quality_columns[2].metric("Duplicados limpiados", context.text.deduplicados)
+        quality_columns[3].metric("Comentarios finales", context.text.total_final)
+        st.caption(
+            "La deduplicación usa institución, fecha de carga, plataforma y texto del comentario."
         )
 
     for warning in context.warnings:

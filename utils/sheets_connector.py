@@ -406,6 +406,11 @@ def _consolidate_comment_columns(df: pd.DataFrame, source_cols: List[str]) -> pd
 def _canonical_form_column_groups(columns: List[str]) -> Dict[str, List[str]]:
     """Agrupa columnas de formulario por nombre canónico tolerando variantes."""
     alias_map = {
+        "marca_temporal": {
+            "marca temporal",
+            "marca_temporal",
+            "timestamp",
+        },
         "fecha": {
             "fecha del reporte",
             "fecha",
@@ -578,14 +583,6 @@ def cargar_respuestas_forms() -> pd.DataFrame:
             normalized_rows.append(row_copy)
 
         df_raw = pd.DataFrame(normalized_rows, columns=headers)
-
-        # Ignorar columna 'Marca temporal' si existe (primera columna A1)
-        drop_candidates = [
-            col for col in df_raw.columns
-            if _normalize_header_label(col).startswith("marca temporal")
-        ]
-        if drop_candidates:
-            df_raw = df_raw.drop(columns=drop_candidates, errors="ignore")
 
         grouped = _canonical_form_column_groups(list(df_raw.columns))
         df = pd.DataFrame(index=df_raw.index)

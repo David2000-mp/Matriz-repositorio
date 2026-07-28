@@ -49,24 +49,40 @@ def normalize_latest_by_account(df: pd.DataFrame, freq: str = "D") -> pd.DataFra
 
     dfc["fecha"] = pd.to_datetime(dfc["fecha"], errors="coerce")
     dfc = dfc.dropna(subset=["fecha"])
-    for col in ("seguidores", "interacciones"):
-        if col in dfc.columns:
-            dfc[col] = pd.to_numeric(dfc[col], errors="coerce").fillna(0)
+    if "seguidores" not in dfc.columns:
+        return dfc.iloc[0:0].copy()
+
+    dfc["seguidores"] = pd.to_numeric(dfc["seguidores"], errors="coerce")
+    if "interacciones" in dfc.columns:
+        dfc["interacciones"] = pd.to_numeric(
+            dfc["interacciones"], errors="coerce"
+        ).fillna(0)
+
+    # Seguidores es un snapshot: un nulo o valor negativo no es una captura válida
+    # y no debe desplazar el último valor reportado del periodo.
+    valid_snapshot = dfc.loc[
+        dfc["seguidores"].notna() & dfc["seguidores"].ge(0)
+    ].copy()
+    if valid_snapshot.empty:
+        return dfc.iloc[0:0].copy()
 
     group_keys = ["id_cuenta"] if "id_cuenta" in dfc.columns else ["entidad", "plataforma"]
-    dfc = dfc.sort_values(group_keys + ["fecha"])
+    valid_snapshot = valid_snapshot.sort_values(group_keys + ["fecha"])
 
     if freq.upper() == "M":
-        dfc["periodo"] = dfc["fecha"].dt.to_period("M")
-        latest_rows = dfc.groupby(group_keys + ["periodo"], as_index=False).tail(1).copy()
-        latest_rows["fecha"] = latest_rows["periodo"].dt.to_timestamp()
+        valid_snapshot["periodo"] = valid_snapshot["fecha"].dt.to_period("M")
+        latest_rows = (
+            valid_snapshot.groupby(group_keys + ["periodo"], as_index=False)
+            .tail(1)
+            .copy()
+        )
         latest_rows = latest_rows.drop(columns=["periodo"])
     else:
-        latest_rows = dfc.groupby(group_keys, as_index=False).tail(1).copy()
+        latest_rows = valid_snapshot.groupby(group_keys, as_index=False).tail(1).copy()
 
     # Calcula seguidores_prev por grupo de manera vectorizada.
     prev_by_group = (
-        dfc.groupby(group_keys, as_index=False)
+        valid_snapshot.groupby(group_keys, as_index=False)
         .nth(-2)
         .loc[:, group_keys + ["seguidores"]]
         .rename(columns={"seguidores": "seguidores_prev"})
@@ -87,6 +103,102 @@ def normalize_latest_by_account(df: pd.DataFrame, freq: str = "D") -> pd.DataFra
 def normalize_monthly_latest(df: pd.DataFrame) -> pd.DataFrame:
     """Convenience: obtiene último registro por cuenta y mes."""
     return normalize_latest_by_account(df, freq="M")
+
+
+def build_followers_snapshot_coverage(
+    df_metricas: pd.DataFrame,
+    current_month: str | pd.Period,
+    previous_month: str | pd.Period,
+) -> dict[str, object]:
+    """Audita cobertura entre dos snapshots mensuales de seguidores.
+
+    Las cuentas esperadas son las presentes en el mes anterior. Una cuenta que
+    desaparece del corte actual se reporta como ``fantasma``; una que sólo está
+    en el corte actual se reporta como ``nueva``. Ninguno de estos cambios debe
+    interpretarse automáticamente como crecimiento orgánico.
+    """
+    empty = {
+        "mes_actual": str(current_month),
+        "mes_anterior": str(previous_month),
+        "cuentas_esperadas": 0,
+        "cuentas_snapshot_valido": 0,
+        "cuentas_fantasma": 0,
+        "cuentas_nuevas": 0,
+        "ids_cuentas_fantasma": tuple(),
+        "ids_cuentas_nuevas": tuple(),
+    }
+    if df_metricas is None or df_metricas.empty:
+        return empty
+
+    snapshots = normalize_monthly_latest(df_metricas)
+    if snapshots.empty or "fecha" not in snapshots.columns:
+        return empty
+
+    work = snapshots.copy()
+    work["fecha"] = pd.to_datetime(work["fecha"], errors="coerce")
+    work = work.dropna(subset=["fecha"])
+    if work.empty:
+        return empty
+
+    if "id_cuenta" in work.columns:
+        account_key = work["id_cuenta"].astype("string").str.strip()
+    elif {"entidad", "plataforma"}.issubset(work.columns):
+        account_key = (
+            work["entidad"].astype("string").str.strip()
+            + "|"
+            + work["plataforma"].astype("string").str.strip()
+        )
+    else:
+        return empty
+
+    work["_account_key"] = account_key
+    work = work.loc[work["_account_key"].notna() & work["_account_key"].ne("")].copy()
+    work["_month"] = work["fecha"].dt.to_period("M")
+    current_period = pd.Period(current_month, freq="M")
+    previous_period = pd.Period(previous_month, freq="M")
+    current_accounts = set(
+        work.loc[work["_month"].eq(current_period), "_account_key"].astype(str)
+    )
+    previous_accounts = set(
+        work.loc[work["_month"].eq(previous_period), "_account_key"].astype(str)
+    )
+    ghosts = tuple(sorted(previous_accounts - current_accounts))
+    new_accounts = tuple(sorted(current_accounts - previous_accounts))
+    return {
+        "mes_actual": str(current_period),
+        "mes_anterior": str(previous_period),
+        "cuentas_esperadas": len(previous_accounts),
+        "cuentas_snapshot_valido": len(current_accounts),
+        "cuentas_fantasma": len(ghosts),
+        "cuentas_nuevas": len(new_accounts),
+        "ids_cuentas_fantasma": ghosts,
+        "ids_cuentas_nuevas": new_accounts,
+    }
+
+
+def build_monthly_followers_series(df_metricas: pd.DataFrame) -> pd.Series:
+    """Construye la serie mensual de seguidores desde snapshots por cuenta.
+
+    Cada punto representa la suma de un único último snapshot válido por
+    cuenta dentro del mes. Los meses sin snapshot se dejan fuera; la capa de
+    pronóstico decide explícitamente si puede interpolarlos.
+    """
+    snapshots = normalize_monthly_latest(df_metricas)
+    if snapshots.empty or not {"fecha", "seguidores"}.issubset(snapshots.columns):
+        return pd.Series(dtype=float, name="seguidores")
+
+    work = snapshots.loc[:, ["fecha", "seguidores"]].copy()
+    work["fecha"] = pd.to_datetime(work["fecha"], errors="coerce")
+    work["seguidores"] = pd.to_numeric(work["seguidores"], errors="coerce")
+    work = work.dropna(subset=["fecha", "seguidores"])
+    if work.empty:
+        return pd.Series(dtype=float, name="seguidores")
+
+    work["periodo"] = work["fecha"].dt.to_period("M").dt.to_timestamp()
+    series = work.groupby("periodo")["seguidores"].sum().sort_index()
+    series.index = pd.DatetimeIndex(series.index, name="periodo")
+    series.name = "seguidores"
+    return series
 
 
 def summarize_followers_growth(df_metricas: pd.DataFrame) -> dict:
@@ -384,6 +496,7 @@ def calculate_growth_metrics(df_metricas: pd.DataFrame) -> pd.DataFrame:
         columns=[
             "Mes",
             "Seguidores",
+            "Crecimiento_Neto_Seguidores",
             "Delta_Seguidores",
             "YoY_Seguidores",
             "Interacciones",
@@ -415,11 +528,19 @@ def calculate_growth_metrics(df_metricas: pd.DataFrame) -> pd.DataFrame:
     df["fecha"] = pd.to_datetime(df["fecha"], errors="coerce")
     df = df.dropna(subset=["fecha"])
 
-    # Usar último registro por cuenta y mes para evitar doble conteo
-    df = normalize_monthly_latest(df)
-    if df.empty:
-        return empty_structure
+    # Conservamos el calendario de meses observados aun cuando todos sus
+    # seguidores sean inválidos. Eso permite distinguir un corte sin snapshot
+    # de un mes que simplemente no existe en la fuente.
+    observed_months = (
+        df.loc[:, ["fecha"]]
+        .assign(Mes_DT=lambda frame: frame["fecha"].dt.to_period("M").dt.to_timestamp())
+        .loc[:, ["Mes_DT"]]
+        .drop_duplicates()
+        .sort_values("Mes_DT")
+    )
 
+    # Usar último registro válido por cuenta y mes para evitar doble conteo.
+    df = normalize_monthly_latest(df)
     if df.empty:
         return empty_structure
 
@@ -431,6 +552,13 @@ def calculate_growth_metrics(df_metricas: pd.DataFrame) -> pd.DataFrame:
         Alcance=("alcance", "sum"),
         Interacciones=("interacciones", "sum"),
     )
+
+    # El mes permanece visible aunque carezca de snapshots válidos. Seguidores
+    # queda como NaN (no cero) para no convertir una falta de cobertura en una
+    # pérdida artificial de audiencia.
+    grouped = observed_months.merge(grouped, on="Mes_DT", how="left")
+    grouped["Alcance"] = grouped["Alcance"].fillna(0.0)
+    grouped["Interacciones"] = grouped["Interacciones"].fillna(0.0)
 
     grouped = grouped.sort_values("Mes_DT").reset_index(drop=True)
 
@@ -461,6 +589,10 @@ def calculate_growth_metrics(df_metricas: pd.DataFrame) -> pd.DataFrame:
         )
 
     # 5. Cálculos de Variación (MoM y YoY)
+    previous_followers = grouped["Seguidores"].shift(1)
+    grouped["Crecimiento_Neto_Seguidores"] = grouped["Seguidores"] - previous_followers
+    if not grouped.empty and pd.notna(grouped.loc[grouped.index[0], "Seguidores"]):
+        grouped.loc[grouped.index[0], "Crecimiento_Neto_Seguidores"] = 0.0
     grouped["Delta_Seguidores"] = _safe_pct_change(grouped["Seguidores"])
     grouped["Delta_Interacciones"] = _safe_pct_change(grouped["Interacciones"])
     grouped["Delta_Engagement"] = _safe_pct_change(grouped["Engagement"])
@@ -480,6 +612,7 @@ def calculate_growth_metrics(df_metricas: pd.DataFrame) -> pd.DataFrame:
         [
             "Mes",
             "Seguidores",
+            "Crecimiento_Neto_Seguidores",
             "Delta_Seguidores",
             "YoY_Seguidores",
             "Interacciones",

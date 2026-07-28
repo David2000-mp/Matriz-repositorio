@@ -15,8 +15,12 @@ import pandas as pd
 
 from utils.account_normalization import normalize_platform_name
 from utils.form_response_importer import normalize_institution_name
+from utils.logger import get_logger
 from utils.metric_catalog import INTERACTION_ALIASES, VISUALIZATION_ALIASES
 from utils.text_mining import keyword_frequency
+
+
+logger = get_logger(__name__)
 
 
 MAESTRA_COLUMNS: Final[tuple[str, ...]] = (
@@ -84,6 +88,7 @@ FORM_STRATEGIC_LABELS: Final[dict[str, str]] = {
     "calificacion_contenido": "Calificación del contenido (1-10)",
 }
 FORM_HEADER_ALIASES: Final[dict[str, tuple[str, ...]]] = {
+    "marca_temporal": ("marca temporal", "marca_temporal", "timestamp"),
     "fecha": ("fecha", "fecha del reporte", "fecha reporte"),
     "institucion": ("institucion", "institucion marista", "entidad", "colegio"),
     "plataforma": ("plataforma", "plataforma social", "fuente"),
@@ -123,6 +128,10 @@ class OfficialTextContext:
     top_words: pd.DataFrame
     sentiment_distribution: pd.DataFrame
     warnings: tuple[str, ...] = ()
+    total_fuente: int = 0
+    total_original: int = 0
+    deduplicados: int = 0
+    total_final: int = 0
 
 
 @dataclass(frozen=True)
@@ -213,7 +222,9 @@ def _metric_key(value: object) -> str:
 
 
 def _platform_key(value: object) -> str:
-    return normalize_platform_name("" if pd.isna(value) else str(value)).casefold()
+    """Genera la misma llave normalizada para fuente y filtro seleccionado."""
+    raw = "" if pd.isna(value) else str(value).strip()
+    return normalize_platform_name(raw).strip().casefold()
 
 
 def _as_number_or_na(value: object) -> object:
@@ -340,6 +351,7 @@ def _filter_demographic(
     colegio_nombre_canonico: str | None,
     plataforma: str | None,
     mes_clave: str | None,
+    criterio_key: str = "demografia base",
 ) -> pd.DataFrame:
     local = _copy_with_columns(df_base_demografica, DEMOGRAPHIC_COLUMNS)
     local = local.loc[:, list(DEMOGRAPHIC_COLUMNS)].copy()
@@ -353,7 +365,7 @@ def _filter_demographic(
         local["fecha_reporte"].notna()
         & local["valor"].notna()
         & local["valor"].ge(0)
-        & local["criterio_key"].eq("demografia base")
+        & local["criterio_key"].eq(criterio_key)
     ].copy()
 
     if colegio_nombre_canonico:
@@ -407,11 +419,12 @@ def build_demographic_context(
     mes_clave: str | None,
 ) -> OfficialDemographicContext:
     """Calcula sexo × edad y ubicación dominantes desde la fuente oficial."""
-    filtered = _filter_demographic(
+    geographic_rows = _filter_demographic(
         df_base_demografica,
         colegio_nombre_canonico=colegio_nombre_canonico,
         plataforma=plataforma,
         mes_clave=mes_clave,
+        criterio_key="ciudad",
     )
     sexo_edad_top, audience_warnings = build_audience_context(
         df_base_demografica,
@@ -419,8 +432,8 @@ def build_demographic_context(
         plataforma=plataforma,
         mes_clave=mes_clave,
     )
-    locations = filtered.loc[
-        filtered["ubicacion"].astype("string").str.strip().ne("")
+    locations = geographic_rows.loc[
+        geographic_rows["ubicacion"].astype("string").str.strip().ne("")
     ].copy()
     if locations.empty:
         return OfficialDemographicContext(
@@ -479,6 +492,7 @@ def build_text_context(
         origin="Comentarios Consolidados",
     )
     viral = _prepare_official_comments(df_videos_virales, origin="Videos Virales")
+    total_fuente = len(consolidated) + len(viral)
     combined = pd.concat([consolidated, viral], ignore_index=True, sort=False).copy()
 
     if colegio_nombre_canonico:
@@ -490,16 +504,23 @@ def build_text_context(
     if mes_clave:
         combined = combined.loc[combined["mes_clave"].eq(mes_clave)].copy()
 
+    total_original = len(combined)
     combined = combined.drop_duplicates(
         subset=["institucion_key", "fecha_dia", "plataforma_key", "comentario"],
         keep="last",
     ).reset_index(drop=True).copy()
+    total_final = len(combined)
+    deduplicados = total_original - total_final
     if combined.empty:
         return OfficialTextContext(
             comentarios=combined,
             top_words=_empty_frame(WORD_COLUMNS),
             sentiment_distribution=_empty_frame(SENTIMENT_COLUMNS),
             warnings=("No hay comentarios oficiales para el corte seleccionado.",),
+            total_fuente=total_fuente,
+            total_original=total_original,
+            deduplicados=deduplicados,
+            total_final=total_final,
         )
 
     top_words = keyword_frequency(combined, "comentario", top_n=3).copy()
@@ -515,6 +536,10 @@ def build_text_context(
         comentarios=combined.copy(),
         top_words=top_words.loc[:, list(WORD_COLUMNS)].copy(),
         sentiment_distribution=sentiment_distribution.loc[:, list(SENTIMENT_COLUMNS)].copy(),
+        total_fuente=total_fuente,
+        total_original=total_original,
+        deduplicados=deduplicados,
+        total_final=total_final,
     )
 
 
@@ -549,6 +574,11 @@ def _normalize_form_context_frame(df_formulario: pd.DataFrame) -> pd.DataFrame:
         candidate_values = candidate_values.replace(r"^\s*$", pd.NA, regex=True)
         normalized[canonical] = candidate_values.bfill(axis=1).iloc[:, 0]
     normalized["fecha"] = pd.to_datetime(normalized["fecha"], errors="coerce", format="mixed")
+    normalized["marca_temporal"] = pd.to_datetime(
+        normalized["marca_temporal"],
+        errors="coerce",
+        format="mixed",
+    )
     normalized["institucion_key"] = normalized["institucion"].map(_identity_key)
     normalized["plataforma_key"] = normalized["plataforma"].map(_platform_key)
     normalized["mes_clave"] = normalized["fecha"].dt.strftime("%Y-%m")
@@ -588,13 +618,28 @@ def build_form_context(
             warnings=("No hay ficha estratégica oficial para el corte seleccionado.",),
         )
 
-    filtered = filtered.sort_values("fecha", ascending=False, kind="stable").copy()
+    filtered = filtered.sort_values(
+        ["fecha", "marca_temporal"],
+        ascending=[False, False],
+        na_position="last",
+        kind="stable",
+    ).copy()
+    selected = filtered.iloc[0]
     warnings: tuple[str, ...] = ()
     if len(filtered) > 1:
+        logger.warning(
+            "Ficha estratégica: %s duplicados para colegio=%r plataforma=%r mes=%r; "
+            "se usó fecha=%s y marca_temporal=%s.",
+            len(filtered),
+            colegio_nombre_canonico,
+            plataforma,
+            mes_clave,
+            selected["fecha"],
+            selected["marca_temporal"],
+        )
         warnings = (
             f"Se detectaron {len(filtered)} respuestas de formulario para el corte; se usó la fecha más reciente.",
         )
-    selected = filtered.iloc[0]
     ficha = {
         field: value
         for field in FORM_STRATEGIC_FIELDS
@@ -740,6 +785,10 @@ def build_satellite_official_context(
             top_words=text.top_words.copy(),
             sentiment_distribution=text.sentiment_distribution.copy(),
             warnings=text.warnings,
+            total_fuente=text.total_fuente,
+            total_original=text.total_original,
+            deduplicados=text.deduplicados,
+            total_final=text.total_final,
         ),
         ficha_estrategica=dict(form.ficha_estrategica),
         warnings=tuple(dict.fromkeys(warnings)),

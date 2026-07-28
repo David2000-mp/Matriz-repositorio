@@ -20,6 +20,12 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from components import PLOTLY_CONFIG, PLOTLY_LAYOUT_DEFAULTS
+from utils.analytics import (
+    build_followers_snapshot_coverage,
+    build_monthly_followers_series,
+    calculate_growth_metrics,
+    normalize_monthly_latest,
+)
 from utils.data_provider import data_provider
 
 FEEDBACK_PATH = Path(__file__).resolve().parent.parent / "data" / "comment_feedback.csv"
@@ -47,7 +53,11 @@ def _apply_dark_chart_text(fig: go.Figure) -> None:
     )
 
 
-def _resolve_global_filters(df: pd.DataFrame) -> pd.DataFrame:
+def _resolve_global_filters(
+    df: pd.DataFrame,
+    *,
+    plataforma_local: str = "Todas",
+) -> pd.DataFrame:
     filtered = df.copy()
     entidad_global = st.session_state.get("filtro_entidad", "Todas")
     mes_global = st.session_state.get("filtro_mes", "Todos")
@@ -60,7 +70,33 @@ def _resolve_global_filters(df: pd.DataFrame) -> pd.DataFrame:
         periodos = fechas.dt.strftime("%Y-%m")
         filtered = filtered[periodos == str(mes_global)]
 
+    if plataforma_local != "Todas" and "plataforma" in filtered.columns:
+        selected_key = str(plataforma_local).strip().casefold()
+        platform_key = filtered["plataforma"].astype("string").str.strip().str.casefold()
+        filtered = filtered.loc[platform_key.eq(selected_key)].copy()
+
     return filtered
+
+
+def _render_platform_filter(df: pd.DataFrame) -> str:
+    """Filtro local que evita mezclar plataformas en los cálculos de snapshot."""
+    platforms: list[str] = []
+    if "plataforma" in df.columns:
+        values = df["plataforma"].dropna().astype("string").str.strip()
+        platforms = sorted(
+            {str(value) for value in values.loc[values.ne("")]},
+            key=str.casefold,
+        )
+    current = st.session_state.get("stats_filtro_plataforma")
+    options = ["Todas", *platforms]
+    if current is not None and current not in options:
+        del st.session_state["stats_filtro_plataforma"]
+    return st.selectbox(
+        "Plataforma",
+        options=options,
+        key="stats_filtro_plataforma",
+        help="Se aplica antes de cálculos de tendencia, inferencia y snapshots de seguidores.",
+    )
 
 
 def _safe_numeric_series(df: pd.DataFrame, col: str) -> pd.Series:
@@ -226,27 +262,68 @@ def _cohen_d(x: np.ndarray, y: np.ndarray) -> float:
     return float((np.mean(x) - np.mean(y)) / pooled)
 
 
-def _fit_linear_forecast(series: pd.Series, horizon: int = 6) -> pd.DataFrame:
+def _regularize_temporal_series(series: pd.Series, *, freq: str) -> pd.Series:
+    """Completa el calendario e interpola únicamente huecos internos."""
     if series.empty:
-        return pd.DataFrame(columns=["step", "y_hat", "lower", "upper", "kind"])
+        return pd.Series(dtype=float, name=series.name)
 
-    y = pd.to_numeric(series, errors="coerce").dropna().to_numpy(dtype=float)
-    if len(y) < 3:
-        return pd.DataFrame(columns=["step", "y_hat", "lower", "upper", "kind"])
+    work = pd.Series(pd.to_numeric(series, errors="coerce"), copy=True)
+    work.index = pd.to_datetime(work.index, errors="coerce")
+    work = work.loc[work.index.notna()].groupby(level=0).mean().sort_index()
+    if work.empty:
+        return pd.Series(dtype=float, name=series.name)
 
-    x = np.arange(len(y), dtype=float)
+    full_index = pd.date_range(work.index.min(), work.index.max(), freq=freq)
+    regular = work.reindex(full_index)
+    regular = regular.interpolate(method="linear", limit_area="inside")
+    regular.index.name = "periodo"
+    regular.name = series.name
+    return regular
+
+
+def _forecast_time_axis(index: pd.DatetimeIndex, *, freq: str, horizon: int) -> tuple[np.ndarray, pd.DatetimeIndex]:
+    """Entrega coordenadas temporales reales y fechas futuras del pronóstico."""
+    dates = pd.DatetimeIndex(index)
+    if freq == "MS":
+        numeric = dates.to_period("M").asi8.astype(float)
+        future_dates = pd.date_range(
+            dates[-1] + pd.offsets.MonthBegin(1), periods=int(horizon), freq="MS"
+        )
+    else:
+        numeric = ((dates - dates[0]) / pd.Timedelta(days=1)).to_numpy(dtype=float)
+        future_dates = pd.date_range(
+            dates[-1] + pd.Timedelta(days=1), periods=int(horizon), freq=freq
+        )
+    return numeric - numeric[0], future_dates
+
+
+def _fit_linear_forecast(series: pd.Series, horizon: int = 6, *, freq: str = "MS") -> pd.DataFrame:
+    empty = pd.DataFrame(columns=["periodo", "y_hat", "lower", "upper", "kind", "y_real"])
+    if series.empty:
+        return empty
+
+    clean = pd.Series(pd.to_numeric(series, errors="coerce"), index=pd.to_datetime(series.index, errors="coerce"))
+    clean = clean.dropna().sort_index()
+    if len(clean) < 3:
+        return empty
+
+    y = clean.to_numpy(dtype=float)
+    x, future_dates = _forecast_time_axis(pd.DatetimeIndex(clean.index), freq=freq, horizon=horizon)
     slope, intercept = np.polyfit(x, y, 1)
     y_hat_hist = intercept + slope * x
     residuals = y - y_hat_hist
     sigma = float(np.std(residuals, ddof=1)) if len(residuals) > 2 else 0.0
 
-    x_future = np.arange(len(y), len(y) + int(horizon), dtype=float)
+    if freq == "MS":
+        x_future = future_dates.to_period("M").asi8.astype(float) - (clean.index.to_period("M").asi8[0])
+    else:
+        x_future = ((future_dates - clean.index[0]) / pd.Timedelta(days=1)).to_numpy(dtype=float)
     y_hat_future = intercept + slope * x_future
     ci = 1.96 * sigma
 
     hist = pd.DataFrame(
         {
-            "step": np.arange(len(y), dtype=int),
+            "periodo": clean.index,
             "y_hat": y_hat_hist,
             "lower": y_hat_hist - ci,
             "upper": y_hat_hist + ci,
@@ -256,7 +333,7 @@ def _fit_linear_forecast(series: pd.Series, horizon: int = 6) -> pd.DataFrame:
     )
     future = pd.DataFrame(
         {
-            "step": np.arange(len(y), len(y) + int(horizon), dtype=int),
+            "periodo": future_dates,
             "y_hat": y_hat_future,
             "lower": y_hat_future - ci,
             "upper": y_hat_future + ci,
@@ -269,13 +346,24 @@ def _fit_linear_forecast(series: pd.Series, horizon: int = 6) -> pd.DataFrame:
     return out
 
 
-def _fit_moving_average_forecast(series: pd.Series, horizon: int = 6, window: int = 3) -> pd.DataFrame:
+def _fit_moving_average_forecast(
+    series: pd.Series,
+    horizon: int = 6,
+    window: int = 3,
+    *,
+    freq: str = "MS",
+) -> pd.DataFrame:
+    empty = pd.DataFrame(columns=["periodo", "y_hat", "lower", "upper", "kind", "y_real"])
     if series.empty:
-        return pd.DataFrame(columns=["step", "y_hat", "lower", "upper", "kind"])
+        return empty
 
-    y = pd.to_numeric(series, errors="coerce").dropna().to_numpy(dtype=float)
-    if len(y) < 3:
-        return pd.DataFrame(columns=["step", "y_hat", "lower", "upper", "kind"])
+    clean = pd.Series(pd.to_numeric(series, errors="coerce"), index=pd.to_datetime(series.index, errors="coerce"))
+    clean = clean.dropna().sort_index()
+    if len(clean) < 3:
+        return empty
+
+    y = clean.to_numpy(dtype=float)
+    _, future_dates = _forecast_time_axis(pd.DatetimeIndex(clean.index), freq=freq, horizon=horizon)
 
     hist_hat = np.empty(len(y), dtype=float)
     hist_hat[0] = y[0]
@@ -297,7 +385,7 @@ def _fit_moving_average_forecast(series: pd.Series, horizon: int = 6, window: in
 
     hist = pd.DataFrame(
         {
-            "step": np.arange(len(y), dtype=int),
+            "periodo": clean.index,
             "y_hat": hist_hat,
             "lower": hist_hat - ci,
             "upper": hist_hat + ci,
@@ -307,7 +395,7 @@ def _fit_moving_average_forecast(series: pd.Series, horizon: int = 6, window: in
     )
     future = pd.DataFrame(
         {
-            "step": np.arange(len(y), len(y) + int(horizon), dtype=int),
+            "periodo": future_dates,
             "y_hat": np.asarray(future_hat, dtype=float),
             "lower": np.asarray(future_hat, dtype=float) - ci,
             "upper": np.asarray(future_hat, dtype=float) + ci,
@@ -379,7 +467,7 @@ def _build_registry_rows(df_metricas: pd.DataFrame, df_feedback: pd.DataFrame) -
     rows: list[dict[str, Any]] = []
 
     eng = _safe_numeric_series(df_metricas, "engagement_rate")
-    seguidores = _safe_numeric_series(df_metricas, "seguidores")
+    growth = calculate_growth_metrics(df_metricas)
 
     if not eng.empty:
         riesgo, recomendacion = _build_recommendation("engagement_media", float(eng.mean()))
@@ -409,20 +497,51 @@ def _build_registry_rows(df_metricas: pd.DataFrame, df_feedback: pd.DataFrame) -
             }
         )
 
-    if not seguidores.empty:
-        riesgo, recomendacion = _build_recommendation("seguidores_media", float(seguidores.mean()))
+    valid_growth = growth.loc[
+        pd.to_numeric(growth.get("Seguidores"), errors="coerce").notna()
+    ].copy() if not growth.empty else pd.DataFrame()
+
+    if not valid_growth.empty:
+        latest = valid_growth.iloc[-1]
+        riesgo, recomendacion = _build_recommendation(
+            "seguidores_snapshot",
+            float(latest["Seguidores"]),
+        )
         rows.append(
             {
                 "timestamp": now,
-                "modulo": "descriptiva",
-                "indicador": "seguidores_media",
-                "valor": float(seguidores.mean()),
-                "interpretacion": "Tamano promedio de audiencia por registro",
+                "modulo": "snapshot_mensual",
+                "indicador": "seguidores_ultimo_corte",
+                "valor": float(latest["Seguidores"]),
+                "interpretacion": f"Snapshot agregado al cierre de {latest['Mes']}",
                 "confianza": "media",
                 "riesgo": riesgo,
                 "recomendacion": recomendacion,
             }
         )
+        if len(valid_growth) >= 2:
+            previous = valid_growth.iloc[-2]
+            coverage = build_followers_snapshot_coverage(
+                df_metricas,
+                current_month=str(latest["Mes"]),
+                previous_month=str(previous["Mes"]),
+            )
+            rows.append(
+                {
+                    "timestamp": now,
+                    "modulo": "snapshot_mensual",
+                    "indicador": "crecimiento_neto_seguidores",
+                    "valor": float(latest["Crecimiento_Neto_Seguidores"]),
+                    "interpretacion": (
+                        f"Variación neta vs. {previous['Mes']}; "
+                        f"cuentas nuevas={coverage['cuentas_nuevas']}, "
+                        f"fantasma={coverage['cuentas_fantasma']}"
+                    ),
+                    "confianza": "media",
+                    "riesgo": "medio",
+                    "recomendacion": "Revisar cobertura antes de atribuir el cambio a crecimiento orgánico.",
+                }
+            )
 
     if not df_feedback.empty and "was_correct" in df_feedback.columns:
         acc = pd.to_numeric(df_feedback["was_correct"], errors="coerce").dropna()
@@ -456,6 +575,7 @@ def _render_summary(df_metricas: pd.DataFrame, df_feedback: pd.DataFrame) -> Non
 
     engagement = _safe_numeric_series(df_metricas, "engagement_rate")
     seguidores = _safe_numeric_series(df_metricas, "seguidores")
+    growth = calculate_growth_metrics(df_metricas)
     interacciones = _safe_numeric_series(df_metricas, "interacciones")
 
     feedback_total = len(df_feedback)
@@ -471,8 +591,103 @@ def _render_summary(df_metricas: pd.DataFrame, df_feedback: pd.DataFrame) -> Non
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("Registros metricas", f"{len(df_metricas):,}")
     c2.metric("Engagement medio", f"{engagement.mean():.2f}%" if not engagement.empty else "N/A")
-    c3.metric("Seguidores medios", f"{seguidores.mean():,.0f}" if not seguidores.empty else "N/A")
+    valid_growth = growth.loc[
+        pd.to_numeric(growth.get("Seguidores"), errors="coerce").notna()
+    ].copy() if not growth.empty else pd.DataFrame()
+    c3.metric(
+        "Seguidores último corte",
+        f"{float(valid_growth.iloc[-1]['Seguidores']):,.0f}"
+        if not valid_growth.empty
+        else "N/A",
+    )
     c4.metric("Accuracy feedback", f"{feedback_acc:.1%}" if pd.notna(feedback_acc) else "N/A")
+
+    if not valid_growth.empty:
+        latest = valid_growth.iloc[-1]
+        latest_period = pd.Period(str(latest["Mes"]), freq="M")
+        previous_period = latest_period - 1
+        previous_rows = growth.loc[
+            growth["Mes"].eq(str(previous_period))
+        ].copy()
+        previous_total = (
+            pd.to_numeric(previous_rows.iloc[0]["Seguidores"], errors="coerce")
+            if not previous_rows.empty
+            else np.nan
+        )
+        current_total = float(latest["Seguidores"])
+        net_growth = (
+            current_total - float(previous_total)
+            if pd.notna(previous_total)
+            else np.nan
+        )
+        mom_growth = (
+            (net_growth / float(previous_total)) * 100.0
+            if pd.notna(net_growth) and float(previous_total) > 0
+            else np.nan
+        )
+        coverage = build_followers_snapshot_coverage(
+            df_metricas,
+            current_month=latest_period,
+            previous_month=previous_period,
+        )
+
+        st.markdown("#### Evolución de seguidores")
+        e1, e2, e3 = st.columns(3)
+        e1.metric(
+            "Seguidores al último corte",
+            f"{current_total:,.0f}",
+            delta=f"{net_growth:+,.0f} vs. {previous_period}"
+            if pd.notna(net_growth)
+            else "Sin corte previo válido",
+        )
+        e2.metric(
+            "Ganancia/pérdida neta",
+            f"{net_growth:+,.0f}" if pd.notna(net_growth) else "N/A",
+            delta=f"vs. {previous_period}" if pd.notna(net_growth) else None,
+        )
+        e3.metric(
+            "Crecimiento mensual (MoM)",
+            f"{mom_growth:+.2f}%" if pd.notna(mom_growth) else "N/A",
+        )
+
+        snapshots = normalize_monthly_latest(df_metricas)
+        used_dates = pd.Series(dtype="datetime64[ns]")
+        if not snapshots.empty and "fecha" in snapshots.columns:
+            snapshot_dates = pd.to_datetime(snapshots["fecha"], errors="coerce")
+            snapshot_months = snapshot_dates.dt.to_period("M")
+            used_dates = snapshot_dates.loc[
+                snapshot_months.isin([previous_period, latest_period])
+            ].dropna()
+
+        with st.expander("Auditoría de Captura y Cobertura"):
+            st.caption(
+                f"Comparación de snapshots: {previous_period} → {latest_period}."
+            )
+            if not used_dates.empty:
+                st.caption(
+                    "Fechas de captura usadas: "
+                    f"{used_dates.min().date().isoformat()} a "
+                    f"{used_dates.max().date().isoformat()}."
+                )
+            else:
+                st.caption("No hay fechas válidas para auditar los snapshots comparados.")
+
+            q1, q2 = st.columns(2)
+            q1.metric("Cuentas esperadas", f"{coverage['cuentas_esperadas']:,}")
+            q2.metric(
+                "Cuentas con snapshot válido",
+                f"{coverage['cuentas_snapshot_valido']:,}",
+            )
+            if coverage["cuentas_nuevas"]:
+                st.warning(
+                    f"{coverage['cuentas_nuevas']} cuenta(s) nueva(s) entraron al set. "
+                    "Esto puede afectar el crecimiento neto."
+                )
+            if coverage["cuentas_fantasma"]:
+                st.warning(
+                    f"{coverage['cuentas_fantasma']} cuenta(s) fantasma dejaron de reportar. "
+                    "Esto puede afectar el crecimiento neto."
+                )
 
     if not interacciones.empty and not seguidores.empty and seguidores.sum() > 0:
         rate = (interacciones.sum() / seguidores.sum()) * 100
@@ -682,12 +897,22 @@ def _render_predictive(df_metricas: pd.DataFrame, df_feedback: pd.DataFrame) -> 
 
     source = st.selectbox(
         "Serie a pronosticar",
-        options=["engagement_rate_mensual", "accuracy_feedback_diaria"],
+        options=[
+            "seguidores_mensuales",
+            "engagement_rate_mensual",
+            "accuracy_feedback_diaria",
+        ],
         key="stats_pred_source",
     )
     horizon = st.slider("Horizonte de pronostico", min_value=4, max_value=12, value=6, step=1, key="stats_pred_h")
 
-    if source == "engagement_rate_mensual":
+    if source == "seguidores_mensuales":
+        serie_original = build_monthly_followers_series(df_metricas)
+        serie = _regularize_temporal_series(serie_original, freq="MS")
+        y_label = "seguidores"
+        forecast_freq = "MS"
+        valid_history = int(serie_original.notna().sum())
+    elif source == "engagement_rate_mensual":
         if "fecha" not in df_metricas.columns or "engagement_rate" not in df_metricas.columns:
             st.warning("No hay columnas necesarias para pronosticar engagement mensual.")
             return
@@ -696,8 +921,11 @@ def _render_predictive(df_metricas: pd.DataFrame, df_feedback: pd.DataFrame) -> 
         tmp["fecha"] = pd.to_datetime(tmp["fecha"], errors="coerce")
         tmp = tmp.dropna(subset=["fecha"])
         tmp["periodo"] = tmp["fecha"].dt.to_period("M").dt.to_timestamp()
-        serie = tmp.groupby("periodo")["engagement_rate"].mean().sort_index()
+        serie_original = tmp.groupby("periodo")["engagement_rate"].mean().sort_index()
+        serie = _regularize_temporal_series(serie_original, freq="MS")
         y_label = "engagement_rate"
+        forecast_freq = "MS"
+        valid_history = int(serie_original.notna().sum())
     else:
         if df_feedback.empty or "timestamp" not in df_feedback.columns or "was_correct" not in df_feedback.columns:
             st.warning("No hay datos de feedback suficientes para pronosticar accuracy.")
@@ -707,11 +935,23 @@ def _render_predictive(df_metricas: pd.DataFrame, df_feedback: pd.DataFrame) -> 
         tmp = tmp.dropna(subset=["timestamp"])
         tmp["periodo"] = tmp["timestamp"].dt.to_period("D").dt.to_timestamp()
         tmp["was_correct_num"] = pd.to_numeric(tmp["was_correct"], errors="coerce")
-        serie = tmp.groupby("periodo")["was_correct_num"].mean().sort_index()
+        serie_original = tmp.groupby("periodo")["was_correct_num"].mean().sort_index()
+        serie = _regularize_temporal_series(serie_original, freq="D")
         y_label = "accuracy"
+        forecast_freq = "D"
+        valid_history = int(serie_original.notna().sum())
 
-    if len(serie) < 4:
-        st.info("Se necesitan al menos 4 periodos historicos para calcular pronostico.")
+    if valid_history < 6:
+        unit = "meses" if forecast_freq == "MS" else "periodos"
+        st.warning(
+            "Historial insuficiente para proyección estadística. "
+            f"Se requieren al menos 6 {unit} de datos continuos "
+            f"(actual: {valid_history} {unit})."
+        )
+        return
+
+    if serie.isna().any():
+        st.warning("La serie tiene huecos sin posibilidad de interpolación; no se generará pronóstico.")
         return
 
     backtest = _walk_forward_backtest(serie, min_train=6)
@@ -729,9 +969,18 @@ def _render_predictive(df_metricas: pd.DataFrame, df_feedback: pd.DataFrame) -> 
         st.caption("Backtesting no disponible por serie corta; se usa baseline lineal.")
 
     if selected_model == "ma3":
-        forecast_df = _fit_moving_average_forecast(serie, horizon=int(horizon), window=3)
+        forecast_df = _fit_moving_average_forecast(
+            serie,
+            horizon=int(horizon),
+            window=3,
+            freq=forecast_freq,
+        )
     else:
-        forecast_df = _fit_linear_forecast(serie, horizon=int(horizon))
+        forecast_df = _fit_linear_forecast(
+            serie,
+            horizon=int(horizon),
+            freq=forecast_freq,
+        )
 
     if forecast_df.empty:
         st.info("No fue posible ajustar el modelo baseline con la serie actual.")
@@ -740,7 +989,7 @@ def _render_predictive(df_metricas: pd.DataFrame, df_feedback: pd.DataFrame) -> 
     fig = go.Figure()
     fig.add_trace(
         go.Scatter(
-            x=forecast_df["step"],
+            x=forecast_df["periodo"],
             y=forecast_df["y_hat"],
             mode="lines",
             name="tendencia",
@@ -749,7 +998,7 @@ def _render_predictive(df_metricas: pd.DataFrame, df_feedback: pd.DataFrame) -> 
     )
     fig.add_trace(
         go.Scatter(
-            x=forecast_df["step"],
+            x=forecast_df["periodo"],
             y=forecast_df["upper"],
             mode="lines",
             name="limite superior",
@@ -758,7 +1007,7 @@ def _render_predictive(df_metricas: pd.DataFrame, df_feedback: pd.DataFrame) -> 
     )
     fig.add_trace(
         go.Scatter(
-            x=forecast_df["step"],
+            x=forecast_df["periodo"],
             y=forecast_df["lower"],
             mode="lines",
             name="limite inferior",
@@ -772,7 +1021,7 @@ def _render_predictive(df_metricas: pd.DataFrame, df_feedback: pd.DataFrame) -> 
     if not real_part.empty:
         fig.add_trace(
             go.Scatter(
-                x=real_part["step"],
+                x=real_part["periodo"],
                 y=real_part["y_real"],
                 mode="markers",
                 name="historico real",
@@ -782,7 +1031,7 @@ def _render_predictive(df_metricas: pd.DataFrame, df_feedback: pd.DataFrame) -> 
 
     fig.update_layout(
         title=f"Pronostico baseline de {y_label} ({selected_model})",
-        xaxis_title="indice temporal",
+        xaxis_title="periodo real",
         yaxis_title=y_label,
         **PLOTLY_LAYOUT_DEFAULTS,
     )
@@ -834,7 +1083,12 @@ def render_statistical_registry_dashboard() -> None:
     if not df_metricas.empty and "fecha" in df_metricas.columns:
         df_metricas["fecha"] = pd.to_datetime(df_metricas["fecha"], errors="coerce")
 
-    df_metricas = _resolve_global_filters(df_metricas) if not df_metricas.empty else df_metricas
+    platform_filter = _render_platform_filter(df_metricas) if not df_metricas.empty else "Todas"
+    df_metricas = (
+        _resolve_global_filters(df_metricas, plataforma_local=platform_filter)
+        if not df_metricas.empty
+        else df_metricas
+    )
     df_feedback = _load_feedback_df()
 
     tab_summary, tab_desc, tab_inf, tab_pred, tab_registry = st.tabs(

@@ -71,6 +71,11 @@ def _require_columns(
         )
 
 
+def _platform_filter_key(value: object) -> str:
+    """Normaliza valores de plataforma antes de cualquier comparación booleana."""
+    return "" if pd.isna(value) else str(value).strip().casefold()
+
+
 def filter_satellite_data(
     df_cuentas_satellite: pd.DataFrame,
     df_publicaciones: pd.DataFrame,
@@ -106,14 +111,27 @@ def filter_satellite_data(
     if colegio_id is not None:
         account_mask &= df_cuentas_satellite["colegio_id"].eq(colegio_id)
     if plataforma is not None:
-        account_mask &= df_cuentas_satellite["plataforma"].eq(plataforma)
+        selected_platform = _platform_filter_key(plataforma)
+        account_mask &= (
+            df_cuentas_satellite["plataforma"]
+            .astype("string")
+            .str.strip()
+            .str.casefold()
+            .eq(selected_platform)
+        )
 
     filtered_accounts = df_cuentas_satellite.loc[account_mask].copy()
     account_ids = filtered_accounts["id_cuenta"].dropna().copy()
 
     publication_mask = df_publicaciones["id_cuenta"].isin(account_ids)
     if plataforma is not None:
-        publication_mask &= df_publicaciones["plataforma"].eq(plataforma)
+        publication_mask &= (
+            df_publicaciones["plataforma"]
+            .astype("string")
+            .str.strip()
+            .str.casefold()
+            .eq(selected_platform)
+        )
     if mes_clave is not None:
         publication_mask &= df_publicaciones["mes_clave"].eq(mes_clave)
 
