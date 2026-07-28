@@ -99,6 +99,48 @@ def _render_platform_filter(df: pd.DataFrame) -> str:
     )
 
 
+def _render_reading_guide() -> None:
+    """Guía compacta para interpretar métricas sin recargar cada pestaña."""
+    with st.expander("Cómo leer este módulo", expanded=False):
+        st.caption(
+            "Las cifras respetan los filtros activos de entidad, mes y plataforma. "
+            "Las asociaciones descritas aquí no prueban causalidad."
+        )
+        st.markdown(
+            "**Resumen y evolución**  \
+            **Registros métricas** es el número de filas analizadas. "
+            "**Engagement medio** es la media de `engagement_rate`; el engagement agregado "
+            "se calcula como `interacciones totales / seguidores totales × 100`.  \
+            **Seguidores** se calculan como el último snapshot válido de cada cuenta en el mes, "
+            "sumado entre cuentas. **Ganancia/pérdida neta** = corte actual − corte del mes anterior; "
+            "**MoM** = neto / corte anterior × 100. Cuentas nuevas o fantasma pueden explicar "
+            "parte de esa variación, por lo que no debe asumirse que todo cambio es orgánico.  \
+            **Accuracy de feedback** es la proporción de validaciones humanas en las que "
+            "`was_correct` fue verdadero; el intervalo Wilson expresa su incertidumbre."
+        )
+        st.markdown(
+            "**Descriptiva**  \
+            **Media** es el promedio, **mediana** el punto central, **desviación estándar** la dispersión, "
+            "e **IQR** = percentil 75 − percentil 25. Un **atípico** cae fuera de "
+            "`[Q1 − 1.5×IQR, Q3 + 1.5×IQR]`. La **frecuencia de etiqueta correcta** cuenta "
+            "las etiquetas asignadas como verdad de referencia por la revisión humana; no son predicciones del modelo."
+        )
+        st.markdown(
+            "**Inferencia**  \
+            **Diferencia media A−B** compara promedios. El **IC 95%** se estima por bootstrap; "
+            "el **p-value** por permutaciones mide cuán compatible es la diferencia con ausencia de efecto. "
+            "**Cohen d** expresa el tamaño estandarizado de la diferencia. La corrección **BH** controla "
+            "falsos descubrimientos cuando se comparan varios grupos."
+        )
+        st.markdown(
+            "**Predictiva y registro**  \
+            La proyección usa fechas reales, interpola huecos internos y exige al menos seis meses válidos "
+            "para series mensuales. Compara tendencia lineal y media móvil de 3 periodos mediante backtesting; "
+            "**MAE** es el error absoluto medio y **MAPE** el error porcentual medio. La banda es incertidumbre "
+            "del modelo, no una garantía. El registro final conserva los indicadores, su riesgo y recomendación."
+        )
+
+
 def _safe_numeric_series(df: pd.DataFrame, col: str) -> pd.Series:
     if col not in df.columns:
         return pd.Series(dtype=float)
@@ -751,6 +793,10 @@ def _render_descriptive(df_metricas: pd.DataFrame, df_feedback: pd.DataFrame) ->
         fig_bar.update_layout(**PLOTLY_LAYOUT_DEFAULTS)
         _apply_dark_chart_text(fig_bar)
         st.plotly_chart(fig_bar, width="stretch", config=PLOTLY_CONFIG)
+        st.caption(
+            "Cuenta la etiqueta confirmada por revisión humana (`correct_label`). "
+            "Describe la verdad de referencia del feedback, no la distribución de predicciones del modelo."
+        )
 
 
 def _render_inference(df_metricas: pd.DataFrame, df_feedback: pd.DataFrame) -> None:
@@ -859,6 +905,9 @@ def _render_inference(df_metricas: pd.DataFrame, df_feedback: pd.DataFrame) -> N
 
     if not df_feedback.empty and "was_correct" in df_feedback.columns and "correct_label" in df_feedback.columns:
         st.markdown("**Inferencia adicional en feedback (accuracy por etiqueta correcta)**")
+        st.caption(
+            "Para cada etiqueta humana correcta, muestra qué proporción de veces el modelo coincidió con ella."
+        )
         tmp = df_feedback.dropna(subset=["correct_label"]).copy()
         tmp["was_correct_num"] = pd.to_numeric(tmp["was_correct"], errors="coerce")
         acc_by_label = (
@@ -1090,6 +1139,8 @@ def render_statistical_registry_dashboard() -> None:
         else df_metricas
     )
     df_feedback = _load_feedback_df()
+
+    _render_reading_guide()
 
     tab_summary, tab_desc, tab_inf, tab_pred, tab_registry = st.tabs(
         ["Resumen", "Descriptiva", "Inferencia", "Predictiva", "Registro"]
