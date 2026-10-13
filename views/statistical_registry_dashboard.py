@@ -1122,8 +1122,6 @@ def _render_registry(df_metricas: pd.DataFrame, df_feedback: pd.DataFrame) -> No
 
 
 def render_statistical_registry_dashboard() -> None:
-    st.title("Registro Estadistico")
-    st.caption("Lectura descriptiva, inferencial y predictiva de metricas globales y feedback.")
 
     df_metricas = data_provider.get_merged_data(force_reload=False)
     if df_metricas is None:

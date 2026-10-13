@@ -25,8 +25,6 @@ def render(df=None):
 
     Acepta opcionalmente un `df` para compatibilidad con el entrypoint global.
     """
-    st.title("⚙️ CONFIGURACIÓN Y ADMINISTRACIÓN")
-    st.caption("🛠️ Herramientas de Gestión y Personalización del Sistema")
     pending_status = st.session_state.pop("_settings_lottie_status", None)
     if pending_status:
         ui.render_status(

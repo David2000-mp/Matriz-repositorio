@@ -505,8 +505,6 @@ def _render_comment_importer() -> None:
 
 
 def render_text_analysis_dashboard() -> None:
-    st.title("Analisis de textos")
-    st.caption("Mineria de textos local y gratuita sobre columnas textuales del formulario.")
     _render_comment_importer()
     st.divider()
 

@@ -1,513 +1,390 @@
 """
 Vista de Landing Page para CHAMPILEAKS.
-Página de inicio con hero banner y navegación rápida.
+
+Portada tipo "centro de mando": hero con el corte de datos vigente, KPIs de la
+red y accesos directos a los módulos principales.
 """
 
-import streamlit as st
-import pandas as pd
+from __future__ import annotations
+
+import html
 import logging
-from pathlib import Path
-from utils.data_provider import data_provider
-from utils import simular, save_batch
-from utils.helpers import get_banner_css
+
+import pandas as pd
+import streamlit as st
+
 from utils.analytics import summarize_followers_growth
+from utils.app_data import format_month_label
+from utils.data_provider import data_provider
+
+# Servidos por Streamlit desde /static (server.enableStaticServing).
+HERO_VIDEO_URL = "app/static/banner_video.mp4"
+HERO_POSTER_URL = "app/static/hero_poster.jpg"
+
+# Tonos legibles sobre el fondo oscuro del hero.
+_PLATFORM_COLORS = {
+    "facebook": "#4C8DFF",
+    "instagram": "#E1306C",
+    "tiktok": "#25F4EE",
+    "youtube": "#FF4D4D",
+    "linkedin": "#3A8DDE",
+    "twitter": "#A0AEC0",
+    "x": "#A0AEC0",
+}
+
+# (url_path, título, descripción, icono) de los accesos directos.
+_MODULES = (
+    (
+        "dashboard",
+        "Dashboard global",
+        "KPIs de seguidores, engagement y salud digital por red.",
+        ":material/dashboard:",
+    ),
+    (
+        "audiencias",
+        "Audiencias y riesgo",
+        "Segmentos educativos y matriz de riesgo institucional.",
+        ":material/groups:",
+    ),
+    (
+        "contenidos",
+        "Contenidos",
+        "Qué formatos funcionan y con qué frecuencia publicar.",
+        ":material/article:",
+    ),
+    (
+        "comparativas",
+        "Comparar colegios",
+        "Dos colegios o periodos, lado a lado.",
+        ":material/compare_arrows:",
+    ),
+    (
+        "registro",
+        "Registro estadístico",
+        "Descriptiva, inferencia y proyección por cuenta.",
+        ":material/query_stats:",
+    ),
+    (
+        "captura",
+        "Captura",
+        "Registra las métricas del mes y revisa pendientes.",
+        ":material/edit_note:",
+    ),
+)
+
+
+def _network_snapshot() -> dict | None:
+    """Calcula seguidores totales, variación y desglose por red del último corte."""
+    cuentas, metricas = data_provider.get_data()
+    if metricas.empty or cuentas.empty:
+        return None
+    try:
+        df = pd.merge(metricas, cuentas, on="id_cuenta", how="left")
+        for logical in ("entidad", "plataforma", "usuario_red"):
+            if logical in df.columns:
+                continue
+            for suff in (f"{logical}_y", f"{logical}_x"):
+                if suff in df.columns:
+                    df[logical] = df.loc[:, suff]
+                    break
+            else:
+                df[logical] = "Unknown"
+        if "fecha" not in df.columns or df["entidad"].isna().all():
+            return None
+
+        df["fecha"] = pd.to_datetime(df["fecha"], errors="coerce")
+        resumen = summarize_followers_growth(df)
+        snapshot = resumen["snapshot"]
+        total = int(resumen["total"])
+        if total <= 0:
+            return None
+
+        by_platform = (
+            snapshot.groupby("plataforma")["seguidores"]
+            .sum()
+            .sort_values(ascending=False)
+        )
+        latest = df["fecha"].dropna().max()
+        return {
+            "total": total,
+            "delta_pct": float(resumen["delta_pct"]),
+            "platforms": [(str(p), int(v)) for p, v in by_platform.items() if v > 0],
+            "entities": int(snapshot["entidad"].nunique()),
+            "accounts": int(len(snapshot)),
+            "cutoff": format_month_label(latest.strftime("%Y-%m"))
+            if pd.notna(latest)
+            else "—",
+        }
+    except Exception as exc:
+        logging.warning("Error calculando el resumen de la landing: %s", exc)
+        return None
+
+
+def _hero_html(snap: dict | None) -> str:
+    """Construye el HTML del hero; todo texto dinámico se escapa."""
+    if snap:
+        delta = snap["delta_pct"]
+        delta_class = "up" if delta >= 0 else "down"
+        delta_html = (
+            f'<span class="cl-hero-delta {delta_class}">{delta:+.1f}% vs mes anterior</span>'
+            if delta
+            else ""
+        )
+        stats = f"""
+            <div class="cl-hero-stats">
+              <div><span class="v">{snap['total']:,}</span><span class="k">Seguidores totales</span>{delta_html}</div>
+              <div><span class="v">{snap['entities']}</span><span class="k">Colegios</span></div>
+              <div><span class="v">{snap['accounts']}</span><span class="k">Cuentas activas</span></div>
+              <div><span class="v">{len(snap['platforms'])}</span><span class="k">Redes</span></div>
+            </div>"""
+        total = max(snap["total"], 1)
+        rows = []
+        for name, value in snap["platforms"]:
+            color = _PLATFORM_COLORS.get(name.lower(), "#94A3B8")
+            share = value / total * 100
+            rows.append(
+                f'<li><span class="n">{html.escape(name)}</span>'
+                f'<span class="bar"><i style="width:{share:.1f}%;background:{color}"></i></span>'
+                f'<span class="p">{share:.0f}%</span></li>'
+            )
+        panel = (
+            '<aside class="cl-hero-panel"><p class="cl-hero-panel-title">Audiencia por red</p>'
+            f'<ul>{"".join(rows)}</ul></aside>'
+        )
+        eyebrow = f'<span class="cl-dot"></span>Red Marista · corte {html.escape(snap["cutoff"])}'
+    else:
+        stats = (
+            '<p class="cl-hero-empty">Aún no hay métricas cargadas. Empieza en '
+            "<b>Captura</b> o sincroniza la fuente desde el panel lateral.</p>"
+        )
+        panel = ""
+        eyebrow = '<span class="cl-dot cl-dot--idle"></span>Red Marista · sin datos'
+
+    return f"""
+    <section class="cl-hero">
+      <video class="cl-hero-video" autoplay loop muted playsinline preload="metadata"
+             poster="{HERO_POSTER_URL}" aria-hidden="true">
+        <source src="{HERO_VIDEO_URL}" type="video/mp4" />
+      </video>
+      <div class="cl-hero-main">
+        <p class="cl-hero-eyebrow">{eyebrow}</p>
+        <h1 class="cl-hero-title">CHAMPI<span class="accent">LEAKS</span></h1>
+        <p class="cl-hero-lead">Inteligencia digital para la red de colegios Maristas:
+        audiencias, contenido y engagement en un solo lugar.</p>
+        {stats}
+      </div>
+      {panel}
+    </section>
+    """
+
+
+_LANDING_CSS = """
+<style>
+.cl-hero {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    display: grid;
+    grid-template-columns: minmax(0, 1.6fr) minmax(240px, 1fr);
+    gap: clamp(1.25rem, 3vw, 2.5rem);
+    align-items: end;
+    padding: clamp(1.5rem, 4vw, 3rem);
+    min-height: 380px;
+    border-radius: 20px;
+    background: #071433 url("app/static/hero_poster.jpg") center / cover;
+    color: #FFFFFF;
+    box-shadow: 0 20px 50px rgba(7, 20, 51, 0.25);
+}
+.cl-hero-video {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    z-index: -3;
+}
+/* Velo de tinta + retícula técnica sobre el video. */
+.cl-hero::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -2;
+    background:
+        linear-gradient(100deg, rgba(7, 20, 51, 0.96) 0%, rgba(7, 20, 51, 0.86) 45%, rgba(7, 20, 51, 0.55) 100%);
+}
+.cl-hero::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background-image:
+        linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+    background-size: 36px 36px;
+    -webkit-mask-image: radial-gradient(120% 90% at 0% 100%, #000 30%, transparent 75%);
+    mask-image: radial-gradient(120% 90% at 0% 100%, #000 30%, transparent 75%);
+}
+section[data-testid="stMain"] .cl-hero-panel li { color: #E6ECF8; }
+section[data-testid="stMain"] .cl-hero-eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.55rem;
+    margin: 0 0 1rem;
+    padding: 0.3rem 0.7rem;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.06);
+    font-family: var(--champi-mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #C9D4EE;
+}
+section[data-testid="stMain"] h1.cl-hero-title {
+    margin: 0;
+    padding: 0;
+    font-size: clamp(2.4rem, 6vw, 4.25rem);
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: -0.035em;
+    color: #FFFFFF;
+}
+section[data-testid="stMain"] .cl-hero-title span { color: #FFFFFF; }
+section[data-testid="stMain"] .cl-hero-title span.accent { color: var(--champi-accent); }
+section[data-testid="stMain"] p.cl-hero-lead {
+    max-width: 52ch;
+    margin: 0.9rem 0 1.75rem;
+    font-size: clamp(0.95rem, 1.4vw, 1.1rem);
+    line-height: 1.5;
+    color: #C9D4EE;
+}
+.cl-hero-stats {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, auto));
+    justify-content: start;
+    gap: 0.75rem 2.25rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+.cl-hero-stats > div { display: flex; flex-direction: column; gap: 0.2rem; }
+.cl-hero-stats .v {
+    font-family: var(--champi-mono);
+    font-size: clamp(1.35rem, 2.4vw, 1.85rem);
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+    color: #FFFFFF;
+}
+.cl-hero-stats .k {
+    font-family: var(--champi-mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #8A9AC0;
+}
+.cl-hero-delta {
+    font-family: var(--champi-mono);
+    font-size: 0.72rem;
+}
+.cl-hero-delta.up { color: #4ADE80; }
+.cl-hero-delta.down { color: #F87171; }
+section[data-testid="stMain"] p.cl-hero-empty { color: #C9D4EE; max-width: 46ch; }
+.cl-hero-panel {
+    align-self: end;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    padding: 1.1rem 1.2rem;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 14px;
+    background: rgba(7, 20, 51, 0.55);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+}
+section[data-testid="stMain"] p.cl-hero-panel-title {
+    margin: 0 0 0.85rem;
+    font-family: var(--champi-mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #8A9AC0;
+}
+.cl-hero-panel ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.6rem; }
+.cl-hero-panel li {
+    display: grid;
+    grid-template-columns: 5.5rem 1fr 2.6rem;
+    align-items: center;
+    gap: 0.6rem;
+    margin: 0;
+    font-size: 0.82rem;
+}
+.cl-hero-panel .bar {
+    height: 6px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.08);
+    overflow: hidden;
+}
+.cl-hero-panel .bar i { display: block; height: 100%; border-radius: inherit; }
+.cl-hero-panel .p {
+    text-align: right;
+    font-family: var(--champi-mono);
+    font-variant-numeric: tabular-nums;
+    color: #C9D4EE;
+}
+/* Tarjetas de módulo: el page_link ocupa la fila de título. */
+.st-key-landing-modules [data-testid="stPageLink"] a {
+    padding: 0;
+    font-weight: 600;
+}
+.st-key-landing-modules [data-testid="stPageLink"] a p {
+    font-size: 1rem;
+    color: var(--champi-ink);
+}
+.st-key-landing-modules [data-testid="stPageLink"] [data-testid="stIconMaterial"] {
+    color: var(--champi-primary);
+}
+@media (max-width: 900px) {
+    .cl-hero { grid-template-columns: 1fr; min-height: 0; }
+    /* La capa responsive global centra y reduce los h1; el wordmark no. */
+    section[data-testid="stMain"] h1.cl-hero-title {
+        font-size: clamp(2.4rem, 12vw, 3.25rem) !important;
+        text-align: left !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        line-height: 1 !important;
+    }
+    .cl-hero-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (prefers-reduced-motion: reduce) {
+    .cl-hero-video { display: none; }
+    .cl-dot { animation: none; }
+}
+</style>
+"""
 
 
 def render(df=None):
-    """
-    Renderiza la página de inicio con banner hero y navegación rápida.
+    """Renderiza la portada. Acepta ``df`` por compatibilidad con el enrutador."""
+    del df
+    st.markdown(_LANDING_CSS, unsafe_allow_html=True)
+    # Markdown interpreta líneas con sangría como bloque de código: se aplana.
+    hero = " ".join(
+        line.strip() for line in _hero_html(_network_snapshot()).splitlines()
+    )
+    st.markdown(hero, unsafe_allow_html=True)
 
-    Acepta un parámetro `df` por compatibilidad con el enrutador.
-    """
-
-    # Hero Banner Institucional con altura responsiva y overlay optimizado
-    banner_css = get_banner_css("banner_landing.jpg")
-
-    # Video de fondo para el hero
-    import base64
-    base_dir = Path(__file__).resolve().parent.parent
-    video_path = base_dir / "images" / "banner_video.mp4"
-
-    def get_video_base64(video_path):
-        if video_path.exists():
-            with open(video_path, "rb") as f:
-                return base64.b64encode(f.read()).decode()
-        logging.warning(f"Video de banner no encontrado: {video_path}")
-        return None
-    video_b64 = get_video_base64(video_path)
-
-    # Calcular total de seguidores actuales y delta vs mes anterior
-    cuentas, metricas = data_provider.get_data()
-    total_seguidores = 0
-    delta_pct = 0.0
-    breakdown_text = ""
-
-    # Verificar si hay datos válidos
-    datos_validos = False
-    if not metricas.empty and not cuentas.empty:
-        try:
-            df = pd.merge(metricas, cuentas, on="id_cuenta", how="left")
-            for logical in ("entidad", "plataforma", "usuario_red"):
-                if logical in df.columns:
-                    continue
-                for suff in (f"{logical}_y", f"{logical}_x", f"{logical}"):
-                    if suff in df.columns:
-                        ser = df.loc[:, suff]
-                        if isinstance(ser, pd.DataFrame):
-                            ser = ser.squeeze()
-                        df[logical] = ser
-                        break
-                else:
-                    df[logical] = "Unknown"
-            if "entidad" in df.columns and not df["entidad"].isna().all():
-                if "fecha" in df.columns:
-                    df["fecha"] = pd.to_datetime(df["fecha"], errors="coerce")
-                    resumen = summarize_followers_growth(df)
-                    total_seguidores = resumen["total"]
-                    delta_pct = resumen["delta_pct"]
-                    snapshot = resumen["snapshot"]
-                    platform_breakdown = snapshot.groupby("plataforma")["seguidores"].sum()
-                    breakdown_parts = []
-                    for platform, followers in platform_breakdown.items():
-                        breakdown_parts.append(f"{platform}: {int(followers):,}")
-                    breakdown_text = " | ".join(breakdown_parts)
-                    datos_validos = total_seguidores > 0
-                    logging.info(f"Landing - Seguidores totales: {total_seguidores:,}, Delta: {delta_pct:.1f}%")
-        except Exception as e:
-            logging.warning(f"Error calculando seguidores en landing: {e}")
-
-    # Colores institucionales Marista
-    PRIMARY_BLUE = "#003696"
-    PRIMARY_BLUE_DARK = "#00235A"
-    ACCENT_YELLOW = "#FFB81C"
-    TEXT_ON_DARK = "#FFFFFF"
-    TEXT_ON_LIGHT = "#212529"
-    DELTA_POSITIVE = "#0A7D35"
-    DELTA_NEGATIVE = "#B42318"
-
-    try:
-        theme = st.get_option("theme.base") or "light"
-        is_dark = theme == "dark"
-    except:
-        is_dark = False
-
-    card_bg = f"rgba(0, 54, 150, 0.85)" if is_dark else f"rgba(0, 54, 150, 0.9)"
-    card_hover_bg = f"rgba(255, 184, 28, 0.95)"
-    metrics_bg = "rgba(255, 255, 255, 0.95)" if is_dark else "rgba(255, 255, 255, 0.98)"
-
-    # BLOQUE DE ESTILOS UNIFICADO
-   # ------------------------------------------------------------------------
-    # BLOQUE DE ESTILOS DEFINITIVO (Video 50% + Fix Barra Superior)
-    # ------------------------------------------------------------------------
-    st.markdown("""
-    <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-
-    /* Tipografía de la landing, aislada del sidebar y sus Material Symbols. */
-    section[data-testid="stMain"],
-    section[data-testid="stMain"] .stMarkdown,
-    section[data-testid="stMain"] h1,
-    section[data-testid="stMain"] h2,
-    section[data-testid="stMain"] h3,
-    section[data-testid="stMain"] h4,
-    section[data-testid="stMain"] h5,
-    section[data-testid="stMain"] h6,
-    section[data-testid="stMain"] p,
-    section[data-testid="stMain"] span:not([data-testid="stIconMaterial"]) {
-        font-family: 'Inter', 'Segoe UI', -apple-system, sans-serif;
-    }
-
-    /* -------------------------------------------
-       1. ESTILOS DE VIDEO Y CONTENIDO (50% IZQUIERDA)
-       ------------------------------------------- */
-    
-    /* ANIMACIONES PERSONALIZADAS PARA GLASS-BOX */
-    @keyframes glassBoxEnter {
-        0% {
-            opacity: 0;
-            transform: translateY(40px);
-        }
-        100% {
-            opacity: 1;
-            transform: translateY(0px);
-        }
-    }
-    
-    @keyframes glassBoxFloat {
-        0%, 100% {
-            transform: translateY(0px);
-        }
-        50% {
-            transform: translateY(-15px);
-        }
-    }
-    
-    @keyframes glassBoxGlow {
-        0%, 100% {
-            box-shadow: 0 8px 32px 0 rgba(31,38,135,0.18),
-                        inset 0 0 20px rgba(255,184,28,0);
-            border-color: rgba(255,255,255,0.28);
-        }
-        50% {
-            box-shadow: 0 12px 42px 0 rgba(31,38,135,0.25),
-                        inset 0 0 30px rgba(255,184,28,0.08),
-                        0 0 30px rgba(255,184,28,0.2);
-            border-color: rgba(255,184,28,0.4);
-        }
-    }
-    
-    .hero-bg-video {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;           /* Forzamos 50% para que sea pantalla dividida */
-        height: 100vh;
-        object-fit: cover;
-        z-index: 0;
-        pointer-events: none;
-        margin-left: 0 !important;
-    }
-
-    .hero-overlay {
-        position: relative;
-        z-index: 2;
-        width: 50%;           /* El texto también ocupa solo el 50% */
-        height: 100vh;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        margin-left: 0;
-        padding-left: 0;
-        perspective: 1200px;
-    }
-
-    .glass-box {
-        position: relative;
-        z-index: 3;
-        background: rgba(7, 27, 51, 0.4) !important;
-        backdrop-filter: blur(16px) saturate(120%) !important;
-        -webkit-backdrop-filter: blur(16px) saturate(120%) !important;
-        border: 1px solid rgba(255, 255, 255, 0.15) !important;
-        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5) !important;
-        border-radius: 20px !important;
-        width: fit-content !important;
-        max-width: calc(100vw - 2rem) !important;
-        padding: clamp(1.5rem, 3vw, 2.5rem) !important;
-        color: #FFFFFF !important;
-        text-align: center;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        animation: glassBoxEnter 0.8s ease-out 0.3s both,
-                   glassBoxFloat 4s ease-in-out 1.1s infinite,
-                   glassBoxGlow 5s ease-in-out 1.1s infinite;
-        transition: transform 0.1s ease-out, box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        transform-style: preserve-3d;
-        overflow: hidden;
-        cursor: grab;
-        touch-action: none;
-        user-select: none;
-    }
-
-    .glass-box.is-dragging {
-        animation: none !important;
-        cursor: grabbing;
-        box-shadow: 0 20px 52px rgba(0, 0, 0, 0.58),
-                    0 0 36px rgba(255, 184, 28, 0.36) !important;
-        border-color: rgba(255, 184, 28, 0.7) !important;
-    }
-
-    .glass-box h1,
-    .glass-box h2,
-    .glass-box h3,
-    .glass-box p,
-    .glass-box span {
-        color: #FFFFFF !important;
-        text-shadow: 0 2px 4px rgba(0,0,0,0.5) !important;
-    }
-
-    /* Jerarquía tipográfica de la consola de inteligencia. */
-    .glass-box .hero-title {
-        font-size: clamp(2rem, 4vw, 3.25rem) !important;
-        font-weight: 900 !important;
-        line-height: 1 !important;
-        letter-spacing: 0.16rem !important;
-        margin: 0 0 0.65rem !important;
-        white-space: nowrap !important;
-        text-shadow: 0 4px 10px rgba(0,0,0,0.6) !important;
-        text-transform: uppercase !important;
-    }
-
-    .glass-box .hero-subtitle {
-        font-size: clamp(0.9rem, 1.8vw, 1.15rem) !important;
-        font-weight: 400 !important;
-        line-height: 1.35 !important;
-        letter-spacing: 0.08rem !important;
-        opacity: 0.88 !important;
-        margin: 0 !important;
-        text-shadow: 0 2px 4px rgba(0,0,0,0.5) !important;
-    }
-    
-    .glass-box::before {
-        content: '';
-        position: absolute;
-        top: -50%;
-        left: -50%;
-        width: 200%;
-        height: 200%;
-        background: radial-gradient(circle, rgba(255,184,28,0.4) 0%, transparent 70%);
-        opacity: 0;
-        transition: opacity 0.3s ease-out;
-        pointer-events: none;
-        z-index: 1;
-    }
-    
-    .glass-box:hover {
-        background: rgba(255,255,255,0.25);
-        border-color: rgba(255,184,28,0.6);
-        box-shadow: 0 16px 48px 0 rgba(31,38,135,0.35),
-                    0 0 40px rgba(255,184,28,0.3);
-    }
-    
-    .glass-box:hover::before {
-        opacity: 1;
-    }
-
-    .hero-title {
-        color: #FFB81C;
-        font-size: clamp(3rem, 5vw, 6rem); /* Ajustado un poco para que no rompa */
-        font-weight: 900;
-        letter-spacing: 8px;
-        text-shadow: 2px 3px 18px rgba(0,0,0,0.95);
-        margin-bottom: 0.7rem;
-        text-transform: uppercase;
-        line-height: 1.1;
-    }
-
-    .hero-subtitle {
-        color: #FFFFFF;
-        font-size: 1.5rem;
-        font-weight: 400;
-        letter-spacing: 2px;
-        margin-top: 0.2rem;
-        margin-bottom: 0;
-        text-shadow: 1px 2px 8px rgba(0,0,0,0.3);
-    }
-
-    /* -------------------------------------------
-       2. ELIMINACIÓN DE BORDES Y FRANJA SUPERIOR
-       ------------------------------------------- */
-    
-    /* Header Transparente */
-    header[data-testid="stHeader"], .stAppHeader.st-emotion-cache-1s6ol36 {
-        background: #001840 !important;
-        background-color: #001840 !important;
-        background-image: none !important;
-        box-shadow: none !important;
-        border: none !important;
-    }
-
-    /* La escena de video debe quedar visible bajo el contenido de la landing. */
-    .stApp,
-    [data-testid="stAppViewContainer"],
-    section[data-testid="stMain"],
-    section[data-testid="stMain"] > div,
-    [data-testid="stMainBlockContainer"] {
-        background: transparent !important;
-        background-color: transparent !important;
-    }
-
-    section[data-testid="stMain"] {
-        position: relative;
-        z-index: 1;
-    }
-
-    /* Eliminar Padding del Contenedor Principal */
-    [data-testid="stMainBlockContainer"] {
-        padding: 0 !important;
-        padding-top: 0 !important;
-        padding-left: 0 !important;
-        padding-right: 0 !important;
-        max-width: 100vw !important;
-        overflow: hidden !important;
-    }
-
-    /* EL TRUCO FINAL: Margen negativo para subir todo y tapar el hueco del header */
-    .main .block-container {
-        margin-top: -65px !important; 
-        padding-top: 0 !important;
-    }
-
-    /* Ocultar decoración superior (linea de colores) */
-    div[data-testid="stDecoration"] {
-        display: none;
-    }
-    
-    /* Sidebar siempre visible encima del video */
-    section[data-testid="stSidebar"] {
-        z-index: 100 !important;
-    }
-
-    /* Móviles */
-    @media (max-width: 768px) {
-        .hero-bg-video, .hero-overlay {
-            width: 100% !important;
-        }
-        .hero-title {
-            font-size: clamp(1.65rem, 9vw, 2.25rem) !important;
-            letter-spacing: 0.1rem !important;
-        }
-        /* Streamlit columns: fuerza 100% ancho y stack vertical */
-        [data-testid="stHorizontalBlock"] {
-            flex-direction: column !important;
-            align-items: stretch !important;
-        }
-        [data-testid="stVerticalBlock"] {
-            width: 100% !important;
-            min-width: 0 !important;
-        }
-        /* Tablas y grids */
-        table {
-            width: 100% !important;
-            font-size: 0.95rem !important;
-            overflow-x: auto !important;
-            display: block !important;
-        }
-        th, td {
-            word-break: break-word !important;
-            padding: 0.5em !important;
-        }
-    }
-    </style>
-    <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const glassBox = document.querySelector('.glass-box');
-        const heroOverlay = document.querySelector('.hero-overlay');
-        
-        if (!glassBox || !heroOverlay) return;
-        
-        heroOverlay.addEventListener('mousemove', function(e) {
-            const rect = glassBox.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
-            
-            // Calcular ángulo de inclinación (max 15° en cada dirección)
-            const centerX = rect.width / 2;
-            const centerY = rect.height / 2;
-            const rotateY = ((x - centerX) / centerX) * 15;
-            const rotateX = -((y - centerY) / centerY) * 15;
-            
-            // Aplicar rotación 3D
-            glassBox.style.transform = `rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
-            
-            // Mover el spotlight (pseudo-elemento ::before)
-            const spotX = (x / rect.width) * 100;
-            const spotY = (y / rect.height) * 100;
-            glassBox.style.setProperty('--spotX', spotX + '%');
-            glassBox.style.setProperty('--spotY', spotY + '%');
-            const beforeElement = glassBox.querySelector('::before');
-            if (beforeElement) {
-                beforeElement.style.backgroundPosition = spotX + '% ' + spotY + '%';
-            }
-        });
-        
-        heroOverlay.addEventListener('mouseleave', function() {
-            glassBox.style.transform = 'rotateX(0deg) rotateY(0deg)';
-        });
-    });
-    </script>
-    """, unsafe_allow_html=True)
-    if video_b64:
-        html_code = f'''
-        <video class="hero-bg-video" autoplay loop muted playsinline>
-            <source src="data:video/mp4;base64,{video_b64}" type="video/mp4" />
-        </video>
-        <div class="hero-overlay">
-            <div class="glass-box">
-                <h1 class="hero-title">CHAMPILEAKS</h1>
-                <p class="hero-subtitle">Inteligencia Digital Marista</p>
-            </div>
-        </div>
-        '''
-        st.markdown(html_code, unsafe_allow_html=True)
-    else:
-        st.markdown('<div class="hero-overlay"><div class="glass-box"><h1 class="hero-title">CHAMPILEAKS</h1><p class="hero-subtitle">Inteligencia Digital Marista</p></div></div>', unsafe_allow_html=True)
-
-    st.html("""
-    <script>
-    (() => {
-      const installDrag = () => {
-        const card = document.querySelector('.glass-box');
-        const overlay = document.querySelector('.hero-overlay');
-        if (!card || !overlay) {
-          window.setTimeout(installDrag, 100);
-          return;
-        }
-        if (card.dataset.champiDragReady === 'true') return;
-        card.dataset.champiDragReady = 'true';
-        card.title = 'Arrástrame para mover la consola · doble clic para centrar';
-
-        let dragging = false;
-        let offsetX = 0;
-        let offsetY = 0;
-        const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
-
-        const centre = () => {
-          card.style.position = '';
-          card.style.left = '';
-          card.style.top = '';
-          card.classList.remove('is-dragging');
-        };
-
-        card.addEventListener('pointerdown', (event) => {
-          if (event.button !== 0) return;
-          const cardRect = card.getBoundingClientRect();
-          const overlayRect = overlay.getBoundingClientRect();
-          card.style.position = 'absolute';
-          card.style.left = `${cardRect.left - overlayRect.left}px`;
-          card.style.top = `${cardRect.top - overlayRect.top}px`;
-          offsetX = event.clientX - cardRect.left;
-          offsetY = event.clientY - cardRect.top;
-          dragging = true;
-          card.classList.add('is-dragging');
-          card.setPointerCapture(event.pointerId);
-          event.preventDefault();
-        });
-
-        card.addEventListener('pointermove', (event) => {
-          if (!dragging) return;
-          const overlayRect = overlay.getBoundingClientRect();
-          const maxLeft = Math.max(0, overlayRect.width - card.offsetWidth);
-          const maxTop = Math.max(0, overlayRect.height - card.offsetHeight);
-          card.style.left = `${clamp(event.clientX - overlayRect.left - offsetX, 0, maxLeft)}px`;
-          card.style.top = `${clamp(event.clientY - overlayRect.top - offsetY, 0, maxTop)}px`;
-        });
-
-        const release = (event) => {
-          if (!dragging) return;
-          dragging = false;
-          card.classList.remove('is-dragging');
-          if (card.hasPointerCapture(event.pointerId)) card.releasePointerCapture(event.pointerId);
-        };
-        card.addEventListener('pointerup', release);
-        card.addEventListener('pointercancel', release);
-        card.addEventListener('dblclick', centre);
-      };
-      installDrag();
-    })();
-    </script>
-    """)
-
-    if datos_validos and total_seguidores > 0:
-        col1, col2, col3 = st.columns([1, 2, 1])
-        with col2:
-            delta_val = f"{delta_pct:+.1f}%" if delta_pct != 0 else None
-            st.metric(
-                label="Seguidores Totales Red Marista",
-                value=f"{total_seguidores:,}",
-                delta=delta_val if delta_val else None,
-                help=breakdown_text if breakdown_text else None
-            )
-    else:
-        st.info("🚀 Bienvenido a tu Inteligencia Digital - Carga datos para comenzar", icon="ℹ️")
+    st.markdown('<p class="cl-section-label">Módulos</p>', unsafe_allow_html=True)
+    pages = st.session_state.get("_nav_pages", {})
+    with st.container(key="landing-modules"):
+        for row_start in range(0, len(_MODULES), 3):
+            cols = st.columns(3)
+            for col, (path, title, description, icon) in zip(
+                cols, _MODULES[row_start : row_start + 3]
+            ):
+                with col, st.container(border=True):
+                    page = pages.get(path)
+                    if page is not None:
+                        st.page_link(page, label=title, icon=icon)
+                    else:
+                        st.markdown(f"{icon} **{title}**")
+                    st.caption(description)

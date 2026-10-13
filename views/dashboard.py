@@ -21,7 +21,7 @@ from utils import (
 from utils.data_provider import data_provider
 from utils.visualizations import plot_engagement_evolution, sanitize_chart_dataframe
 from utils.data_manager import load_configs
-from components import inject_custom_css, render_live_indicator
+from components import inject_custom_css, render_friendly_error
 from utils.analytics import (
     calculate_growth_metrics,
     calculate_health_score,
@@ -324,11 +324,6 @@ def render(df=None):
     # Inyectar estilos globales desde components
     inject_custom_css()
 
-    title_col, live_col = st.columns([8, 2], vertical_alignment="center")
-    with title_col:
-        st.title("Dashboard Global")
-    with live_col:
-        render_live_indicator("En vivo")
     # Cargar datos usando data provider si no se proporcionaron
     if df is None:
         # Progress bar con pasos (usa caché compartido; sin recarga forzada)
@@ -369,7 +364,7 @@ def render(df=None):
 
     # Si recibimos un DataFrame filtrado desde el entrypoint, úsalo.
     if df is None or (hasattr(df, "empty") and df.empty):
-        st.warning("⚠️ No hay datos para los filtros seleccionados.")
+        st.warning("No hay datos para los filtros seleccionados.")
         st.caption("💡 Ajusta los filtros o intenta otro periodo.")
         return
 
@@ -469,7 +464,12 @@ def render(df=None):
         data_quality_issues.append("Fechas inválidas o faltantes")
 
     if data_quality_issues:
-        st.warning("⚠️ **Problemas de calidad de datos detectados:**\n" + "\n".join(f"- {issue}" for issue in data_quality_issues))
+        # Un solo bloque plegado: avisa sin desplazar los KPIs hacia abajo.
+        with st.expander(
+            f"Calidad de datos · {len(data_quality_issues)} aviso(s)",
+            icon=":material/warning:",
+        ):
+            st.markdown("\n".join(f"- {issue}" for issue in data_quality_issues))
 
     # Crear df_unique para cálculos consistentes
     df_unique = (
@@ -477,18 +477,6 @@ def render(df=None):
         .drop_duplicates(subset=['entidad', 'plataforma'], keep='last')
     )
 
-    # Botón de descarga del reporte HTML usando utils.generar_reporte_html
-    try:
-        report_html = generar_reporte_html(df_m_month, f"Reporte {periodo_label}")
-        st.download_button(
-            "Descargar Reporte HTML",
-            report_html,
-            file_name=f"Reporte_{periodo_label}.html",
-            mime="text/html",
-        )
-    except Exception as e:
-        logging.warning(f"No se pudo generar el reporte HTML: {e}")
-        st.caption("📊 No se pudo generar el reporte HTML para descarga.")
 
     # Verificar anomalías en el mes actual
     if "anomalia_seguidores" in df_unique.columns:
@@ -507,14 +495,22 @@ def render(df=None):
             st.toast(f"⚠️ Se detectó comportamiento inusual en {plataformas_str}", icon="⚠️")
 
     # --- Resumen Ejecutivo ---
-    col_title, col_refresh = st.columns([5, 1])
+    col_title, col_report = st.columns([4, 1], vertical_alignment="center")
     with col_title:
-        st.subheader("Resumen Ejecutivo")
-    with col_refresh:
-        if st.button("↻", help="Actualizar datos desde Google Sheets", key="refresh_btn"):
-            st.cache_data.clear()
-            st.session_state.force_data_refresh = True
-            st.rerun()
+        st.subheader("Resumen ejecutivo")
+    with col_report:
+        try:
+            report_html = generar_reporte_html(df_m_month, f"Reporte {periodo_label}")
+            st.download_button(
+                "Reporte HTML",
+                report_html,
+                file_name=f"Reporte_{periodo_label}.html",
+                mime="text/html",
+                icon=":material/download:",
+                use_container_width=True,
+            )
+        except Exception as e:
+            logging.warning(f"No se pudo generar el reporte HTML: {e}")
 
     # Mostrar skeleton mientras se calculan métricas
     kpi_placeholder = st.empty()
@@ -547,7 +543,7 @@ def render(df=None):
         # Detector de anomalías: alerta si el delta de seguidores es > +/-20%
         try:
             if abs(delta_seg) > 20:
-                st.warning("⚠️ Salto inusual detectado. Verifica la consistencia de las capturas.")
+                st.warning("Salto inusual detectado. Verifica la consistencia de las capturas.")
         except Exception:
             # Si delta_seg no está definido o hay error, no hacer nada
             pass
@@ -591,110 +587,99 @@ def render(df=None):
     # Limpiar skeleton y mostrar KPIs reales
     kpi_placeholder.empty()
     
-    # CSS para cards de KPIs
-    st.markdown("""
-    <style>
-    .kpi-card {
-        background: #F8F9FA;
-        border: 1px solid #E9ECEF;
-        border-radius: 8px;
-        padding: 16px;
-        margin: 4px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        text-align: center;
-    }
-    .kpi-card h4 {
-        margin: 0 0 8px 0;
-        font-size: 14px;
-        color: #495057;
-        font-weight: 600;
-    }
-    .kpi-value {
-        font-size: 24px;
-        font-weight: 700;
-        color: #212529;
-        margin: 8px 0;
-    }
-    .kpi-delta {
-        font-size: 12px;
-        margin: 4px 0;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-    
-    k1, k2, k3, k4 = st.columns(4)
-    # Mostrar MoM y YoY juntos cuando estén disponibles
+    # Series mensuales para las mini-gráficas de los KPIs (últimos 12 meses).
+    spark_followers = None
+    spark_engagement = None
+    try:
+        monthly = df_full.assign(_mes=df_full["fecha"].dt.strftime("%Y-%m"))
+        # Un mes con captura parcial (pocas cuentas reportadas) hundiría la
+        # suma; solo se grafican meses con al menos 80 % de las cuentas.
+        accounts_per_month = monthly.groupby("_mes")["entidad"].size()
+        complete_months = accounts_per_month[
+            accounts_per_month >= 0.8 * accounts_per_month.max()
+        ].index
+        monthly = monthly[monthly["_mes"].isin(complete_months)]
+        spark_followers = (
+            monthly.groupby("_mes")["seguidores"].sum().sort_index().tail(12).round(0).tolist()
+        )
+        spark_engagement = [
+            round(float(calcular_kpi_engagement_global(group)), 2)
+            for _, group in sorted(monthly.groupby("_mes"), key=lambda item: item[0])[-12:]
+        ]
+    except Exception as e:
+        logging.warning(f"No se pudieron construir las series de KPIs: {e}")
+
+    def _spark(series):
+        return series if series and len(series) > 1 else None
+
+    # Texto de variación que también consume el reporte PDF.
     if mes_anterior:
+        delta_display = f"{delta_seg:+.1f}%"
         if yoy_seg is not None:
-            delta_display = f"{delta_seg:+.1f}% (YoY {yoy_seg:+.1f}%)"
-        else:
-            delta_display = f"{delta_seg:+.1f}%"
+            delta_display += f" (YoY {yoy_seg:+.1f}%)"
     else:
         delta_display = "-"
 
+    k1, k2, k3, k4 = st.columns(4)
+
     with k1:
-        with st.container():
-            st.markdown(f"""
-            <div class="kpi-card">
-                <h4>Seguidores {get_traffic_light_indicator('growth', delta_seg)}</h4>
-                <div class="kpi-value">{tot_seg:,.0f}</div>
-                <div class="kpi-delta">{delta_display}</div>
-            </div>
-            """, unsafe_allow_html=True)
+        yoy_text = f" Variación anual: {yoy_seg:+.1f}%." if yoy_seg is not None else ""
+        st.metric(
+            "Seguidores",
+            f"{tot_seg:,.0f}",
+            delta=f"{delta_seg:+.1f}%" if mes_anterior else None,
+            delta_description="vs mes anterior" if mes_anterior else None,
+            help="Último registro de cada cuenta, sumado." + yoy_text,
+            chart_data=_spark(spark_followers),
+            chart_type="area",
+        )
         if anomalia_seguidores:
-            st.markdown("⚠️ **Anomalía detectada**", help="Variación >20% vs promedio móvil o mes anterior")
+            st.caption(
+                ":material/warning: Anomalía: variación mayor a 20 % frente al promedio móvil.",
+            )
 
     with k2:
-        with st.container():
-            st.markdown(f"""
-            <div class="kpi-card">
-                <h4>Engagement Promedio {get_traffic_light_indicator('engagement', er_global)}</h4>
-                <div class="kpi-value">{er_global:.2f}%</div>
-                <div class="kpi-delta">{f"{delta_er:+.2f} pp" if mes_anterior else "-"}</div>
-            </div>
-            """, unsafe_allow_html=True)
-        if status_global:
-            st.caption(f"💡 Nota sobre Engagement: {status_global}")
-    
-    # Coverage KPI (assuming k3 is for coverage)
+        st.metric(
+            "Engagement promedio",
+            f"{er_global:.2f}%",
+            delta=f"{delta_er:+.2f} pp" if mes_anterior else None,
+            delta_description="vs mes anterior" if mes_anterior else None,
+            help=status_global or "Interacciones entre seguidores, ponderado por cuenta.",
+            chart_data=_spark(spark_engagement),
+            chart_type="line",
+        )
+
     with k3:
-        # Calculate coverage - number of institutions with data
         instituciones_con_datos = df_unique['entidad'].nunique()
         total_instituciones = len(COLEGIOS_MARISTAS)
         coverage_pct = (instituciones_con_datos / total_instituciones * 100) if total_instituciones > 0 else 0
-        
-        with st.container():
-            st.markdown(f"""
-            <div class="kpi-card">
-                <h4>Cobertura Institucional</h4>
-                <div class="kpi-value">{instituciones_con_datos}/{total_instituciones}</div>
-                <div class="kpi-delta">{coverage_pct:.1f}%</div>
-            </div>
-            """, unsafe_allow_html=True)
-    
-    # Health score KPI (k4)
-    with k4:
-        score_label = f"{health_score:.0f}"
-        if health_score > 80:
-            color = "#1E7E34"  # Verde oscuro
-        elif health_score > 60:
-            color = "#CC7000"  # Naranja oscuro
-        else:
-            color = "#C82333"  # Rojo oscuro
-        
-        tooltip = (
-            "Salud Digital: Score que mide la salud general de tus redes sociales. Se calcula promediando Engagement (50%), Crecimiento Anual (30%) y Consistencia (20%). Un score alto indica cuentas saludables con buen engagement y crecimiento sostenido. "
-            f"Indicador de confiabilidad: {get_traffic_light_indicator('health', health_score)} (🟢 >80 óptimo, 🟡 >60 aceptable, 🔴 ≤60 requiere atención)"
+        st.metric(
+            "Cobertura institucional",
+            f"{instituciones_con_datos}/{total_instituciones}",
+            delta=f"{coverage_pct:.0f}% de colegios con datos",
+            delta_color="off",
+            delta_arrow="off",
+            help="Colegios con al menos un registro frente al catálogo Marista.",
         )
-        
-        with st.container():
-            st.markdown(f"""
-            <div class="kpi-card" title="{tooltip}">
-                <h4>Salud Digital {get_traffic_light_indicator('health', health_score)}</h4>
-                <div class="kpi-value" style="color: {color};">{score_label}</div>
-                <div class="kpi-delta">Score (0-100)</div>
-            </div>
-            """, unsafe_allow_html=True)
+
+    with k4:
+        if health_score > 80:
+            health_label, health_color = "Óptima", "green"
+        elif health_score > 60:
+            health_label, health_color = "Aceptable", "orange"
+        else:
+            health_label, health_color = "Requiere atención", "red"
+        st.metric(
+            "Salud digital",
+            f"{health_score:.0f}/100",
+            delta=health_label,
+            delta_color=health_color,
+            delta_arrow="off",
+            help=(
+                "Promedio ponderado de engagement (50 %), crecimiento anual (30 %) y "
+                "consistencia de publicación (20 %). >80 óptima · >60 aceptable."
+            ),
+        )
 
     school_name = st.session_state.get('filtro_entidad', 'Todos')
     meta_seguidores = 0.0
@@ -739,7 +724,7 @@ def render(df=None):
         st.caption("🎯 Configura metas para esta institución y así visualizar el avance contra objetivo.")
 
     # Desglose por Red Social
-    st.subheader("Desglose por Red Social")
+    st.subheader("Desglose por red social")
     
     # Normalizar engagement_rate a numérico
     df_unique_display = df_unique.copy()
@@ -757,13 +742,29 @@ def render(df=None):
         })
     ).reset_index()
     
-    for _, row in platform_summary.iterrows():
-        status = get_engagement_status(engagement_rate=row['engagement_promedio'])
-        engagement_display = status if status else f"{row['engagement_promedio']:.2f}%"
-        st.write(f"**{row['plataforma']}**: Seguidores totales: {row['seguidores']:,.0f}, Engagement promedio: {engagement_display}")
+    total_platform_followers = float(platform_summary['seguidores'].sum()) or 1.0
+    breakdown_table = platform_summary.assign(
+        participacion=platform_summary['seguidores'] / total_platform_followers * 100,
+    ).sort_values('seguidores', ascending=False)
+    # Mismo formato de miles que los KPIs (370,433), sin depender del locale
+    # del navegador.
+    breakdown_table['seguidores'] = breakdown_table['seguidores'].map(lambda v: f"{v:,.0f}")
+    st.dataframe(
+        breakdown_table[['plataforma', 'seguidores', 'participacion', 'engagement_promedio']],
+        hide_index=True,
+        use_container_width=True,
+        column_config={
+            'plataforma': st.column_config.TextColumn("Red"),
+            'seguidores': st.column_config.TextColumn("Seguidores", alignment="right"),
+            'participacion': st.column_config.ProgressColumn(
+                "Participación", format="%.1f%%", min_value=0, max_value=100,
+            ),
+            'engagement_promedio': st.column_config.NumberColumn("Engagement", format="%.2f%%"),
+        },
+    )
 
     # Pulse Ejecutivo por Plataforma
-    st.markdown("### 🧭 Pulse Ejecutivo por Plataforma")
+    st.markdown("### Pulso por plataforma")
     if not platform_summary.empty:
         platform_summary = platform_summary.sort_values('engagement_promedio', ascending=False).reset_index(drop=True)
         leader_row = platform_summary.iloc[0]
@@ -1007,7 +1008,7 @@ def render(df=None):
             # Crear gráfico de barras
             if px is None:
                 chart_placeholder.empty()
-                st.error("Plotly no está disponible. Instala `plotly` para ver gráficos.")
+                st.info("Las gráficas no están disponibles en este entorno.", icon=":material/bar_chart_off:")
             else:
                 fig_platform = px.bar(
                     platform_data,
@@ -1041,7 +1042,7 @@ def render(df=None):
     except Exception as e:
         chart_placeholder.empty()
         logging.error(f"Error al generar gráfica de plataformas: {e}")
-        st.error(f"Error en gráfica de plataformas: {str(e)}")
+        render_friendly_error("No pudimos dibujar la gráfica de plataformas.", e, key="err-plataformas")
 
     st.markdown("---")
 
@@ -1077,7 +1078,7 @@ def render(df=None):
                 
                 if px is None:
                     evolution_placeholder.empty()
-                    st.error("Plotly no está disponible. Instala `plotly` para ver gráficos.")
+                    st.info("Las gráficas no están disponibles en este entorno.", icon=":material/bar_chart_off:")
                 else:
                     df_evo = (
                         df_full.groupby(["fecha", "plataforma"])["seguidores"].sum().reset_index()
@@ -1171,7 +1172,7 @@ def render(df=None):
         except Exception as e:
             evolution_placeholder.empty()
             logging.error(f"Error al generar gráfica de evolución: {e}")
-            st.error(f"Error al gráfica de evolución: {str(e)}")
+            render_friendly_error("No pudimos dibujar la evolución.", e, key="err-evolucion")
 
         # Gráfica de evolución de engagement
         st.markdown("### 📈 Evolución de Engagement por Red Social")
@@ -1207,7 +1208,7 @@ def render(df=None):
                     resumen = resumen.sort_values("seguidores", ascending=False)
                     if px is None:
                         ranking_placeholder.empty()
-                        st.error("Plotly no está disponible. Instala `plotly` para ver gráficos.")
+                        st.info("Las gráficas no están disponibles en este entorno.", icon=":material/bar_chart_off:")
                     else:
                         fig_bar = px.bar(
                             resumen,
@@ -1229,7 +1230,7 @@ def render(df=None):
                 
                 # Nueva gráfica: Ranking de Engagement por Institución y Red Social
                 st.markdown("---")
-                st.subheader("📊 Ranking de Engagement por Institución")
+                st.subheader("Ranking de engagement por institución")
                 
                 engagement_placeholder = st.empty()
                 with engagement_placeholder.container():
@@ -1242,7 +1243,7 @@ def render(df=None):
                     # Debug: verificar si existe la columna engagement_rate
                     if 'engagement_rate' not in df_engagement.columns:
                         engagement_placeholder.empty()
-                        st.warning("⚠️ La columna 'engagement_rate' no existe en los datos. Ingresa valores de engagement en Google Sheets.")
+                        st.warning("La columna 'engagement_rate' no existe en los datos. Ingresa valores de engagement en Google Sheets.")
                     else:
                         df_engagement['engagement_rate'] = pd.to_numeric(
                             df_engagement['engagement_rate'].astype(str).str.replace(',', '.', regex=False),
@@ -1312,11 +1313,11 @@ def render(df=None):
                 except Exception as e:
                     engagement_placeholder.empty()
                     logging.error(f"Error al generar gráfica de engagement: {e}")
-                    st.error(f"Error en gráfica de engagement: {str(e)}")
+                    render_friendly_error("No pudimos dibujar el ranking de engagement.", e, key="err-engagement")
         except Exception as e:
             ranking_placeholder.empty()
             logging.error(f"Error al generar gráfica de ranking: {e}")
-            st.error(f"Error en gráfica de ranking: {str(e)}")
+            render_friendly_error("No pudimos dibujar el ranking.", e, key="err-ranking")
 
     # --- Ranking de Crecimiento de Seguidores ---
     st.markdown("### 🚀 Crecimiento de Seguidores por Institución")
@@ -1341,7 +1342,7 @@ def render(df=None):
             return
 
         if px is None:
-            st.warning("Plotly no disponible - no se puede mostrar la gráfica")
+            st.info("Las gráficas no están disponibles en este entorno.", icon=":material/bar_chart_off:")
             return
 
         ranking_abs_df = ranking_df.sort_values(
@@ -1468,7 +1469,11 @@ def render(df=None):
                 config=PLOTLY_CONFIG,
             )
         except Exception as pct_error:
-            st.error(f"No se pudo renderizar la gráfica de % crecimiento: {pct_error}")
+            render_friendly_error(
+                "No pudimos dibujar el % de crecimiento.",
+                pct_error,
+                key=f"err-crecimiento-pct-{section_title}",
+            )
 
         leader_row = ranking_abs_df.iloc[0]
         total_growth = ranking_abs_df["crecimiento_abs"].sum()
@@ -1579,7 +1584,7 @@ def render(df=None):
             st.info("No hay datos de crecimiento de seguidores disponibles.")
 
     except Exception as e:
-        st.error(f"Error al calcular ranking de crecimiento: {str(e)}")
+        render_friendly_error("No pudimos calcular el ranking de crecimiento.", e, key="err-crecimiento")
         logging.error(f"Error en ranking de crecimiento: {e}")
 
     # --- Evolución de la Salud Digital (últimos 6 meses) ---
@@ -1610,7 +1615,7 @@ def render(df=None):
             
             if px is None:
                 health_placeholder.empty()
-                st.error("Plotly no está disponible. Instala `plotly` para ver gráficos.")
+                st.info("Las gráficas no están disponibles en este entorno.", icon=":material/bar_chart_off:")
             else:
                 fig_health = px.line(x=labels, y=health_points, markers=True, labels={"x": "Mes", "y": "Salud"}, title="Evolución de la Salud Digital (últimos 6 meses)")
                 fig_health.update_traces(line=dict(width=3))
@@ -1622,7 +1627,7 @@ def render(df=None):
     except Exception as e:
         health_placeholder.empty()
         logging.error(f"Error al generar gráfica de salud digital: {e}")
-        st.warning(f"No se pudo generar la serie histórica de salud: {str(e)}")
+        render_friendly_error("No pudimos generar la serie histórica de salud digital.", e, key="err-salud")
 
     # Vista de datos plegable con paginación
     with st.expander("Ver datos fuente"):

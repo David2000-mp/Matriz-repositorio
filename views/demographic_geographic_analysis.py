@@ -507,7 +507,6 @@ def render_comparison_block(df_for_network: pd.DataFrame, colegio: str):
 
 def render_demographic_geographic_analysis() -> None:
     """Render principal de la pestaña de analisis demografico y geografico."""
-    st.title("Analisis Demografico y Geografico")
     st.caption("Fuente: Google Sheets - Base_Maestra_Colegios y Base_Demografica_Colegios")
 
     data = load_data()
