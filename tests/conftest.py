@@ -364,7 +364,8 @@ def disable_streamlit_cache(monkeypatch):
     # BONUS: También parchear st.cache (deprecado pero puede estar en código legacy)
     bypass_cache_legacy = lambda *args, **kwargs: bypass_cache(*args, **kwargs)
     bypass_cache_legacy.clear = lambda: None
-    monkeypatch.setattr("streamlit.cache", bypass_cache_legacy)
+    # Streamlit >= 1.36 eliminó st.cache: solo se parchea si aún existe.
+    monkeypatch.setattr("streamlit.cache", bypass_cache_legacy, raising=False)
 
     # Log para debugging (opcional, comentar en producción)
     # print("✅ Streamlit cache DESACTIVADO para este test")

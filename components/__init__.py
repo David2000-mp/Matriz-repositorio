@@ -32,10 +32,14 @@ from .ui import (
     FilterBarActions,
     MetricCard,
     PageHeader,
+    SectionLabel,
+    filter_chip,
     render_empty_state,
+    render_friendly_error,
     render_live_indicator,
     render_loader,
     render_status,
+    status_chip,
 )
 
 try:
@@ -58,6 +62,10 @@ __all__ = [
     "FilterBarActions",
     "MetricCard",
     "PageHeader",
+    "SectionLabel",
+    "filter_chip",
+    "render_friendly_error",
+    "status_chip",
     "render_empty_state",
     "render_live_indicator",
     "render_loader",

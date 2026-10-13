@@ -892,11 +892,6 @@ def _render_block_4_strict_comparison(
 
 
 def render_cross_intelligence_view() -> None:
-    st.title("Inteligencia cruzada")
-    st.caption(
-        "Entiende quién compone la audiencia y cómo se relaciona con el rendimiento "
-        "del contenido. La vista inicia con el histórico completo de toda la red."
-    )
 
     colegio, plataforma, month_key, metric_key, sexo, edad = _render_filters()
     if not month_key:

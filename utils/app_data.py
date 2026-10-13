@@ -94,3 +94,51 @@ def apply_global_filters(
         filtered = filtered[filtered["entidad"] == entity]
 
     return filtered
+
+
+_MESES_CORTOS = ("ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic")
+
+
+def format_month_label(month: str) -> str:
+    """Convierte ``YYYY-MM`` en una etiqueta corta en español (``sep 2026``)."""
+    try:
+        year, number = str(month).split("-")[:2]
+        index = int(number) - 1
+    except ValueError:
+        return str(month)
+    if not 0 <= index < 12:
+        return str(month)
+    return f"{_MESES_CORTOS[index]} {year}"
+
+
+@dataclass(frozen=True)
+class DataSummary:
+    latest_month: str | None
+    entities: int
+    accounts: int
+    records: int
+
+
+def summarize_dataset(df: pd.DataFrame) -> DataSummary:
+    """Resume el corte de datos para los indicadores de estado de la UI."""
+    if df is None or df.empty:
+        return DataSummary(latest_month=None, entities=0, accounts=0, records=0)
+
+    latest = None
+    if "fecha" in df.columns:
+        dates = pd.to_datetime(df["fecha"], errors="coerce").dropna()
+        if not dates.empty:
+            latest = dates.max().strftime("%Y-%m")
+
+    def _distinct(column: str) -> int:
+        if column not in df.columns:
+            return 0
+        values = df[column].dropna().astype(str).str.strip()
+        return int(values[values != ""].nunique())
+
+    return DataSummary(
+        latest_month=latest,
+        entities=_distinct("entidad"),
+        accounts=_distinct("id_cuenta"),
+        records=len(df),
+    )

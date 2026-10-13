@@ -17,7 +17,6 @@ def render_audit_view(df_merged=None):
     Args:
         df_merged: parametro opcional para compatibilidad futura.
     """
-    st.header("🔍 Auditoría de Respuestas")
 
     try:
         df_forms = cargar_respuestas_forms()

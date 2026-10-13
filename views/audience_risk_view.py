@@ -530,8 +530,6 @@ def _risk_row_style(row: pd.Series) -> list[str]:
 
 def render(df: pd.DataFrame | None = None) -> None:
     """Render de la vista Segmentacion de Audiencias y Riesgo."""
-    st.title("Segmentacion de Audiencias y Riesgo")
-    st.caption("Segmentacion por segmento educativo y matriz de riesgo institucional.")
 
     data = load_base_data(df)
     data = _apply_sidebar_filters(data)

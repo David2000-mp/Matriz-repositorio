@@ -1,30 +1,38 @@
+[server]
+# Sirve /static (video y póster de la landing) como archivos cacheables en
+# lugar de incrustarlos en base64 en cada rerun.
+enableStaticServing = true
+
 [theme]
 base = "light"
-primaryColor = "#FFB81C"
-backgroundColor = "#FFFFFF"
-secondaryBackgroundColor = "#F2F4F7"
-textColor = "#212529"
-linkColor = "#003696"
+primaryColor = "#1450D2"
+backgroundColor = "#F5F7FB"
+secondaryBackgroundColor = "#EAEFF7"
+textColor = "#0B1530"
+linkColor = "#1450D2"
+borderColor = "#DCE3EE"
 font = "Inter:https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap, sans-serif"
 headingFont = "Inter:https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap, sans-serif"
+codeFont = "JetBrains Mono:https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap, monospace"
 baseFontSize = 14
 baseRadius = "0.75rem"
 buttonRadius = "0.625rem"
-showSidebarBorder = true
+showSidebarBorder = false
 
-blueColor = "#003696"
+blueColor = "#1450D2"
 yellowColor = "#FFB81C"
 greenColor = "#0A7D35"
 orangeColor = "#CC7000"
 redColor = "#B42318"
-grayColor = "#6C757D"
+grayColor = "#64748B"
 
 [theme.sidebar]
 primaryColor = "#FFB81C"
-backgroundColor = "#003696"
-secondaryBackgroundColor = "#002566"
-textColor = "#FFFFFF"
+backgroundColor = "#071433"
+secondaryBackgroundColor = "#0E1F4D"
+textColor = "#E6ECF8"
 linkColor = "#FFB81C"
+borderColor = "#1B2C5C"
 headingFontSizes = ["1.5rem", "1.125rem", "1rem"]
 headingFontWeights = [700, 600, 600]
 showWidgetBorder = false

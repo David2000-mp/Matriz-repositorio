@@ -89,14 +89,11 @@ def render(df=None):
     Renderiza la vista de captura de datos priorizando Google Forms y verificación mensual.
     """
     # Configurar el sidebar
-    st.sidebar.title("Opciones de Captura")
+    st.sidebar.subheader("Opciones de captura")
     opcion = st.sidebar.radio(
         "Selecciona una opción:", ["Formulario Externo", "Carga Masiva", "Captura Anual"]
     )
 
-    st.title("📝 Captura de Datos")
-    st.caption("Registro de Métricas por Cuenta")
-    st.markdown("---")
 
     # Calcular datos faltantes
     try:

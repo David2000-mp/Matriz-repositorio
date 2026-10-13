@@ -124,9 +124,10 @@ def test_load_data_dataframes_tienen_tipos_correctos(mock_conectar_sheets):
     # df_cuentas: todas las columnas deben ser strings (object)
     for col in ["id_cuenta", "entidad", "plataforma", "usuario_red"]:
         if col in df_cuentas.columns:
-            assert (
-                df_cuentas[col].dtype == "object"
-            ), f"Columna '{col}' debe ser tipo object (string)"
+            # pandas 3 infiere StringDtype para texto; ambos cumplen el contrato.
+            assert pd.api.types.is_string_dtype(
+                df_cuentas[col]
+            ), f"Columna '{col}' debe ser de texto (object o string)"
 
     # df_metricas: fechas deben ser datetime
     if not df_metricas.empty:

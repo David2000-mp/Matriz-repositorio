@@ -129,14 +129,6 @@ def render_comparison_view():
     - Período A vs Período B (próximamente)
     """
 
-    # Header
-    st.title("📊 Comparación Lado a Lado")
-    st.markdown("""
-    Compara métricas entre dos entidades, o analiza una cuenta frente al promedio de la red Marista.
-    """)
-
-    st.divider()
-
     # Estado global
     state = get_app_state()
 

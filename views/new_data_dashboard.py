@@ -866,8 +866,6 @@ def _render_format_diagnostic(monthly: pd.DataFrame) -> None:
 
 
 def render_new_data_dashboard() -> None:
-    st.title("Tipo de contenidos")
-    st.caption("Panel ejecutivo para evaluar desempeno, calidad y oportunidades por tipo de contenido.")
 
     control_left, control_right = st.columns(2)
     with control_left:

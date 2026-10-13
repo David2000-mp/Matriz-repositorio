@@ -515,8 +515,6 @@ def _render_trace_explorer(
 def render() -> None:
     """Renderiza contexto oficial primero y análisis granular sólo si existe."""
     st.warning(SATELLITE_WARNING, icon="⚠️")
-    st.title("Módulo Satélite")
-    st.caption("Análisis granular acompañado por el contexto histórico oficial.")
 
     data = load_satellite_data()
     base_maestra, base_demografica = load_analytics_bases()

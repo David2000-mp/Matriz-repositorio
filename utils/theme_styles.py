@@ -11,18 +11,18 @@ import streamlit as st
 
 
 CHAMPI_THEME = {
-    "primary": "#003696",
+    "primary": "#1450D2",
     "primary_interactive": "#1677FF",
     "secondary": "#002566",
     "accent": "#FFB81C",
     "bg": "#FFFFFF",
-    "card": "#F2F4F7",
-    "sidebar": "#003696",
-    "text": "#212529",
-    "text_secondary": "#495057",
+    "card": "#FFFFFF",
+    "sidebar": "#071433",
+    "text": "#0B1530",
+    "text_secondary": "#55627A",
     "text_on_dark": "#FFFFFF",
-    "caption": "#6C757D",
-    "border": "#DEE2E6",
+    "caption": "#64748B",
+    "border": "#DCE3EE",
     "success": "#0A7D35",
     "danger": "#B42318",
     "warning": "#CC7000",
@@ -89,20 +89,38 @@ def get_theme_css() -> str:
     return """
     <style>
     :root {
-        --champi-primary: #003696;
+        --champi-primary: #1450D2;
+        --champi-primary-strong: #003696;
         --champi-primary-interactive: #1677FF;
         --champi-accent: #FFB81C;
+        --champi-ink: #0B1530;
+        --champi-ink-2: #071433;
         --champi-surface: #FFFFFF;
-        --champi-surface-muted: #F2F4F7;
-        --champi-text: #212529;
-        --champi-text-muted: #495057;
-        --champi-border: #DEE2E6;
-        --champi-sidebar-text: #FFFFFF;
+        --champi-canvas: #F5F7FB;
+        --champi-surface-muted: #EEF2F8;
+        --champi-text: #0B1530;
+        --champi-text-muted: #55627A;
+        --champi-border: #DCE3EE;
+        --champi-sidebar-text: #E6ECF8;
+        --champi-sidebar-muted: #8A9AC0;
+        --champi-success: #0A7D35;
+        --champi-danger: #B42318;
+        --champi-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+        --champi-shadow-sm: 0 1px 2px rgba(11, 21, 48, 0.04), 0 1px 3px rgba(11, 21, 48, 0.06);
+        --champi-shadow-md: 0 8px 24px rgba(11, 21, 48, 0.08);
     }
 
+    /* ---------- Lienzo principal ---------- */
     section[data-testid="stMain"] {
-        background: var(--champi-surface);
+        background:
+            radial-gradient(1200px 400px at 85% -120px, rgba(20, 80, 210, 0.07), transparent 70%),
+            var(--champi-canvas);
         color: var(--champi-text);
+    }
+
+    /* El header nativo está oculto: no hace falta reservarle 6rem. */
+    section[data-testid="stMain"] [data-testid="stMainBlockContainer"] {
+        padding-top: 2.25rem;
     }
 
     section[data-testid="stMain"] :is(p, label, li, h1, h2, h3, h4, h5, h6),
@@ -114,14 +132,31 @@ def get_theme_css() -> str:
         color: var(--champi-text);
     }
 
-    section[data-testid="stMain"] :is(h1, h2, h3) {
-        color: var(--champi-primary);
+    section[data-testid="stMain"] :is(h1, h2, h3, h4) {
+        color: var(--champi-ink);
+        letter-spacing: -0.015em;
     }
 
-    /* Sidebar nativo: selectores explícitos, sin universales. */
+    section[data-testid="stMain"] h1 { font-weight: 700; }
+    section[data-testid="stMain"] :is(h2, h3) { font-weight: 650; }
+
+    /* Cifras con dígitos tabulares: las columnas numéricas se alinean. */
+    section[data-testid="stMain"] :is(
+        [data-testid="stMetricValue"],
+        [data-testid="stMetricDelta"],
+        [data-testid="stDataFrame"],
+        table
+    ) {
+        font-variant-numeric: tabular-nums;
+    }
+
+    /* ---------- Sidebar ---------- */
     section[data-testid="stSidebar"] {
-        background: #003696;
+        background:
+            linear-gradient(180deg, rgba(20, 80, 210, 0.18) 0%, transparent 220px),
+            var(--champi-ink-2);
         color: var(--champi-sidebar-text);
+        border-right: 1px solid rgba(255, 255, 255, 0.06);
     }
 
     [data-testid="stSidebarHeader"] {
@@ -170,26 +205,32 @@ def get_theme_css() -> str:
     [data-testid="stLogo"] img,
     [data-testid="stSidebarLogo"],
     [data-testid="stSidebarHeader"] img {
-        /* Activo recortado sin margen transparente: se muestra completo. */
-        height: 48px !important;
+        height: 44px !important;
         min-height: 0 !important;
-        max-height: 48px !important;
+        max-height: 44px !important;
         width: auto !important;
         max-width: 100% !important;
         flex: 0 0 auto !important;
         object-fit: contain !important;
     }
 
-    /* Streamlit aplica colores internos sobre los PageLink. Esta regla se
-       limita al nav nativo y gana la cascada en todos sus nodos hijos. */
     [data-testid="stSidebarNav"] * {
-        color: #FFFFFF !important;
+        color: var(--champi-sidebar-text) !important;
     }
 
     [data-testid="stSidebarNav"] svg {
-        color: #FFFFFF !important;
-        fill: #FFFFFF !important;
-        stroke: currentColor !important;
+        color: var(--champi-sidebar-text) !important;
+    }
+
+    /* Encabezados de grupo del menú: etiqueta técnica en monoespaciada. */
+    [data-testid="stNavSectionHeader"],
+    [data-testid="stNavSectionHeader"] * {
+        font-family: var(--champi-mono) !important;
+        font-size: 0.68rem !important;
+        font-weight: 500 !important;
+        letter-spacing: 0.12em !important;
+        text-transform: uppercase !important;
+        color: var(--champi-sidebar-muted) !important;
     }
 
     section[data-testid="stSidebar"] :is(h1, h2, h3, p, label, a),
@@ -197,7 +238,7 @@ def get_theme_css() -> str:
     section[data-testid="stSidebarNav"] a span:not([data-testid="stIconMaterial"]),
     section[data-testid="stSidebar"] [data-testid="stPageLink"] a,
     section[data-testid="stSidebar"] [data-testid="stPageLink"] a span:not([data-testid="stIconMaterial"]) {
-        color: #FFFFFF !important;
+        color: var(--champi-sidebar-text) !important;
     }
 
     section[data-testid="stSidebarNav"] a,
@@ -205,41 +246,33 @@ def get_theme_css() -> str:
         display: flex;
         align-items: center;
         gap: 0.625rem;
-        min-height: 2.5rem;
-        border-radius: 0.625rem;
+        min-height: 2.35rem;
+        border-radius: 0.5rem;
         line-height: 1.25;
         text-decoration: none;
-        transform: translateX(0);
-        transition:
-            transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1),
-            background-color 180ms ease,
-            box-shadow 180ms ease;
-        will-change: transform;
+        transition: background-color 160ms ease, box-shadow 160ms ease;
     }
 
     section[data-testid="stSidebarNav"] a:not([aria-current="page"]):hover,
     section[data-testid="stSidebar"] [data-testid="stPageLink"] a:not([aria-current="page"]):hover {
-        background: rgba(255, 255, 255, 0.09) !important;
-        box-shadow: 0 4px 14px rgba(0, 24, 64, 0.18);
-        transform: translateX(4px);
-    }
-
-    section[data-testid="stSidebarNav"] a:active,
-    section[data-testid="stSidebar"] [data-testid="stPageLink"] a:active {
-        transform: translateX(2px) scale(0.99);
+        background: rgba(255, 255, 255, 0.06) !important;
     }
 
     section[data-testid="stSidebarNav"] a[aria-current="page"],
     section[data-testid="stSidebar"] [data-testid="stPageLink"] a[aria-current="page"],
     section[data-testid="stSidebarNav"] [data-testid="stPageLink"]:has(a[aria-current="page"]) {
-        background: rgba(255, 255, 255, 0.10) !important;
-        box-shadow: inset 3px 0 0 #FFB81C;
+        background: linear-gradient(90deg, rgba(255, 184, 28, 0.16), rgba(255, 184, 28, 0.02)) !important;
+        box-shadow: inset 2px 0 0 var(--champi-accent);
     }
 
     section[data-testid="stSidebarNav"] a[aria-current="page"] span,
     section[data-testid="stSidebar"] [data-testid="stPageLink"] a[aria-current="page"] span {
         color: #FFFFFF !important;
-        font-weight: 650;
+        font-weight: 600;
+    }
+
+    section[data-testid="stSidebarNav"] a[aria-current="page"] [data-testid="stIconMaterial"] {
+        color: var(--champi-accent) !important;
     }
 
     section[data-testid="stSidebar"] [data-testid="stIconMaterial"],
@@ -247,114 +280,148 @@ def get_theme_css() -> str:
         font-family: "Material Symbols Rounded", "Material Symbols Outlined" !important;
         font-weight: normal !important;
         font-style: normal !important;
-        font-size: 1.25rem !important;
-        transform: scale(1);
-        transform-origin: center;
-        transition: transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
+        font-size: 1.15rem !important;
         line-height: 1 !important;
         letter-spacing: normal !important;
         text-transform: none !important;
         white-space: nowrap !important;
-        color: #FFFFFF !important;
-        fill: #FFFFFF !important;
-    }
-
-    section[data-testid="stSidebarNav"] a:hover [data-testid="stIconMaterial"],
-    section[data-testid="stSidebar"] [data-testid="stPageLink"] a:hover [data-testid="stIconMaterial"] {
-        transform: scale(1.08);
+        color: var(--champi-sidebar-muted) !important;
     }
 
     section[data-testid="stSidebar"] svg,
     section[data-testid="stSidebarNav"] svg {
-        color: #FFFFFF !important;
-        fill: currentColor !important;
-        stroke: currentColor;
+        color: var(--champi-sidebar-text) !important;
     }
 
-    section[data-testid="stSidebar"] [data-testid="stSelectbox"] [data-baseweb="select"] {
-        background: #FFFFFF !important;
-        color: #002566 !important;
-        border-color: rgba(255, 255, 255, 0.65) !important;
+    section[data-testid="stSidebar"] [data-testid="stSelectbox"] [data-baseweb="select"] > div {
+        background: rgba(255, 255, 255, 0.06) !important;
+        border: 1px solid rgba(255, 255, 255, 0.14) !important;
     }
 
     section[data-testid="stSidebar"] [data-testid="stSelectbox"] [data-baseweb="select"] :is(div, span, input, svg) {
-        color: #002566 !important;
-        fill: currentColor !important;
+        color: #FFFFFF !important;
     }
 
-    section[data-testid="stSidebar"] [data-testid="stSelectbox"] [data-baseweb="select"] input::placeholder {
-        color: #495057 !important;
-        opacity: 1;
+    section[data-testid="stSidebar"] [data-testid="stSelectbox"] label p {
+        font-family: var(--champi-mono) !important;
+        font-size: 0.7rem !important;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--champi-sidebar-muted) !important;
     }
 
+    section[data-testid="stSidebar"] .stButton > button {
+        background: transparent;
+        color: var(--champi-sidebar-text);
+        border: 1px solid rgba(255, 255, 255, 0.16);
+    }
+
+    section[data-testid="stSidebar"] .stButton > button:hover {
+        background: rgba(255, 255, 255, 0.06);
+        border-color: var(--champi-accent);
+        color: #FFFFFF;
+    }
+
+    /* ---------- Controles del área principal ---------- */
     section[data-testid="stMain"] :is(input, textarea, [role="combobox"]) {
         background: #FFFFFF;
         color: var(--champi-text);
-        border: 1px solid var(--champi-border);
         border-radius: 0.625rem;
     }
 
     section[data-testid="stMain"] :is(input, textarea, [role="combobox"]):focus-within {
-        border-color: var(--champi-primary-interactive);
-        box-shadow: 0 0 0 3px rgba(22, 119, 255, 0.15);
+        border-color: var(--champi-primary);
+        box-shadow: 0 0 0 3px rgba(20, 80, 210, 0.15);
     }
 
-    [data-testid="stMetric"],
-    [data-testid="stDataFrame"],
-    div[data-testid="stVerticalBlockBorderWrapper"] {
+    /* ---------- Superficies: tarjetas, KPIs y tablas ---------- */
+    section[data-testid="stMain"] [data-testid="stExpander"] details {
+        background: var(--champi-surface);
         border-color: var(--champi-border);
-        border-radius: 0.75rem;
+        border-radius: 0.875rem;
+        box-shadow: var(--champi-shadow-sm);
     }
 
     [data-testid="stMetric"] {
-        background: var(--champi-surface-muted);
-        padding: 1rem;
+        background: var(--champi-surface);
+        border: 1px solid var(--champi-border);
+        border-radius: 0.875rem;
+        padding: 0.95rem 1.1rem 1rem;
+        box-shadow: var(--champi-shadow-sm);
+        position: relative;
+        overflow: hidden;
     }
 
-    section[data-testid="stMain"] [data-testid="stMetric"],
-    section[data-testid="stMain"] [data-testid="stPlotlyChart"],
-    section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"] {
-        transition:
-            transform 180ms ease,
-            box-shadow 180ms ease,
-            border-color 180ms ease;
+    /* Línea de acento superior: firma visual de los KPIs. */
+    [data-testid="stMetric"]::before {
+        content: "";
+        position: absolute;
+        inset: 0 0 auto 0;
+        height: 2px;
+        background: linear-gradient(90deg, var(--champi-primary), var(--champi-primary-interactive) 60%, var(--champi-accent));
+        opacity: 0.85;
     }
 
-    section[data-testid="stMain"] [data-testid="stMetric"]:hover,
-    section[data-testid="stMain"] div[data-testid="stVerticalBlockBorderWrapper"]:hover {
-        border-color: rgba(22, 119, 255, 0.35);
-        box-shadow: 0 10px 28px rgba(0, 54, 150, 0.10);
-        transform: translateY(-2px);
+    [data-testid="stMetricLabel"],
+    [data-testid="stMetricLabel"] p {
+        font-family: var(--champi-mono) !important;
+        font-size: 0.7rem !important;
+        font-weight: 500 !important;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--champi-text-muted) !important;
     }
 
-    section[data-testid="stMain"] [data-testid="stPlotlyChart"],
+    [data-testid="stMetricValue"],
+    [data-testid="stMetricValue"] div {
+        font-family: var(--champi-mono) !important;
+        font-weight: 600 !important;
+        letter-spacing: -0.02em;
+        color: var(--champi-ink) !important;
+    }
+
+    [data-testid="stMetricDelta"] {
+        font-family: var(--champi-mono) !important;
+        font-size: 0.78rem !important;
+    }
+
+    section[data-testid="stMain"] [data-testid="stDataFrame"] {
+        border: 1px solid var(--champi-border);
+        border-radius: 0.75rem;
+        overflow: hidden;
+        background: var(--champi-surface);
+    }
+
+    section[data-testid="stMain"] [data-testid="stPlotlyChart"] {
+        background: var(--champi-surface);
+        border: 1px solid var(--champi-border);
+        border-radius: 0.875rem;
+        padding: 0.5rem 0.5rem 0.25rem;
+        box-shadow: var(--champi-shadow-sm);
+        animation: champi-fade-up 240ms ease-out both;
+    }
+
     section[data-testid="stMain"] [data-testid="stAlert"] {
+        border-radius: 0.75rem;
         animation: champi-fade-up 240ms ease-out both;
     }
 
     .stButton > button,
     .stDownloadButton > button {
         border-radius: 0.625rem;
-        transition: transform 150ms ease, box-shadow 150ms ease;
+        font-weight: 500;
+        transition: background-color 150ms ease, border-color 150ms ease, box-shadow 150ms ease;
     }
 
-    .stButton > button[kind="primary"],
-    .stDownloadButton > button[kind="primary"] {
-        background: var(--champi-primary);
-        color: #FFFFFF;
+    section[data-testid="stMain"] .stButton > button:hover,
+    section[data-testid="stMain"] .stDownloadButton > button:hover {
         border-color: var(--champi-primary);
-    }
-
-    .stButton > button:hover,
-    .stDownloadButton > button:hover {
-        border-color: var(--champi-accent);
-        transform: translateY(-1px);
+        color: var(--champi-primary);
     }
 
     .stButton > button:active,
     .stDownloadButton > button:active {
-        box-shadow: none;
-        transform: translateY(0) scale(0.98);
+        transform: scale(0.98);
     }
 
     [data-baseweb="tab-list"] {
@@ -364,59 +431,161 @@ def get_theme_css() -> str:
 
     [data-baseweb="tab"][aria-selected="true"] {
         color: var(--champi-primary);
-        border-bottom-color: var(--champi-accent);
     }
 
     [data-baseweb="tab"] {
         transition: color 160ms ease, background-color 160ms ease;
     }
 
-    /* Animación suave (Fade & Slide Up) para páginas y pestañas */
     @keyframes fade-slide-in {
-        0% { opacity: 0; transform: translateY(12px); }
+        0% { opacity: 0; transform: translateY(8px); }
         100% { opacity: 1; transform: translateY(0); }
     }
 
-    [data-testid="stMainBlock"],
     [data-testid="stTabContent"],
     .stTabs [role="tabpanel"] {
-        animation: fade-slide-in 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
-    }
-
-    [data-testid="stTabs"] button {
-        transition: color 0.2s ease, border-color 0.2s ease;
-    }
-
-    /* Efecto hover genérico para tarjetas/métricas */
-    .metric-card-hover {
-        transition: all 0.3s ease;
-    }
-    .metric-card-hover:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 8px 24px rgba(0,0,0,0.12);
-    }
-
-    /* El video fijo de la landing no debe heredar un contenedor transformado. */
-    [data-testid="stMainBlock"]:has(.hero-bg-video) {
-        animation: none;
-        transform: none;
+        animation: fade-slide-in 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) both;
     }
 
     @keyframes champi-fade-up {
-        from {
-            opacity: 0;
-            transform: translateY(6px);
-        }
-        to {
-            opacity: 1;
-            transform: translateY(0);
-        }
+        from { opacity: 0; transform: translateY(6px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ---------- Componentes propios (components/ui.py) ---------- */
+    .cl-header {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 0.75rem 1.5rem;
+        padding: 0.25rem 0 1.1rem;
+        margin-bottom: 0.4rem;
+        border-bottom: 1px solid var(--champi-border);
+    }
+
+    .cl-eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-family: var(--champi-mono);
+        font-size: 0.7rem;
+        font-weight: 500;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--champi-primary);
+        margin: 0 0 0.35rem;
+    }
+
+    .cl-eyebrow::before {
+        content: "";
+        width: 14px;
+        height: 2px;
+        background: var(--champi-accent);
+        border-radius: 2px;
+    }
+
+    section[data-testid="stMain"] h1.cl-title {
+        font-size: clamp(1.6rem, 2.4vw, 2.1rem);
+        line-height: 1.15;
+        font-weight: 700;
+        letter-spacing: -0.025em;
+        margin: 0;
+        padding: 0;
+        color: var(--champi-ink);
+    }
+
+    /* El ancla automática de Streamlit no aporta en estos encabezados y en
+       pantallas estrechas salta a una segunda línea. */
+    :is(h1.cl-title, h1.cl-hero-title) [data-testid="stHeaderActionElements"] {
+        display: none !important;
+    }
+
+    section[data-testid="stMain"] p.cl-subtitle {
+        margin: 0.4rem 0 0;
+        max-width: 72ch;
+        font-size: 0.95rem;
+        color: var(--champi-text-muted);
+    }
+
+    .cl-chips {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.4rem;
+    }
+
+    .cl-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        padding: 0.28rem 0.6rem;
+        border: 1px solid var(--champi-border);
+        border-radius: 999px;
+        background: var(--champi-surface);
+        font-family: var(--champi-mono);
+        font-size: 0.72rem;
+        color: var(--champi-text-muted);
+        white-space: nowrap;
+    }
+
+    .cl-chip b {
+        font-weight: 600;
+        color: var(--champi-ink);
+    }
+
+    .cl-chip--filter {
+        border-color: rgba(20, 80, 210, 0.35);
+        background: rgba(20, 80, 210, 0.06);
+        color: var(--champi-primary);
+    }
+
+    .cl-dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--champi-success);
+        box-shadow: 0 0 0 0 rgba(10, 125, 53, 0.45);
+        animation: cl-pulse 2.4s ease-out infinite;
+    }
+
+    .cl-dot--idle {
+        background: #94A3B8;
+        animation: none;
+    }
+
+    @keyframes cl-pulse {
+        0% { box-shadow: 0 0 0 0 rgba(10, 125, 53, 0.45); }
+        70% { box-shadow: 0 0 0 7px rgba(10, 125, 53, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(10, 125, 53, 0); }
+    }
+
+    .cl-section-label {
+        font-family: var(--champi-mono);
+        font-size: 0.7rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--champi-text-muted);
+        margin: 0 0 0.6rem;
+    padding-top: 1.5rem;
+    }
+
+    .cl-sidebar-status {
+        font-family: var(--champi-mono);
+        font-size: 0.68rem;
+        line-height: 1.6;
+        color: var(--champi-sidebar-muted);
+    }
+
+    .cl-sidebar-status b {
+        color: var(--champi-sidebar-text);
+        font-weight: 500;
     }
 
     /*
-     * Capa responsive compartida. Las vistas usan columnas, tablas y grÃ¡ficas
+     * Capa responsive compartida. Las vistas usan columnas, tablas y gráficas
      * nativas; estas reglas conservan su comportamiento sin exigir que cada
-     * pantalla implemente una versiÃ³n mÃ³vil independiente.
+     * pantalla implemente una versión móvil independiente.
      */
     @media (max-width: 1024px) {
         section[data-testid="stMain"] [data-testid="stMainBlockContainer"] {
@@ -456,7 +625,7 @@ def get_theme_css() -> str:
     @media (max-width: 767px) {
         html {
             -webkit-text-size-adjust: 100%;
-            -webkit-tap-highlight-color: rgba(0, 54, 150, 0.2) !important;
+            -webkit-tap-highlight-color: rgba(20, 80, 210, 0.2) !important;
         }
 
         [data-testid="stAppViewContainer"],
@@ -475,13 +644,6 @@ def get_theme_css() -> str:
             padding-left: 1rem !important;
             padding-right: 1rem !important;
             padding-bottom: calc(1.5rem + env(safe-area-inset-bottom)) !important;
-        }
-
-        section[data-testid="stMain"] [data-testid="stMainBlockContainer"]:has(
-            .hero-bg-video
-        ) {
-            margin: 0 !important;
-            padding: 0 !important;
         }
 
         section[data-testid="stMain"] :is(
@@ -521,7 +683,7 @@ def get_theme_css() -> str:
 
         /*
          * La captura anual construye una matriz de 12 meses con etiquetas
-         * colapsadas. En mÃ³vil ocultamos su cabecera duplicada y recuperamos
+         * colapsadas. En móvil ocultamos su cabecera duplicada y recuperamos
          * la etiqueta completa junto a cada campo para que el apilado conserve
          * el contexto de mes y plataforma.
          */
@@ -582,22 +744,13 @@ def get_theme_css() -> str:
             text-align: center !important;
         }
 
+        /* Los KPIs conservan la alineación izquierda: etiqueta, valor y
+           variación se leen como una columna. */
         section[data-testid="stMain"] :is(
             [data-testid="stCaptionContainer"],
-            [data-testid="stMetric"],
-            [data-testid="stMetricLabel"],
-            [data-testid="stMetricValue"],
-            [data-testid="stMetricDelta"],
             .kpi-card
         ) {
             text-align: center !important;
-        }
-
-        section[data-testid="stMain"] :is(
-            [data-testid="stMetricLabel"],
-            [data-testid="stMetricDelta"]
-        ) {
-            justify-content: center !important;
         }
 
         section[data-testid="stMain"] :is(img, video, canvas, svg) {
@@ -605,8 +758,8 @@ def get_theme_css() -> str:
         }
 
         /*
-         * 16px evita el zoom automÃ¡tico de iOS; 44px es el objetivo tÃ¡ctil
-         * mÃ­nimo para acciones y controles frecuentes.
+         * 16px evita el zoom automático de iOS; 44px es el objetivo táctil
+         * mínimo para acciones y controles frecuentes.
          */
         section[data-testid="stMain"] :is(input, textarea, [role="combobox"]) {
             min-width: 0 !important;
@@ -724,7 +877,7 @@ def get_theme_css() -> str:
             z-index: 100002 !important;
             height: 100dvh !important;
             max-height: 100dvh !important;
-            background: #003696 !important;
+            background: var(--champi-ink-2) !important;
             box-shadow: none !important;
             padding-bottom: env(safe-area-inset-bottom) !important;
         }
@@ -736,7 +889,7 @@ def get_theme_css() -> str:
 
         section[data-testid="stSidebar"] [data-testid="stSidebarContent"] {
             height: 100% !important;
-            background: #003696 !important;
+            background: var(--champi-ink-2) !important;
             overflow-x: hidden;
             overscroll-behavior: contain;
             -webkit-overflow-scrolling: touch;
@@ -749,20 +902,12 @@ def get_theme_css() -> str:
             overflow: auto;
         }
 
-        /* El viewport mÃ³vil cambia al mostrar/ocultar la barra del navegador. */
-        .hero-bg-video,
-        .hero-overlay {
-            width: 100% !important;
-            height: 100svh !important;
-            min-height: 100svh !important;
-        }
+    }
 
-        .glass-box {
-            max-width: calc(100vw - 2rem) !important;
-            touch-action: pan-y !important;
-            cursor: default !important;
-            animation: none !important;
-            transform: none !important;
+    @media (max-width: 767px) {
+        section[data-testid="stMain"] h1.cl-title {
+            text-align: left !important;
+            margin: 0 !important;
         }
     }
 
@@ -791,13 +936,6 @@ def get_theme_css() -> str:
 
         section[data-testid="stMain"] [data-baseweb="tab"] {
             font-size: 0.875rem !important;
-        }
-    }
-
-    @media (max-width: 767px) and (orientation: landscape) {
-        .hero-bg-video,
-        .hero-overlay {
-            min-height: 100svh !important;
         }
     }
 
@@ -906,9 +1044,13 @@ def inject_layout_compact_css(hide_streamlit_header: bool = False) -> None:
             visibility: visible;
             opacity: 1;
             color: #FFFFFF;
-            background: rgba(255,255,255,.18);
-            border: 1px solid rgba(255,255,255,.5);
+            background: #071433;
+            border: 1px solid rgba(255,255,255,.18);
+            box-shadow: 0 4px 14px rgba(11,21,48,.18);
             border-radius: .5rem;
+        }}
+        button[data-testid="stExpandSidebarButton"] [data-testid="stIconMaterial"] {{
+            color: #FFFFFF !important;
         }}
         button[data-testid="stExpandSidebarButton"]:focus-visible,
         div[data-testid="stSidebarCollapseButton"] button:focus-visible {{
